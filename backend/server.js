@@ -1,5 +1,6 @@
 require('dotenv').config();
 const express = require('express');
+const cors = require('cors');
 const { createClient } = require('@supabase/supabase-js');
 
 const app = express();
@@ -10,6 +11,7 @@ const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_ANON_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
+app.use(cors());
 app.use(express.json());
 
 // Middleware for authentication
@@ -172,6 +174,44 @@ app.post('/api/create-checkout-session', authenticateToken, async (req, res) => 
     // res.json({ url: session.url });
 
     res.status(501).json({ message: "Payment gateway not yet implemented. Cash on Delivery is assumed." });
+});
+
+// Review Routes
+app.get('/api/products/:id/reviews', async (req, res) => {
+    const { id } = req.params;
+    const { data, error } = await supabase
+        .from('reviews')
+        .select(`
+            *,
+            users (name)
+        `)
+        .eq('product_id', id);
+    
+    if (error) return res.status(500).json({ error: error.message });
+    res.json(data);
+});
+
+app.post('/api/products/:id/reviews', authenticateToken, async (req, res) => {
+    const { id } = req.params;
+    const { rating, comment } = req.body;
+    const { user } = req;
+
+    const { data, error } = await supabase
+        .from('reviews')
+        .insert([{
+            product_id: id,
+            user_id: user.id,
+            rating,
+            comment
+        }])
+        .select(`
+            *,
+            users (name)
+        `)
+        .single();
+
+    if (error) return res.status(500).json({ error: error.message });
+    res.status(201).json(data);
 });
 
 app.listen(port, () => {
