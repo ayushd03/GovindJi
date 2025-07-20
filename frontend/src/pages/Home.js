@@ -7,33 +7,61 @@ import { productsAPI } from '../services/api';
 
 const Home = () => {
   const [featuredProducts, setFeaturedProducts] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    const fetchFeaturedProducts = async () => {
+    const fetchData = async () => {
       try {
-        const response = await productsAPI.getAll();
-        setFeaturedProducts(response.data.slice(0, 8));
+        // Fetch products and categories in parallel
+        const [productsResponse, categoriesResponse] = await Promise.all([
+          productsAPI.getAll(),
+          fetch('/api/categories').then(res => res.json())
+        ]);
+        
+        setFeaturedProducts(productsResponse.data.slice(0, 8));
+        setCategories(categoriesResponse);
       } catch (err) {
-        setError('Failed to load products');
-        console.error('Error fetching products:', err);
+        setError('Failed to load data');
+        console.error('Error fetching data:', err);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchFeaturedProducts();
+    fetchData();
   }, []);
 
-  const categories = [
-    { name: 'Almonds', image: '🌰', color: 'from-amber-400 to-orange-500' },
-    { name: 'Cashews', image: '🥜', color: 'from-yellow-400 to-amber-500' },
-    { name: 'Pistachios', image: '🌰', color: 'from-green-400 to-emerald-500' },
-    { name: 'Walnuts', image: '🌰', color: 'from-brown-400 to-amber-600' },
-    { name: 'Dates', image: '🫐', color: 'from-red-400 to-pink-500' },
-    { name: 'Raisins', image: '🍇', color: 'from-purple-400 to-indigo-500' },
-  ];
+  // Category background image mapping with fallback gradients
+  const getCategoryBackground = (categoryName) => {
+    const backgrounds = {
+      'Nuts': {
+        image: '/category-backgrounds/nuts.jpg',
+        gradient: 'from-amber-400 to-orange-500'
+      },
+      'Dried Fruits': {
+        image: '/category-backgrounds/dried-fruits.jpg',
+        gradient: 'from-red-400 to-pink-500'
+      },
+      'Seeds': {
+        image: '/category-backgrounds/seeds.jpg',
+        gradient: 'from-green-400 to-emerald-500'
+      },
+      'Spices': {
+        image: '/category-backgrounds/spices.jpg',
+        gradient: 'from-yellow-400 to-amber-500'
+      },
+      'Traditional Sweets': {
+        image: '/category-backgrounds/sweets.jpg',
+        gradient: 'from-purple-400 to-indigo-500'
+      }
+    };
+    return backgrounds[categoryName] || {
+      image: '/category-backgrounds/default.jpg',
+      gradient: 'from-gray-400 to-gray-600'
+    };
+  };
 
   const features = [
     {
@@ -98,7 +126,7 @@ const Home = () => {
     <div className="min-h-screen">
       {/* Hero Section */}
       <motion.section 
-        className="relative min-h-screen flex items-center justify-center overflow-hidden"
+        className="relative min-h-screen flex items-center justify-center overflow-hidden pt-0"
         style={{
           backgroundImage: `url(${process.env.PUBLIC_URL}/hero_bgg.webp)`,
           backgroundSize: 'cover',
@@ -123,7 +151,7 @@ const Home = () => {
           transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
         />
 
-        <div className="relative z-10 container mx-auto px-4 text-center text-white">
+        <div className="relative z-10 container mx-auto px-1 text-center text-white">
           <motion.div
             initial={{ opacity: 0, y: 50 }}
             animate={{ opacity: 1, y: 0 }}
@@ -149,8 +177,8 @@ const Home = () => {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8, delay: 0.6 }}
             >
-              Your premium destination for the finest dry fruits and nuts, 
-              handpicked for quality and freshness
+              Your one-stop shop for the finest dry fruits and nuts,
+              handpicked for exceptional quality and guaranteed freshness
             </motion.p>
             
             <motion.div
@@ -163,7 +191,7 @@ const Home = () => {
                 <motion.button
                   whileHover={{ scale: 1.05, y: -2 }}
                   whileTap={{ scale: 0.95 }}
-                  className="bg-white text-primary-accent px-8 py-4 rounded-full font-semibold text-lg shadow-2xl hover:shadow-3xl transition-all duration-300 flex items-center space-x-2"
+                  className="bg-white text-gray-800 px-8 py-4 rounded-full font-semibold text-lg shadow-2xl hover:shadow-3xl transition-all duration-300 flex items-center space-x-2"
                 >
                   <span>Shop Now</span>
                   <ArrowRight className="w-5 h-5" />
@@ -174,7 +202,7 @@ const Home = () => {
                 className="flex items-center space-x-2 text-white/90"
                 whileHover={{ scale: 1.02 }}
               >
-                <div className="flex -space-x-2">
+                <div className="flex space-x-1">
                   {[1, 2, 3, 4, 5].map((star) => (
                     <Star key={star} className="w-5 h-5 fill-yellow-400 text-yellow-400" />
                   ))}
@@ -191,7 +219,7 @@ const Home = () => {
         className="section-padding bg-gradient-to-br from-light-gray to-white"
         {...fadeInUp}
       >
-        <div className="container mx-auto px-4">
+        <div className="container mx-auto px-1">
           <motion.div className="text-center mb-16" {...fadeInUp}>
             <h2 className="text-4xl md:text-5xl font-bold text-primary-text mb-4">
               Shop by Category
@@ -202,33 +230,49 @@ const Home = () => {
           </motion.div>
           
           <motion.div 
-            className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6"
+            className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6"
             variants={stagger}
             initial="initial"
             whileInView="animate"
             viewport={{ once: true }}
           >
-            {categories.map((category, index) => (
-              <motion.div
-                key={category.name}
-                variants={fadeInUp}
-                whileHover={{ scale: 1.05, y: -5 }}
-                className="group cursor-pointer"
-              >
-                <div className={`relative bg-gradient-to-br ${category.color} rounded-2xl p-8 text-center shadow-lg group-hover:shadow-xl transition-all duration-300`}>
-                  <div className="text-4xl mb-4">{category.image}</div>
-                  <h3 className="text-white font-semibold text-lg">{category.name}</h3>
-                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 rounded-2xl transition-all duration-300" />
-                </div>
-              </motion.div>
-            ))}
+            {categories.map((category, index) => {
+              const bgConfig = getCategoryBackground(category.name);
+              return (
+                <motion.div
+                  key={category.id || category.name}
+                  variants={fadeInUp}
+                  whileHover={{ scale: 1.05, y: -5 }}
+                  className="group cursor-pointer"
+                >
+                  <div 
+                    className={`relative h-48 rounded-2xl p-6 text-center shadow-lg group-hover:shadow-xl transition-all duration-300 bg-gradient-to-br ${bgConfig.gradient}`}
+                    style={{
+                      backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.3), rgba(0, 0, 0, 0.5)), url('${bgConfig.image}')`,
+                      backgroundSize: 'cover',
+                      backgroundPosition: 'center',
+                      backgroundBlendMode: 'overlay'
+                    }}
+                  >
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent rounded-2xl" />
+                    <div className="relative z-10 h-full flex flex-col justify-end">
+                      <h3 className="text-white font-bold text-xl mb-2 drop-shadow-lg">{category.name}</h3>
+                      <div className="text-white/90 text-sm font-medium opacity-80 group-hover:opacity-100 transition-opacity">
+                        Shop Now →
+                      </div>
+                    </div>
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 rounded-2xl transition-all duration-300" />
+                  </div>
+                </motion.div>
+              );
+            })}
           </motion.div>
         </div>
       </motion.section>
 
       {/* Featured Products Section */}
       <motion.section className="section-padding bg-white" {...fadeInUp}>
-        <div className="container mx-auto px-4">
+        <div className="container mx-auto px-1">
           <motion.div className="text-center mb-16" {...fadeInUp}>
             <h2 className="text-4xl md:text-5xl font-bold text-primary-text mb-4">
               Featured Products
@@ -284,7 +328,7 @@ const Home = () => {
         className="section-padding bg-gradient-to-br from-primary-accent/5 to-secondary-accent/5"
         {...fadeInUp}
       >
-        <div className="container mx-auto px-4">
+        <div className="container mx-auto px-1">
           <motion.div className="text-center mb-16" {...fadeInUp}>
             <h2 className="text-4xl md:text-5xl font-bold text-primary-text mb-4">
               Why Choose GovindJi Dry Fruits?
@@ -332,7 +376,7 @@ const Home = () => {
         className="section-padding bg-gradient-to-r from-primary-accent to-secondary-accent text-white"
         {...fadeInUp}
       >
-        <div className="container mx-auto px-4 text-center">
+        <div className="container mx-auto px-1 text-center">
           <motion.div {...fadeInUp}>
             <h2 className="text-4xl md:text-5xl font-bold mb-6">
               Ready to Experience Premium Quality?
@@ -345,7 +389,7 @@ const Home = () => {
               <motion.button
                 whileHover={{ scale: 1.05, y: -2 }}
                 whileTap={{ scale: 0.95 }}
-                className="bg-white text-primary-accent px-8 py-4 rounded-full font-semibold text-lg shadow-2xl hover:shadow-3xl transition-all duration-300 inline-flex items-center space-x-2"
+                className="bg-white text-gray-800 px-8 py-4 rounded-full font-semibold text-lg shadow-2xl hover:shadow-3xl transition-all duration-300 inline-flex items-center space-x-2"
               >
                 <span>Start Shopping</span>
                 <ArrowRight className="w-5 h-5" />

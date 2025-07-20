@@ -37,7 +37,7 @@ const Footer = () => {
     <footer className="bg-footer-bg text-white mt-auto">
       {/* Main Footer Content */}
       <motion.div 
-        className="container mx-auto px-4 pt-20 pb-16"
+        className="container mx-auto px-2 pt-20 pb-16"
         variants={stagger}
         initial="initial"
         whileInView="whileInView"
@@ -205,7 +205,7 @@ const Footer = () => {
         transition={{ duration: 0.6, delay: 0.3 }}
         viewport={{ once: true }}
       >
-        <div className="container mx-auto px-4">
+        <div className="container mx-auto px-2">
           <div className="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
             <div className="flex items-center space-x-2 text-gray-300">
               <span>&copy; 2024 GovindJi Dry Fruits. All rights reserved.</span>

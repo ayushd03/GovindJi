@@ -42,24 +42,26 @@ const Header = () => {
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
         isScrolled 
           ? 'bg-white/95 backdrop-blur-md shadow-lg' 
-          : 'bg-white'
+          : 'bg-white/85 backdrop-blur-xl shadow-sm'
       }`}
       initial={{ y: -100 }}
       animate={{ y: 0 }}
       transition={{ duration: 0.5 }}
     >
-      <div className="container mx-auto px-4">
+      <div className="container mx-auto px-1">
         <div className="flex items-center justify-between h-20">
           {/* Logo */}
           <motion.div
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
+            className="relative"
           >
-            <Link to="/" className="flex items-center">
+            <Link to="/" className="flex items-center relative">
+              <div className="absolute inset-0 bg-white/20 backdrop-blur-sm rounded-lg -m-2 shadow-sm"></div>
               <img 
                 src="/Govindji_Logo.webp" 
                 alt="GovindJi Dry Fruits" 
-                className="h-16 w-auto transition-transform duration-300"
+                className="h-16 w-auto transition-transform duration-300 relative z-10"
               />
             </Link>
           </motion.div>
@@ -109,7 +111,7 @@ const Header = () => {
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: 10 }}
-                      className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-100 py-2"
+                      className="absolute right-0 mt-2 w-48 bg-white/95 backdrop-blur-md rounded-lg shadow-lg border border-gray-100/50 py-2"
                     >
                       <Link
                         to="/orders"
@@ -208,9 +210,9 @@ const Header = () => {
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
-            className="lg:hidden bg-white border-t border-gray-100"
+            className="lg:hidden bg-white/95 backdrop-blur-md border-t border-gray-100/50"
           >
-            <div className="container mx-auto px-4 py-4 space-y-4">
+            <div className="container mx-auto px-1 py-4 space-y-4">
               <Link 
                 to="/products" 
                 className="block text-primary-text hover:text-primary-accent transition-colors duration-300 font-medium py-2"

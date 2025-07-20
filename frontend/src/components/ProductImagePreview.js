@@ -26,8 +26,12 @@ const ProductImagePreview = ({ productId, fallbackImageUrl = null, className = '
       alt="Product preview"
       className={`product-preview-image ${className}`}
       onError={(e) => {
-        e.target.style.display = 'none';
-        e.target.nextElementSibling.style.display = 'flex';
+        if (e.target) {
+          e.target.style.display = 'none';
+          if (e.target.nextElementSibling) {
+            e.target.nextElementSibling.style.display = 'flex';
+          }
+        }
       }}
       style={{ display: 'block' }}
     />

@@ -45,7 +45,7 @@
   --box-shadow-hover: 0 6px 20px rgba(0, 0, 0, 0.12);
   
   /* Container Max Width */
-  --container-max-width: 1280px;
+  --container-max-width: 1600px;
 }
 
 /* Custom Base Styles using Tailwind's @layer directive */
@@ -88,7 +88,7 @@
 /* Custom Component Classes using Tailwind's @layer directive */
 @layer components {
   .container {
-    @apply max-w-container mx-auto px-4 md:px-6;
+    @apply max-w-container mx-auto px-4 md:px-6 lg:px-8;
   }
 
   .btn-primary {
@@ -112,7 +112,7 @@
   }
 
   .section-padding {
-    @apply py-16 lg:py-24;
+    @apply py-20 lg:py-28;
   }
 
   .hero-section {
