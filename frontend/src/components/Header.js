@@ -26,7 +26,7 @@ const Header = () => {
     <header className="header">
       <div className="header-container">
         <Link to="/" className="logo">
-          <img src="/Govindji_Logo.webp " alt="GovindJi Dry Fruits" className="logo-image" />
+          <img src="/Govindji_Logo.webp" alt="GovindJi Dry Fruits" className="logo-image" />
         </Link>
 
         <form className="search-form" onSubmit={handleSearch}>

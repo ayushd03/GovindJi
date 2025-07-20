@@ -32,7 +32,9 @@ const ProductCard = ({ product }) => {
               src={primaryImage || '/placeholder-product.jpg'}
               alt={product.name}
               onError={(e) => {
-                e.target.src = '/placeholder-product.jpg';
+                if (e.target && e.target.src !== '/placeholder-product.jpg') {
+                  e.target.src = '/placeholder-product.jpg';
+                }
               }}
             />
           )}

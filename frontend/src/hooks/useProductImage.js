@@ -16,7 +16,7 @@ export const useProductImage = (productId, fallbackImageUrl = null) => {
         const response = await fetch(`/api/products/${productId}/images`);
         const images = await response.json();
         
-        if (images && images.length > 0) {
+        if (Array.isArray(images) && images.length > 0) {
           // Find primary image or use first image
           const primary = images.find(img => img.is_primary) || images[0];
           setPrimaryImage(primary.image_url);

@@ -24,9 +24,10 @@ const ImageGalleryManager = ({ productId, isOpen, onClose, onImagesUpdate }) => 
     try {
       const response = await fetch(`/api/products/${productId}/images`);
       const data = await response.json();
-      setImages(data);
+      setImages(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Error fetching images:', error);
+      setImages([]);
     } finally {
       setLoading(false);
     }
@@ -43,7 +44,7 @@ const ImageGalleryManager = ({ productId, isOpen, onClose, onImagesUpdate }) => 
         const formData = new FormData();
         formData.append('image', file);
         formData.append('alt_text', file.name);
-        formData.append('is_primary', images.length === 0); // First image is primary
+        formData.append('is_primary', Array.isArray(images) && images.length === 0); // First image is primary
 
         const response = await fetch(`/api/admin/products/${productId}/images/upload`, {
           method: 'POST',
@@ -81,7 +82,7 @@ const ImageGalleryManager = ({ productId, isOpen, onClose, onImagesUpdate }) => 
         },
         body: JSON.stringify({
           ...urlForm,
-          is_primary: urlForm.is_primary || images.length === 0
+          is_primary: urlForm.is_primary || (Array.isArray(images) && images.length === 0)
         })
       });
 
@@ -286,7 +287,7 @@ const ImageGalleryManager = ({ productId, isOpen, onClose, onImagesUpdate }) => 
         <div className="images-grid">
           {loading ? (
             <div className="loading">Loading images...</div>
-          ) : images.length === 0 ? (
+          ) : !Array.isArray(images) || images.length === 0 ? (
             <div className="no-images">
               <p>No images uploaded yet.</p>
               <p>Upload your first image to get started!</p>
@@ -310,7 +311,9 @@ const ImageGalleryManager = ({ productId, isOpen, onClose, onImagesUpdate }) => 
                       src={image.image_url} 
                       alt={image.alt_text || 'Product image'}
                       onError={(e) => {
-                        e.target.src = '/placeholder-image.png';
+                        if (e.target && e.target.src !== '/placeholder-product.jpg') {
+                          e.target.src = '/placeholder-product.jpg';
+                        }
                       }}
                     />
                     {image.is_primary && (
