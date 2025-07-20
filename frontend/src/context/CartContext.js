@@ -12,6 +12,7 @@ export const useCart = () => {
 
 export const CartProvider = ({ children }) => {
   const [cartItems, setCartItems] = useState([]);
+  const [cartNotification, setCartNotification] = useState(null);
 
   useEffect(() => {
     const savedCart = localStorage.getItem('cartItems');
@@ -38,6 +39,18 @@ export const CartProvider = ({ children }) => {
       
       return [...prevItems, { ...product, quantity }];
     });
+    
+    // Show notification
+    setCartNotification({
+      type: 'success',
+      message: `${product.name} added to cart!`,
+      id: Date.now()
+    });
+    
+    // Clear notification after 3 seconds
+    setTimeout(() => {
+      setCartNotification(null);
+    }, 3000);
   };
 
   const removeFromCart = (productId) => {
@@ -77,6 +90,7 @@ export const CartProvider = ({ children }) => {
     clearCart,
     getCartTotal,
     getCartItemsCount,
+    cartNotification,
   };
 
   return (

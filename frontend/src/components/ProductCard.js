@@ -1,15 +1,22 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import './ProductCard.css';
 
 const ProductCard = ({ product }) => {
   const { addToCart } = useCart();
+  const [isAdding, setIsAdding] = useState(false);
 
   const handleAddToCart = (e) => {
     e.preventDefault();
     e.stopPropagation();
+    
+    setIsAdding(true);
     addToCart(product);
+    
+    setTimeout(() => {
+      setIsAdding(false);
+    }, 600);
   };
 
   return (
@@ -40,10 +47,11 @@ const ProductCard = ({ product }) => {
       </Link>
       
       <button 
-        className="add-to-cart-btn"
+        className={`add-to-cart-btn ${isAdding ? 'adding' : ''}`}
         onClick={handleAddToCart}
+        disabled={isAdding}
       >
-        Add to Cart
+        {isAdding ? '✓ Added!' : 'Add to Cart'}
       </button>
     </div>
   );

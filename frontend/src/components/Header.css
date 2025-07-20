@@ -20,10 +20,14 @@
   color: white;
 }
 
-.logo h1 {
-  margin: 0;
-  font-size: 1.8rem;
-  font-weight: bold;
+.logo-image {
+  height: 50px;
+  width: auto;
+  transition: transform 0.2s ease;
+}
+
+.logo-image:hover {
+  transform: scale(1.05);
 }
 
 .search-form {

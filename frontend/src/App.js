@@ -5,6 +5,7 @@ import { CartProvider } from './context/CartContext';
 import Header from './components/Header';
 import Footer from './components/Footer';
 import AdminLayout from './components/AdminLayout';
+import CartNotification from './components/CartNotification';
 import Home from './pages/Home';
 import Products from './pages/Products';
 import Login from './pages/Login';
@@ -12,6 +13,7 @@ import Signup from './pages/Signup';
 import Cart from './pages/Cart';
 import Checkout from './pages/Checkout';
 import OrderSuccess from './pages/OrderSuccess';
+import Orders from './pages/Orders';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import ProductManagement from './pages/admin/ProductManagement';
 import OrderManagement from './pages/admin/OrderManagement';
@@ -54,6 +56,7 @@ function App() {
       <CartProvider>
         <Router>
           <div className="App">
+            <CartNotification />
             <Routes>
               {/* Admin Routes */}
               <Route path="/admin/*" element={
@@ -88,6 +91,14 @@ function App() {
                         } 
                       />
                       <Route path="/order-success" element={<OrderSuccess />} />
+                      <Route 
+                        path="/orders" 
+                        element={
+                          <ProtectedRoute>
+                            <Orders />
+                          </ProtectedRoute>
+                        } 
+                      />
                     </Routes>
                   </main>
                   <Footer />

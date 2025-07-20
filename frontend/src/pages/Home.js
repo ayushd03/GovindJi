@@ -31,7 +31,12 @@ const Home = () => {
 
   return (
     <div className="home">
-      <section className="hero">
+      <section 
+        className="hero"
+        style={{
+          backgroundImage: `linear-gradient(rgba(44, 85, 48, 0.8), rgba(44, 85, 48, 0.8)), url(${process.env.PUBLIC_URL}/hero_bgg.webp)`
+        }}
+      >
         <div className="hero-content">
           <h1>Welcome to GovindJi Dry Fruits</h1>
           <p>Your one-stop destination for premium dry fruits and nuts</p>

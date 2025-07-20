@@ -76,13 +76,33 @@
   font-size: 1rem;
   font-weight: 600;
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: all 0.3s ease;
   margin: 0 1rem 1rem 1rem;
   border-radius: 4px;
+  position: relative;
+  overflow: hidden;
 }
 
 .add-to-cart-btn:hover {
   background-color: #e76f51;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+}
+
+.add-to-cart-btn.adding {
+  background-color: #28a745;
+  transform: scale(0.95);
+  animation: addToCartPulse 0.6s ease;
+}
+
+.add-to-cart-btn:disabled {
+  cursor: not-allowed;
+}
+
+@keyframes addToCartPulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(0.95); background-color: #28a745; }
+  100% { transform: scale(1); }
 }
 
 @media (max-width: 480px) {
