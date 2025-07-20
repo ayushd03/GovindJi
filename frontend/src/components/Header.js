@@ -26,7 +26,7 @@ const Header = () => {
     <header className="header">
       <div className="header-container">
         <Link to="/" className="logo">
-          <h1>NutMart</h1>
+          <h1>GovindJi Dry Fruits</h1>
         </Link>
 
         <form className="search-form" onSubmit={handleSearch}>
@@ -47,6 +47,9 @@ const Header = () => {
             <>
               <span className="user-greeting">Hi, {user?.user_metadata?.name || user?.email}</span>
               <Link to="/orders" className="nav-link">My Orders</Link>
+              {(user?.email?.includes('admin') || user?.user_metadata?.role === 'admin') && (
+                <Link to="/admin" className="nav-link admin-link">Admin Panel</Link>
+              )}
               <button onClick={handleLogout} className="nav-button">Logout</button>
             </>
           ) : (

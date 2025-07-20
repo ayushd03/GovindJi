@@ -34,7 +34,7 @@ const ProductCard = ({ product }) => {
             }
           </p>
           <div className="product-price">
-            ${parseFloat(product.price).toFixed(2)}
+            ₹{parseFloat(product.price).toFixed(2)}
           </div>
         </div>
       </Link>

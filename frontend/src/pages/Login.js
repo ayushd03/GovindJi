@@ -43,7 +43,7 @@ const Login = () => {
   return (
     <div className="auth-container">
       <div className="auth-card">
-        <h2>Login to NutMart</h2>
+        <h2>Login to GovindJi Dry Fruits</h2>
         
         {error && <div className="error-message">{error}</div>}
         

@@ -30,15 +30,23 @@ export const AuthProvider = ({ children }) => {
       const response = await authAPI.login({ email, password });
       const { user, session } = response.data;
       
+      if (!session || !user) {
+        return { 
+          success: false, 
+          error: 'Invalid login response' 
+        };
+      }
+      
       localStorage.setItem('authToken', session.access_token);
       localStorage.setItem('userData', JSON.stringify(user));
       setUser(user);
       
       return { success: true };
     } catch (error) {
+      console.error('Login error:', error);
       return { 
         success: false, 
-        error: error.response?.data?.error || 'Login failed' 
+        error: error.response?.data?.error || error.message || 'Login failed' 
       };
     }
   };
@@ -46,8 +54,27 @@ export const AuthProvider = ({ children }) => {
   const signup = async (name, email, password) => {
     try {
       const response = await authAPI.signup({ name, email, password });
-      const { user, session } = response.data;
+      const data = response.data;
       
+      // Handle email confirmation required case
+      if (data.confirmationRequired) {
+        return { 
+          success: true, 
+          message: data.message || 'Please check your email to confirm your account',
+          confirmationRequired: true
+        };
+      }
+      
+      // Handle successful signup with immediate session
+      if (data.session && data.user) {
+        localStorage.setItem('authToken', data.session.access_token);
+        localStorage.setItem('userData', JSON.stringify(data.user));
+        setUser(data.user);
+        return { success: true };
+      }
+      
+      // Handle other cases
+      const { user, session } = data;
       if (session) {
         localStorage.setItem('authToken', session.access_token);
         localStorage.setItem('userData', JSON.stringify(user));
@@ -56,9 +83,10 @@ export const AuthProvider = ({ children }) => {
       
       return { success: true };
     } catch (error) {
+      console.error('Signup error:', error);
       return { 
         success: false, 
-        error: error.response?.data?.error || 'Signup failed' 
+        error: error.response?.data?.error || error.message || 'Signup failed' 
       };
     }
   };

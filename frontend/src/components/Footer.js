@@ -6,7 +6,7 @@ const Footer = () => {
     <footer className="footer">
       <div className="footer-container">
         <div className="footer-section">
-          <h3>NutMart</h3>
+          <h3>GovindJi Dry Fruits</h3>
           <p>Your trusted source for premium dry fruits and nuts.</p>
         </div>
         
@@ -30,13 +30,13 @@ const Footer = () => {
         
         <div className="footer-section">
           <h4>Contact Info</h4>
-          <p>Email: info@nutmart.com</p>
+          <p>Email: info@govindjidryfruit.com</p>
           <p>Phone: +1 (555) 123-4567</p>
         </div>
       </div>
       
       <div className="footer-bottom">
-        <p>&copy; 2024 NutMart. All rights reserved.</p>
+        <p>&copy; 2024 GovindJi Dry Fruits. All rights reserved.</p>
       </div>
     </footer>
   );

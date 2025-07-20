@@ -43,7 +43,13 @@ const Signup = () => {
     const result = await signup(formData.name, formData.email, formData.password);
     
     if (result.success) {
-      navigate('/');
+      if (result.confirmationRequired) {
+        setError(''); // Clear any previous errors
+        alert(result.message || 'Please check your email to confirm your account before logging in.');
+        navigate('/login');
+      } else {
+        navigate('/');
+      }
     } else {
       setError(result.error);
     }
@@ -54,7 +60,7 @@ const Signup = () => {
   return (
     <div className="auth-container">
       <div className="auth-card">
-        <h2>Sign up for NutMart</h2>
+        <h2>Sign up for GovindJi Dry Fruits</h2>
         
         {error && <div className="error-message">{error}</div>}
         

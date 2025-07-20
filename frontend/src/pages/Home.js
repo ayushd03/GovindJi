@@ -33,7 +33,7 @@ const Home = () => {
     <div className="home">
       <section className="hero">
         <div className="hero-content">
-          <h1>Welcome to NutMart</h1>
+          <h1>Welcome to GovindJi Dry Fruits</h1>
           <p>Your one-stop destination for premium dry fruits and nuts</p>
           <Link to="/products" className="cta-button">
             Shop Now
@@ -65,7 +65,7 @@ const Home = () => {
 
       <section className="features">
         <div className="container">
-          <h2>Why Choose NutMart?</h2>
+          <h2>Why Choose GovindJi Dry Fruits?</h2>
           <div className="features-grid">
             <div className="feature">
               <h3>Premium Quality</h3>

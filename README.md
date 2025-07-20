@@ -1,4 +1,4 @@
-# NutMart - E-commerce Platform for Dry Fruits
+# GovindJiDryFruits - E-commerce Platform for Dry Fruits
 
 A full-stack e-commerce application built with React.js (frontend) and Node.js/Express.js (backend), using Supabase for database and authentication.
 

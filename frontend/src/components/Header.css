@@ -96,6 +96,15 @@
   font-weight: bold;
 }
 
+.admin-link {
+  background-color: #667eea;
+  font-weight: bold;
+}
+
+.admin-link:hover {
+  background-color: #5a67d8;
+}
+
 @media (max-width: 768px) {
   .header-container {
     flex-direction: column;
