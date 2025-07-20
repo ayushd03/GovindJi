@@ -27,6 +27,10 @@ export const productsAPI = {
   addReview: (productId, reviewData) => api.post(`/api/products/${productId}/reviews`, reviewData),
 };
 
+export const categoriesAPI = {
+  getAll: () => api.get('/api/categories'),
+};
+
 export const ordersAPI = {
   create: (orderData) => api.post('/api/orders', orderData),
   getUserOrders: (userId) => api.get(`/api/orders/${userId}`),

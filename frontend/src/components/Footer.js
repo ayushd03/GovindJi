@@ -37,7 +37,7 @@ const Footer = () => {
     <footer className="bg-footer-bg text-white mt-auto">
       {/* Main Footer Content */}
       <motion.div 
-        className="container mx-auto px-2 pt-20 pb-16"
+        className="container mx-auto px-2 pt-16 pb-16"
         variants={stagger}
         initial="initial"
         whileInView="whileInView"
@@ -148,8 +148,9 @@ const Footer = () => {
                 <MapPin className="w-5 h-5 text-primary-accent mt-1 flex-shrink-0" />
                 <div>
                   <p className="text-gray-300 leading-relaxed">
-                    123 Business District,<br />
-                    New Delhi, India 110001
+                    PV82+M8J, Marothia Bazar,<br />
+                    Bartan Bazar, Indore,<br />
+                    Madhya Pradesh 452002
                   </p>
                 </div>
               </div>
@@ -157,10 +158,10 @@ const Footer = () => {
               <div className="flex items-center space-x-3">
                 <Phone className="w-5 h-5 text-primary-accent flex-shrink-0" />
                 <a 
-                  href="tel:+911234567890" 
+                  href="tel:+919340637575" 
                   className="text-gray-300 hover:text-primary-accent transition-colors duration-300"
                 >
-                  +91 12345 67890
+                  093406 37575
                 </a>
               </div>
               
@@ -172,6 +173,15 @@ const Footer = () => {
                 >
                   info@govindjidryfruit.com
                 </a>
+              </div>
+              
+              <div className="flex items-start space-x-3">
+                <div className="w-5 h-5 text-primary-accent mt-1 flex-shrink-0">🕐</div>
+                <div>
+                  <p className="text-gray-300 leading-relaxed">
+                    Closed ⋅ Opens 9 am Mon
+                  </p>
+                </div>
               </div>
             </div>
 
@@ -208,7 +218,7 @@ const Footer = () => {
         <div className="container mx-auto px-2">
           <div className="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
             <div className="flex items-center space-x-2 text-gray-300">
-              <span>&copy; 2024 GovindJi Dry Fruits. All rights reserved.</span>
+              <span>&copy; 2025 GovindJi Dry Fruits. All rights reserved.</span>
               <span className="hidden md:inline">|</span>
               <span className="hidden md:inline">Made with</span>
               <Heart className="w-4 h-4 text-red-500 fill-current hidden md:inline" />
@@ -223,7 +233,7 @@ const Footer = () => {
                 Privacy Policy
               </Link>
               <Link 
-                to="/terms" 
+                to="/terms"
                 className="text-gray-300 hover:text-primary-accent transition-colors duration-300 text-sm"
               >
                 Terms & Conditions

@@ -1,16 +1,20 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ShoppingCart, Star, Heart, Eye } from 'lucide-react';
+import { ShoppingCart, Star, Heart, Eye, Plus, Minus } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useProductImage } from '../hooks/useProductImage';
 
 const ProductCard = ({ product }) => {
-  const { addToCart } = useCart();
+  const { addToCart, updateQuantity, cartItems } = useCart();
   const { primaryImage, loading: imageLoading } = useProductImage(product.id, product.image_url);
   const [isAdding, setIsAdding] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const [isFavorited, setIsFavorited] = useState(false);
+  
+  // Get the current quantity of this product in cart
+  const cartItem = cartItems.find(item => item.id === product.id);
+  const currentQuantity = cartItem ? cartItem.quantity : 0;
 
   const handleAddToCart = (e) => {
     e.preventDefault();
@@ -22,6 +26,26 @@ const ProductCard = ({ product }) => {
     setTimeout(() => {
       setIsAdding(false);
     }, 600);
+  };
+
+  const handleIncrement = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (currentQuantity === 0) {
+      addToCart(product);
+    } else {
+      updateQuantity(product.id, currentQuantity + 1);
+    }
+  };
+
+  const handleDecrement = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (currentQuantity > 1) {
+      updateQuantity(product.id, currentQuantity - 1);
+    } else if (currentQuantity === 1) {
+      updateQuantity(product.id, 0); // This will remove the item
+    }
   };
 
   const handleFavoriteToggle = (e) => {
@@ -83,7 +107,7 @@ const ProductCard = ({ product }) => {
             />
           ) : (
             <motion.img
-              src={primaryImage || '/placeholder-product.jpg'}
+              src={primaryImage || product.image_url || '/placeholder-product.jpg'}
               alt={product.name}
               className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
               onError={(e) => {
@@ -169,37 +193,73 @@ const ProductCard = ({ product }) => {
         </div>
       </Link>
 
-      {/* Add to Cart Button */}
+      {/* Add to Cart Button / Quantity Controls */}
       <div className="px-6 pb-6">
-        <motion.button
-          onClick={handleAddToCart}
-          disabled={isAdding}
-          className={`w-full py-3 rounded-xl font-semibold text-white transition-all duration-300 flex items-center justify-center space-x-2 ${
-            isAdding
-              ? 'bg-green-500 cursor-not-allowed'
-              : 'bg-primary-accent hover:bg-secondary-accent shadow-md hover:shadow-lg'
-          }`}
-          whileHover={{ scale: isAdding ? 1 : 1.02 }}
-          whileTap={{ scale: isAdding ? 1 : 0.98 }}
-          animate={isAdding ? { scale: [1, 1.05, 1] } : {}}
-          transition={{ duration: 0.6 }}
-        >
-          {isAdding ? (
-            <>
-              <motion.div
-                animate={{ rotate: 360 }}
-                transition={{ duration: 0.5 }}
-                className="w-5 h-5 border-2 border-white border-t-transparent rounded-full"
-              />
-              <span>Added!</span>
-            </>
-          ) : (
-            <>
-              <ShoppingCart className="w-5 h-5" />
-              <span>Add to Cart</span>
-            </>
-          )}
-        </motion.button>
+        {currentQuantity === 0 ? (
+          <motion.button
+            onClick={handleAddToCart}
+            disabled={isAdding}
+            className={`w-full py-3 rounded-xl font-semibold text-white transition-all duration-300 flex items-center justify-center space-x-2 ${
+              isAdding
+                ? 'bg-green-500 cursor-not-allowed'
+                : 'bg-primary-accent hover:bg-secondary-accent shadow-md hover:shadow-lg'
+            }`}
+            whileHover={{ scale: isAdding ? 1 : 1.02 }}
+            whileTap={{ scale: isAdding ? 1 : 0.98 }}
+            animate={isAdding ? { scale: [1, 1.05, 1] } : {}}
+            transition={{ duration: 0.6 }}
+          >
+            {isAdding ? (
+              <>
+                <motion.div
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 0.5 }}
+                  className="w-5 h-5 border-2 border-white border-t-transparent rounded-full"
+                />
+                <span>Added!</span>
+              </>
+            ) : (
+              <>
+                <ShoppingCart className="w-5 h-5" />
+                <span>Add to Cart</span>
+              </>
+            )}
+          </motion.button>
+        ) : (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="w-full flex items-center justify-center bg-white border-2 border-primary-accent rounded-xl shadow-lg overflow-hidden"
+          >
+            <motion.button
+              onClick={handleDecrement}
+              whileHover={{ scale: 1.1, backgroundColor: '#f3f4f6' }}
+              whileTap={{ scale: 0.95 }}
+              className="flex-1 py-3 flex items-center justify-center text-primary-accent hover:bg-gray-50 transition-all duration-200"
+            >
+              <Minus className="w-5 h-5" />
+            </motion.button>
+            
+            <motion.div 
+              className="flex-1 py-3 flex items-center justify-center bg-primary-accent text-white font-bold text-lg"
+              key={currentQuantity}
+              initial={{ scale: 1.2 }}
+              animate={{ scale: 1 }}
+              transition={{ duration: 0.2 }}
+            >
+              {currentQuantity}
+            </motion.div>
+            
+            <motion.button
+              onClick={handleIncrement}
+              whileHover={{ scale: 1.1, backgroundColor: '#f3f4f6' }}
+              whileTap={{ scale: 0.95 }}
+              className="flex-1 py-3 flex items-center justify-center text-primary-accent hover:bg-gray-50 transition-all duration-200"
+            >
+              <Plus className="w-5 h-5" />
+            </motion.button>
+          </motion.div>
+        )}
       </div>
 
       {/* Decorative gradient overlay */}

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, useAnimation } from 'framer-motion';
 import { ArrowRight, Star, Shield, Truck, Heart, Award, Leaf, CheckCircle } from 'lucide-react';
 import ProductCard from '../components/ProductCard';
 import { productsAPI } from '../services/api';
@@ -10,6 +10,38 @@ const Home = () => {
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [isHovered, setIsHovered] = useState(false);
+  const controls = useAnimation();
+
+  // Start animation when products are loaded
+  useEffect(() => {
+    if (featuredProducts.length > 0 && !isHovered) {
+      controls.start({
+        x: [-320, -320 * (featuredProducts.length + 1)],
+        transition: {
+          duration: featuredProducts.length * 6,
+          repeat: Infinity,
+          ease: "linear"
+        }
+      });
+    }
+  }, [featuredProducts, isHovered, controls]);
+
+  // Handle hover state
+  useEffect(() => {
+    if (isHovered) {
+      controls.stop();
+    } else if (featuredProducts.length > 0) {
+      controls.start({
+        x: [-320, -320 * (featuredProducts.length + 1)],
+        transition: {
+          duration: featuredProducts.length * 6,
+          repeat: Infinity,
+          ease: "linear"
+        }
+      });
+    }
+  }, [isHovered, featuredProducts.length, controls]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -126,7 +158,7 @@ const Home = () => {
     <div className="min-h-screen">
       {/* Hero Section */}
       <motion.section 
-        className="relative min-h-screen flex items-center justify-center overflow-hidden pt-0"
+        className="relative min-h-screen flex items-center justify-center overflow-hidden pt-20"
         style={{
           backgroundImage: `url(${process.env.PUBLIC_URL}/hero_bgg.webp)`,
           backgroundSize: 'cover',
@@ -292,19 +324,38 @@ const Home = () => {
             </motion.div>
           ) : (
             <>
-              <motion.div 
-                className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-12"
-                variants={stagger}
-                initial="initial"
-                whileInView="animate"
-                viewport={{ once: true }}
+              <div 
+                className="relative overflow-hidden mb-12"
+                onMouseEnter={() => setIsHovered(true)}
+                onMouseLeave={() => setIsHovered(false)}
               >
-                {featuredProducts.map((product, index) => (
-                  <motion.div key={product.id} variants={slideInFromRight}>
-                    <ProductCard product={product} />
-                  </motion.div>
-                ))}
-              </motion.div>
+                <motion.div 
+                  className="flex gap-8 will-change-transform"
+                  animate={controls}
+                  style={{
+                    width: `${(featuredProducts.length * 2 + 2) * 320}px`
+                  }}
+                >
+                  {/* Duplicate products for seamless loop */}
+                  {[...featuredProducts, ...featuredProducts, ...featuredProducts.slice(0, 2)].map((product, index) => (
+                    <motion.div 
+                      key={`${product.id}-${index}`} 
+                      className="flex-shrink-0 w-80"
+                      whileHover={{ 
+                        scale: 1.05,
+                        zIndex: 10
+                      }}
+                      transition={{ 
+                        type: "spring",
+                        stiffness: 300,
+                        damping: 20
+                      }}
+                    >
+                      <ProductCard product={product} />
+                    </motion.div>
+                  ))}
+                </motion.div>
+              </div>
               
               <motion.div className="text-center" {...fadeInUp}>
                 <Link to="/products">
@@ -373,7 +424,7 @@ const Home = () => {
 
       {/* Call to Action Section */}
       <motion.section 
-        className="section-padding bg-gradient-to-r from-primary-accent to-secondary-accent text-white"
+        className="pt-20 lg:pt-28 pb-12 lg:pb-16 bg-gradient-to-r from-primary-accent to-secondary-accent text-white"
         {...fadeInUp}
       >
         <div className="container mx-auto px-1 text-center">
