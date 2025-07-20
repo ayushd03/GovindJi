@@ -81,4 +81,21 @@ CREATE TABLE admin_logs (
     entity_id UUID,
     details JSONB,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-); 
+);
+
+-- Product Images table for multiple images per product with ordering
+CREATE TABLE product_images (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    product_id UUID REFERENCES products(id) ON DELETE CASCADE,
+    image_url TEXT NOT NULL,
+    image_type VARCHAR(10) DEFAULT 'url', -- 'url' for direct URLs, 'file' for uploaded files
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    alt_text VARCHAR(255),
+    is_primary BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Index for better performance on product_id and sort_order
+CREATE INDEX idx_product_images_product_sort ON product_images(product_id, sort_order);
+CREATE INDEX idx_product_images_product_primary ON product_images(product_id, is_primary); 

@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import ImageGalleryManager from '../../components/ImageGalleryManager';
+import ProductImagePreview from '../../components/ProductImagePreview';
 import './ProductManagement.css';
 
 const ProductManagement = () => {
@@ -7,6 +9,8 @@ const ProductManagement = () => {
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
+  const [showImageGallery, setShowImageGallery] = useState(false);
+  const [selectedProductForImages, setSelectedProductForImages] = useState(null);
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -144,6 +148,21 @@ const ProductManagement = () => {
       weight: '',
       unit: 'kg'
     });
+  };
+
+  const handleOpenImageGallery = (product) => {
+    setSelectedProductForImages(product);
+    setShowImageGallery(true);
+  };
+
+  const handleCloseImageGallery = () => {
+    setShowImageGallery(false);
+    setSelectedProductForImages(null);
+  };
+
+  const handleImagesUpdate = () => {
+    // Refresh products list to update image counts or primary images
+    fetchProducts();
   };
 
   return (
@@ -330,13 +349,14 @@ const ProductManagement = () => {
                 <th>Price</th>
                 <th>Stock</th>
                 <th>Status</th>
+                <th>Images</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
               {products.length === 0 ? (
                 <tr>
-                  <td colSpan="7" className="no-products">
+                  <td colSpan="8" className="no-products">
                     No products found. Add your first product to get started!
                   </td>
                 </tr>
@@ -345,11 +365,7 @@ const ProductManagement = () => {
               <tr key={product.id}>
                 <td>
                   <div className="product-image">
-                    {product.image_url ? (
-                      <img src={product.image_url} alt={product.name} />
-                    ) : (
-                      <div className="no-image">📦</div>
-                    )}
+                    <ProductImagePreview productId={product.id} fallbackImageUrl={product.image_url} />
                   </div>
                 </td>
                 <td>
@@ -371,6 +387,15 @@ const ProductManagement = () => {
                   <span className={`status ${product.is_active ? 'active' : 'inactive'}`}>
                     {product.is_active ? 'Active' : 'Inactive'}
                   </span>
+                </td>
+                <td>
+                  <button 
+                    className="manage-images-btn"
+                    onClick={() => handleOpenImageGallery(product)}
+                    title="Manage product images"
+                  >
+                    📸 Manage Images
+                  </button>
                 </td>
                 <td>
                   <div className="actions">
@@ -395,6 +420,14 @@ const ProductManagement = () => {
           </table>
         )}
       </div>
+
+      {/* Image Gallery Manager Modal */}
+      <ImageGalleryManager
+        productId={selectedProductForImages?.id}
+        isOpen={showImageGallery}
+        onClose={handleCloseImageGallery}
+        onImagesUpdate={handleImagesUpdate}
+      />
     </div>
   );
 };

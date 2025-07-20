@@ -1,6 +1,10 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+const { v4: uuidv4 } = require('uuid');
 const { createClient } = require('@supabase/supabase-js');
 
 const app = express();
@@ -13,6 +17,38 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 
 app.use(cors());
 app.use(express.json());
+
+// Configure multer for file uploads
+const storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        const uploadPath = path.join(__dirname, '../frontend/public/product_images');
+        // Ensure directory exists
+        if (!fs.existsSync(uploadPath)) {
+            fs.mkdirSync(uploadPath, { recursive: true });
+        }
+        cb(null, uploadPath);
+    },
+    filename: function (req, file, cb) {
+        // Generate unique filename with original extension
+        const uniqueName = `${uuidv4()}${path.extname(file.originalname)}`;
+        cb(null, uniqueName);
+    }
+});
+
+const upload = multer({
+    storage: storage,
+    limits: {
+        fileSize: 5 * 1024 * 1024 // 5MB limit
+    },
+    fileFilter: function (req, file, cb) {
+        // Check file type
+        if (file.mimetype.startsWith('image/')) {
+            cb(null, true);
+        } else {
+            cb(new Error('Only image files are allowed!'), false);
+        }
+    }
+});
 
 // Middleware for authentication
 const authenticateToken = async (req, res, next) => {
@@ -276,6 +312,287 @@ app.put('/api/admin/products/:id/stock', authenticateAdmin, async (req, res) => 
     }]);
 
     res.json(data);
+});
+
+// Product Images Routes
+// Get all images for a product
+app.get('/api/products/:id/images', async (req, res) => {
+    const { id } = req.params;
+    
+    try {
+        const { data, error } = await supabase
+            .from('product_images')
+            .select('*')
+            .eq('product_id', id)
+            .order('sort_order', { ascending: true });
+        
+        if (error) return res.status(500).json({ error: error.message });
+        res.json(data || []);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Upload image file for a product
+app.post('/api/admin/products/:id/images/upload', authenticateAdmin, upload.single('image'), async (req, res) => {
+    const { id } = req.params;
+    const { alt_text, is_primary } = req.body;
+    
+    if (!req.file) {
+        return res.status(400).json({ error: 'No image file provided' });
+    }
+    
+    try {
+        // Get the highest sort_order for this product
+        const { data: existingImages, error: sortError } = await supabase
+            .from('product_images')
+            .select('sort_order')
+            .eq('product_id', id)
+            .order('sort_order', { ascending: false })
+            .limit(1);
+        
+        const nextSortOrder = existingImages && existingImages.length > 0 
+            ? existingImages[0].sort_order + 1 
+            : 0;
+        
+        // If this is set as primary, remove primary flag from other images
+        if (is_primary === 'true' || is_primary === true) {
+            await supabase
+                .from('product_images')
+                .update({ is_primary: false })
+                .eq('product_id', id);
+        }
+        
+        // Create the image URL (relative path from public directory)
+        const imageUrl = `/product_images/${req.file.filename}`;
+        
+        const { data, error } = await supabase
+            .from('product_images')
+            .insert([{
+                product_id: id,
+                image_url: imageUrl,
+                image_type: 'file',
+                sort_order: nextSortOrder,
+                alt_text: alt_text || '',
+                is_primary: is_primary === 'true' || is_primary === true
+            }])
+            .select()
+            .single();
+        
+        if (error) {
+            // Delete the uploaded file if database insert fails
+            fs.unlinkSync(req.file.path);
+            return res.status(500).json({ error: error.message });
+        }
+        
+        // Log admin action
+        await supabase.from('admin_logs').insert([{
+            admin_id: req.user.id,
+            action: 'UPLOAD_PRODUCT_IMAGE',
+            entity_type: 'product',
+            entity_id: id,
+            details: { image_id: data.id, filename: req.file.filename }
+        }]);
+        
+        res.status(201).json(data);
+    } catch (error) {
+        // Delete the uploaded file if any error occurs
+        if (req.file && fs.existsSync(req.file.path)) {
+            fs.unlinkSync(req.file.path);
+        }
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Add image by URL for a product
+app.post('/api/admin/products/:id/images/url', authenticateAdmin, async (req, res) => {
+    const { id } = req.params;
+    const { image_url, alt_text, is_primary } = req.body;
+    
+    if (!image_url) {
+        return res.status(400).json({ error: 'Image URL is required' });
+    }
+    
+    try {
+        // Get the highest sort_order for this product
+        const { data: existingImages, error: sortError } = await supabase
+            .from('product_images')
+            .select('sort_order')
+            .eq('product_id', id)
+            .order('sort_order', { ascending: false })
+            .limit(1);
+        
+        const nextSortOrder = existingImages && existingImages.length > 0 
+            ? existingImages[0].sort_order + 1 
+            : 0;
+        
+        // If this is set as primary, remove primary flag from other images
+        if (is_primary) {
+            await supabase
+                .from('product_images')
+                .update({ is_primary: false })
+                .eq('product_id', id);
+        }
+        
+        const { data, error } = await supabase
+            .from('product_images')
+            .insert([{
+                product_id: id,
+                image_url,
+                image_type: 'url',
+                sort_order: nextSortOrder,
+                alt_text: alt_text || '',
+                is_primary: is_primary || false
+            }])
+            .select()
+            .single();
+        
+        if (error) return res.status(500).json({ error: error.message });
+        
+        // Log admin action
+        await supabase.from('admin_logs').insert([{
+            admin_id: req.user.id,
+            action: 'ADD_PRODUCT_IMAGE_URL',
+            entity_type: 'product',
+            entity_id: id,
+            details: { image_id: data.id, image_url }
+        }]);
+        
+        res.status(201).json(data);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Update image order for a product
+app.put('/api/admin/products/:id/images/reorder', authenticateAdmin, async (req, res) => {
+    const { id } = req.params;
+    const { imageOrders } = req.body; // Array of { id, sort_order }
+    
+    if (!Array.isArray(imageOrders)) {
+        return res.status(400).json({ error: 'imageOrders must be an array' });
+    }
+    
+    try {
+        // Update each image's sort_order
+        const updatePromises = imageOrders.map(async (item) => {
+            return supabase
+                .from('product_images')
+                .update({ sort_order: item.sort_order, updated_at: new Date().toISOString() })
+                .eq('id', item.id)
+                .eq('product_id', id); // Ensure image belongs to this product
+        });
+        
+        await Promise.all(updatePromises);
+        
+        // Get updated images
+        const { data, error } = await supabase
+            .from('product_images')
+            .select('*')
+            .eq('product_id', id)
+            .order('sort_order', { ascending: true });
+        
+        if (error) return res.status(500).json({ error: error.message });
+        
+        // Log admin action
+        await supabase.from('admin_logs').insert([{
+            admin_id: req.user.id,
+            action: 'REORDER_PRODUCT_IMAGES',
+            entity_type: 'product',
+            entity_id: id,
+            details: { image_count: imageOrders.length }
+        }]);
+        
+        res.json(data);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Delete a product image
+app.delete('/api/admin/products/:productId/images/:imageId', authenticateAdmin, async (req, res) => {
+    const { productId, imageId } = req.params;
+    
+    try {
+        // Get image details before deletion
+        const { data: imageData, error: fetchError } = await supabase
+            .from('product_images')
+            .select('*')
+            .eq('id', imageId)
+            .eq('product_id', productId)
+            .single();
+        
+        if (fetchError || !imageData) {
+            return res.status(404).json({ error: 'Image not found' });
+        }
+        
+        // Delete from database
+        const { error } = await supabase
+            .from('product_images')
+            .delete()
+            .eq('id', imageId)
+            .eq('product_id', productId);
+        
+        if (error) return res.status(500).json({ error: error.message });
+        
+        // If it was a file upload, delete the actual file
+        if (imageData.image_type === 'file') {
+            const filePath = path.join(__dirname, '../frontend/public', imageData.image_url);
+            if (fs.existsSync(filePath)) {
+                fs.unlinkSync(filePath);
+            }
+        }
+        
+        // Log admin action
+        await supabase.from('admin_logs').insert([{
+            admin_id: req.user.id,
+            action: 'DELETE_PRODUCT_IMAGE',
+            entity_type: 'product',
+            entity_id: productId,
+            details: { image_id: imageId, image_url: imageData.image_url }
+        }]);
+        
+        res.json({ message: 'Image deleted successfully' });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Set an image as primary
+app.put('/api/admin/products/:productId/images/:imageId/primary', authenticateAdmin, async (req, res) => {
+    const { productId, imageId } = req.params;
+    
+    try {
+        // Remove primary flag from all images of this product
+        await supabase
+            .from('product_images')
+            .update({ is_primary: false, updated_at: new Date().toISOString() })
+            .eq('product_id', productId);
+        
+        // Set the specified image as primary
+        const { data, error } = await supabase
+            .from('product_images')
+            .update({ is_primary: true, updated_at: new Date().toISOString() })
+            .eq('id', imageId)
+            .eq('product_id', productId)
+            .select()
+            .single();
+        
+        if (error) return res.status(500).json({ error: error.message });
+        
+        // Log admin action
+        await supabase.from('admin_logs').insert([{
+            admin_id: req.user.id,
+            action: 'SET_PRIMARY_PRODUCT_IMAGE',
+            entity_type: 'product',
+            entity_id: productId,
+            details: { image_id: imageId }
+        }]);
+        
+        res.json(data);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
 });
 
 // Categories Routes
