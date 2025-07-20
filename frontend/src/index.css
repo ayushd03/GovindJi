@@ -1,13 +1,121 @@
-body {
-  margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+/* Tailwind CSS Base Styles */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Import Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&family=Lato:wght@300;400;500;600&display=swap');
+
+/* Global Design System - GovindJi Dry Fruits */
+:root {
+  /* Legacy CSS Variables (for backwards compatibility) */
+  --color-primary-bg: #FFFFFF;
+  --color-primary-text: #212121;
+  --color-primary-accent: #F39C12;
+  --color-secondary-accent: #E67E22;
+  --color-footer-bg: #1E392A;
+  --color-light-gray: #F8F9FA;
+  --color-border: #E5E5E5;
+  --color-shadow: rgba(0, 0, 0, 0.08);
+  
+  /* Typography */
+  --font-heading: 'Montserrat', sans-serif;
+  --font-body: 'Lato', sans-serif;
+  
+  /* Font Sizes */
+  --font-size-h1: 3rem;
+  --font-size-h2: 2.2rem;
+  --font-size-h3: 1.5rem;
+  --font-size-body: 1rem;
+  --font-size-small: 0.875rem;
+  
+  /* Spacing System (8px base) */
+  --spacing-xs: 0.5rem;
+  --spacing-sm: 1rem;
+  --spacing-md: 1.5rem;
+  --spacing-lg: 2rem;
+  --spacing-xl: 3rem;
+  --spacing-2xl: 4rem;
+  
+  /* Border Radius */
+  --border-radius: 8px;
+  
+  /* Box Shadow */
+  --box-shadow: 0 4px 12px var(--color-shadow);
+  --box-shadow-hover: 0 6px 20px rgba(0, 0, 0, 0.12);
+  
+  /* Container Max Width */
+  --container-max-width: 1280px;
 }
 
-code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
+/* Custom Base Styles using Tailwind's @layer directive */
+@layer base {
+  * {
+    @apply m-0 p-0 box-border;
+  }
+
+  body {
+    @apply font-body text-base leading-relaxed text-primary-text bg-primary-bg;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-heading font-semibold leading-tight mb-4;
+  }
+
+  h1 {
+    @apply text-h1 font-bold;
+  }
+
+  h2 {
+    @apply text-h2 font-semibold;
+  }
+
+  h3 {
+    @apply text-h3 font-semibold;
+  }
+
+  p {
+    @apply mb-4 leading-relaxed;
+  }
+
+  code {
+    font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
+  }
+}
+
+/* Custom Component Classes using Tailwind's @layer directive */
+@layer components {
+  .container {
+    @apply max-w-container mx-auto px-4 md:px-6;
+  }
+
+  .btn-primary {
+    @apply bg-primary-accent text-white px-6 py-3 rounded-default font-medium transition-all duration-300 hover:bg-secondary-accent hover:shadow-custom-hover transform hover:scale-105;
+  }
+
+  .btn-secondary {
+    @apply bg-transparent text-primary-accent border-2 border-primary-accent px-6 py-3 rounded-default font-medium transition-all duration-300 hover:bg-primary-accent hover:text-white;
+  }
+
+  .card {
+    @apply bg-white rounded-default shadow-custom p-6 transition-all duration-300 hover:shadow-custom-hover transform hover:-translate-y-1;
+  }
+
+  .product-card {
+    @apply bg-white rounded-default shadow-custom overflow-hidden transition-all duration-300 hover:shadow-custom-hover transform hover:-translate-y-2;
+  }
+
+  .input-field {
+    @apply w-full px-4 py-3 border border-border-color rounded-default focus:outline-none focus:ring-2 focus:ring-primary-accent focus:border-transparent transition-all duration-300;
+  }
+
+  .section-padding {
+    @apply py-16 lg:py-24;
+  }
+
+  .hero-section {
+    @apply min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-accent/10 to-secondary-accent/10;
+  }
 }

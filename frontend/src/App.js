@@ -76,7 +76,7 @@ function App() {
               <Route path="/*" element={
                 <>
                   <Header />
-                  <main className="main-content">
+                  <main className="main-content pt-20">
                     <Routes>
                       <Route path="/" element={<Home />} />
                       <Route path="/products" element={<Products />} />
