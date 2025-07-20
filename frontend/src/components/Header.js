@@ -164,7 +164,7 @@ const Header = () => {
                 whileTap={{ scale: 0.95 }}
                 className="flex items-center space-x-2 bg-primary-accent text-white px-4 py-2 rounded-full hover:bg-secondary-accent transition-all duration-300 shadow-md hover:shadow-lg"
               >
-                <ShoppingCart className="w-5 h-5" />
+                <ShoppingCart className="w-5 h-5" data-cart-icon />
                 <span className="font-medium">Cart</span>
                 {cartItemsCount > 0 && (
                   <motion.span
@@ -275,7 +275,7 @@ const Header = () => {
                 className="flex items-center justify-center space-x-2 bg-primary-accent text-white py-3 rounded-full hover:bg-secondary-accent transition-all duration-300 shadow-md"
                 onClick={() => setIsMenuOpen(false)}
               >
-                <ShoppingCart className="w-5 h-5" />
+                <ShoppingCart className="w-5 h-5" data-cart-icon />
                 <span className="font-medium">Cart ({cartItemsCount})</span>
               </Link>
             </div>

@@ -10,7 +10,13 @@ CREATE TABLE users (
 
 CREATE TABLE categories (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    name VARCHAR(255) UNIQUE NOT NULL
+    name VARCHAR(255) UNIQUE NOT NULL,
+    description TEXT,
+    display_order INTEGER DEFAULT 0,
+    gradient_colors VARCHAR(255), -- Store gradient CSS class like 'from-amber-400 to-orange-500'
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 CREATE TABLE products (
@@ -96,6 +102,22 @@ CREATE TABLE product_images (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Index for better performance on product_id and sort_order
+-- Category Images table for multiple images per category with ordering
+CREATE TABLE category_images (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    category_id UUID REFERENCES categories(id) ON DELETE CASCADE,
+    image_url TEXT NOT NULL,
+    image_type VARCHAR(10) DEFAULT 'url', -- 'url' for direct URLs, 'file' for uploaded files
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    alt_text VARCHAR(255),
+    is_primary BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Indexes for better performance
 CREATE INDEX idx_product_images_product_sort ON product_images(product_id, sort_order);
-CREATE INDEX idx_product_images_product_primary ON product_images(product_id, is_primary); 
+CREATE INDEX idx_product_images_product_primary ON product_images(product_id, is_primary);
+CREATE INDEX idx_category_images_category_sort ON category_images(category_id, sort_order);
+CREATE INDEX idx_category_images_category_primary ON category_images(category_id, is_primary);
+CREATE INDEX idx_categories_display_order ON categories(display_order, is_active); 

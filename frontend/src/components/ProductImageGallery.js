@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { productsAPI } from '../services/api';
 import './ProductImageGallery.css';
 
 const ProductImageGallery = ({ productId, fallbackImageUrl = null }) => {
@@ -28,8 +29,8 @@ const ProductImageGallery = ({ productId, fallbackImageUrl = null }) => {
   const fetchImages = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`/api/products/${productId}/images`);
-      const data = await response.json();
+      const response = await productsAPI.getImages(productId);
+      const data = response.data;
       
       if (data && data.length > 0) {
         // Sort by sort_order and prioritize primary image

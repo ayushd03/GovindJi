@@ -25,6 +25,7 @@ export const productsAPI = {
   getByCategory: (category) => api.get(`/api/products/category/${category}`),
   getReviews: (productId) => api.get(`/api/products/${productId}/reviews`),
   addReview: (productId, reviewData) => api.post(`/api/products/${productId}/reviews`, reviewData),
+  getImages: (productId) => api.get(`/api/products/${productId}/images`),
 };
 
 export const categoriesAPI = {

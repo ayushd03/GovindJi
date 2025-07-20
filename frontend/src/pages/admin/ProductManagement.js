@@ -13,6 +13,7 @@ import {
   CheckCircleIcon,
   CubeIcon
 } from '@heroicons/react/24/outline';
+import { categoriesAPI } from '../../services/api';
 
 const ProductManagement = () => {
   const [products, setProducts] = useState([]);
@@ -56,9 +57,11 @@ const ProductManagement = () => {
 
   const fetchCategories = async () => {
     try {
-      const response = await fetch('/api/categories');
-      const data = await response.json();
-      setCategories(data);
+      const response = await categoriesAPI.getAll();
+      const data = response.data;
+      // Filter only active categories for product selection
+      const activeCategories = data.filter(category => category.is_active !== false);
+      setCategories(activeCategories);
     } catch (error) {
       console.error('Error fetching categories:', error);
       // Fallback categories if API fails

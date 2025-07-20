@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { productsAPI } from '../services/api';
 import './ImageGalleryManager.css';
 
 const ImageGalleryManager = ({ productId, isOpen, onClose, onImagesUpdate }) => {
@@ -22,8 +23,8 @@ const ImageGalleryManager = ({ productId, isOpen, onClose, onImagesUpdate }) => 
   const fetchImages = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`/api/products/${productId}/images`);
-      const data = await response.json();
+      const response = await productsAPI.getImages(productId);
+      const data = response.data;
       setImages(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Error fetching images:', error);

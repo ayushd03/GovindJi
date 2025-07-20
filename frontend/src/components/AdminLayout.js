@@ -14,7 +14,8 @@ import {
   XMarkIcon,
   ArrowRightOnRectangleIcon,
   ChevronLeftIcon,
-  ChevronRightIcon
+  ChevronRightIcon,
+  TagIcon
 } from '@heroicons/react/24/outline';
 
 const AdminLayout = ({ children }) => {
@@ -31,6 +32,7 @@ const AdminLayout = ({ children }) => {
   const menuItems = [
     { path: '/admin', label: 'Dashboard', icon: ChartBarIcon },
     { path: '/admin/products', label: 'Products', icon: CubeIcon },
+    { path: '/admin/categories', label: 'Categories', icon: TagIcon },
     { path: '/admin/orders', label: 'Orders', icon: ShoppingCartIcon },
     { path: '/admin/inventory', label: 'Inventory', icon: ClipboardDocumentListIcon },
     { path: '/admin/customers', label: 'Customers', icon: UsersIcon },

@@ -18,6 +18,7 @@ import Orders from './pages/Orders';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import ProductManagement from './pages/admin/ProductManagement';
 import OrderManagement from './pages/admin/OrderManagement';
+import CategoryManagement from './pages/admin/CategoryManagement';
 import './App.css';
 
 const ProtectedRoute = ({ children }) => {
@@ -67,6 +68,7 @@ function App() {
                       <Route path="/" element={<AdminDashboard />} />
                       <Route path="/products" element={<ProductManagement />} />
                       <Route path="/orders" element={<OrderManagement />} />
+                      <Route path="/categories" element={<CategoryManagement />} />
                     </Routes>
                   </AdminLayout>
                 </AdminRoute>

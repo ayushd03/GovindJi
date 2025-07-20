@@ -41,9 +41,10 @@ export const CartProvider = ({ children }) => {
     });
     
     // Show notification
+    const sizeText = product.size ? ` (${product.size})` : '';
     setCartNotification({
       type: 'success',
-      message: `${product.name} added to cart!`,
+      message: `${product.name}${sizeText} added to cart!`,
       id: Date.now()
     });
     
@@ -82,6 +83,19 @@ export const CartProvider = ({ children }) => {
     return cartItems.reduce((total, item) => total + item.quantity, 0);
   };
 
+  const getProductCartInfo = (productId) => {
+    const productItems = cartItems.filter(item => 
+      item.originalId === productId || item.id === productId
+    );
+    
+    if (productItems.length === 0) {
+      return { totalQuantity: 0, items: [] };
+    }
+    
+    const totalQuantity = productItems.reduce((total, item) => total + item.quantity, 0);
+    return { totalQuantity, items: productItems };
+  };
+
   const value = {
     cartItems,
     addToCart,
@@ -90,6 +104,7 @@ export const CartProvider = ({ children }) => {
     clearCart,
     getCartTotal,
     getCartItemsCount,
+    getProductCartInfo,
     cartNotification,
   };
 

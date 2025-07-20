@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { motion, useAnimation } from 'framer-motion';
 import { ArrowRight, Star, Shield, Truck, Heart, Award, Leaf, CheckCircle } from 'lucide-react';
 import ProductCard from '../components/ProductCard';
-import { productsAPI } from '../services/api';
+import { productsAPI, categoriesAPI } from '../services/api';
 
 const Home = () => {
   const [featuredProducts, setFeaturedProducts] = useState([]);
@@ -49,14 +49,18 @@ const Home = () => {
         // Fetch products and categories in parallel
         const [productsResponse, categoriesResponse] = await Promise.all([
           productsAPI.getAll(),
-          fetch('/api/categories').then(res => res.json())
+          categoriesAPI.getAll()
         ]);
         
         setFeaturedProducts(productsResponse.data.slice(0, 8));
-        setCategories(categoriesResponse);
+        // Ensure categories is always an array
+        setCategories(Array.isArray(categoriesResponse.data) ? categoriesResponse.data : []);
       } catch (err) {
         setError('Failed to load data');
         console.error('Error fetching data:', err);
+        // Set empty arrays on error
+        setFeaturedProducts([]);
+        setCategories([]);
       } finally {
         setLoading(false);
       }
@@ -65,33 +69,15 @@ const Home = () => {
     fetchData();
   }, []);
 
-  // Category background image mapping with fallback gradients
-  const getCategoryBackground = (categoryName) => {
-    const backgrounds = {
-      'Nuts': {
-        image: '/category-backgrounds/nuts.jpg',
-        gradient: 'from-amber-400 to-orange-500'
-      },
-      'Dried Fruits': {
-        image: '/category-backgrounds/dried-fruits.jpg',
-        gradient: 'from-red-400 to-pink-500'
-      },
-      'Seeds': {
-        image: '/category-backgrounds/seeds.jpg',
-        gradient: 'from-green-400 to-emerald-500'
-      },
-      'Spices': {
-        image: '/category-backgrounds/spices.jpg',
-        gradient: 'from-yellow-400 to-amber-500'
-      },
-      'Traditional Sweets': {
-        image: '/category-backgrounds/sweets.jpg',
-        gradient: 'from-purple-400 to-indigo-500'
-      }
-    };
-    return backgrounds[categoryName] || {
-      image: '/category-backgrounds/default.jpg',
-      gradient: 'from-gray-400 to-gray-600'
+  // Get category background from category data or fallback to gradient
+  const getCategoryBackground = (category) => {
+    // Use primary image if available, otherwise fallback to gradient
+    const primaryImage = category.primary_image || category.category_images?.[0]?.image_url;
+    const gradient = category.gradient_colors || 'from-gray-400 to-gray-600';
+    
+    return {
+      image: primaryImage,
+      gradient: gradient
     };
   };
 
@@ -268,8 +254,8 @@ const Home = () => {
             whileInView="animate"
             viewport={{ once: true }}
           >
-            {categories.map((category, index) => {
-              const bgConfig = getCategoryBackground(category.name);
+            {(categories || []).map((category, index) => {
+              const bgConfig = getCategoryBackground(category);
               return (
                 <motion.div
                   key={category.id || category.name}
@@ -325,7 +311,7 @@ const Home = () => {
           ) : (
             <>
               <div 
-                className="relative overflow-hidden mb-12"
+                className="relative overflow-hidden mb-12 py-6"
                 onMouseEnter={() => setIsHovered(true)}
                 onMouseLeave={() => setIsHovered(false)}
               >

@@ -22,7 +22,14 @@ app.use(express.urlencoded({ limit: '25mb', extended: true }));
 // Configure multer for file uploads
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
-        const uploadPath = path.join(__dirname, '../frontend/public/product_images');
+        // Determine upload path based on route
+        let uploadPath;
+        if (req.url.includes('/categories/')) {
+            uploadPath = path.join(__dirname, '../frontend/public/category_images');
+        } else {
+            uploadPath = path.join(__dirname, '../frontend/public/product_images');
+        }
+        
         // Ensure directory exists
         if (!fs.existsSync(uploadPath)) {
             fs.mkdirSync(uploadPath, { recursive: true });
@@ -598,34 +605,376 @@ app.put('/api/admin/products/:productId/images/:imageId/primary', authenticateAd
 
 // Categories Routes
 app.get('/api/categories', async (req, res) => {
-    const { data, error } = await supabase
-        .from('categories')
-        .select('*')
-        .order('name');
-    if (error) return res.status(500).json({ error: error.message });
-    res.json(data);
+    try {
+        const { data: categories, error } = await supabase
+            .from('categories')
+            .select(`
+                *,
+                category_images (
+                    id,
+                    image_url,
+                    sort_order,
+                    alt_text,
+                    is_primary
+                )
+            `)
+            .eq('is_active', true)
+            .order('display_order', { ascending: true });
+        
+        if (error) return res.status(500).json({ error: error.message });
+        
+        // Sort images by sort_order and mark primary image
+        const categoriesWithImages = categories.map(category => ({
+            ...category,
+            category_images: category.category_images.sort((a, b) => a.sort_order - b.sort_order),
+            primary_image: category.category_images.find(img => img.is_primary)?.image_url || category.category_images[0]?.image_url
+        }));
+        
+        res.json(categoriesWithImages);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.get('/api/admin/categories', authenticateAdmin, async (req, res) => {
+    try {
+        const { data: categories, error } = await supabase
+            .from('categories')
+            .select(`
+                *,
+                category_images (
+                    id,
+                    image_url,
+                    sort_order,
+                    alt_text,
+                    is_primary
+                )
+            `)
+            .order('display_order', { ascending: true });
+        
+        if (error) return res.status(500).json({ error: error.message });
+        
+        const categoriesWithImages = categories.map(category => ({
+            ...category,
+            category_images: category.category_images.sort((a, b) => a.sort_order - b.sort_order),
+            primary_image: category.category_images.find(img => img.is_primary)?.image_url || category.category_images[0]?.image_url
+        }));
+        
+        res.json(categoriesWithImages);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.get('/api/admin/categories/:id', authenticateAdmin, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { data, error } = await supabase
+            .from('categories')
+            .select(`
+                *,
+                category_images (
+                    id,
+                    image_url,
+                    sort_order,
+                    alt_text,
+                    is_primary
+                )
+            `)
+            .eq('id', id)
+            .single();
+        
+        if (error) return res.status(500).json({ error: error.message });
+        if (!data) return res.status(404).json({ message: 'Category not found' });
+        
+        data.category_images = data.category_images.sort((a, b) => a.sort_order - b.sort_order);
+        data.primary_image = data.category_images.find(img => img.is_primary)?.image_url || data.category_images[0]?.image_url;
+        
+        res.json(data);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
 });
 
 app.post('/api/admin/categories', authenticateAdmin, async (req, res) => {
-    const { name } = req.body;
-    
-    const { data, error } = await supabase
-        .from('categories')
-        .insert([{ name }])
-        .select()
-        .single();
+    try {
+        const { name, description, display_order = 0, gradient_colors, is_active = true } = req.body;
+        
+        if (!name || name.trim() === '') {
+            return res.status(400).json({ error: 'Category name is required' });
+        }
+        
+        const { data, error } = await supabase
+            .from('categories')
+            .insert([{ 
+                name: name.trim(), 
+                description, 
+                display_order, 
+                gradient_colors, 
+                is_active 
+            }])
+            .select()
+            .single();
 
-    if (error) return res.status(500).json({ error: error.message });
+        if (error) return res.status(500).json({ error: error.message });
 
-    await supabase.from('admin_logs').insert([{
-        admin_id: req.user.id,
-        action: 'CREATE_CATEGORY',
-        entity_type: 'category',
-        entity_id: data.id,
-        details: { category_name: name }
-    }]);
+        await supabase.from('admin_logs').insert([{
+            admin_id: req.user.id,
+            action: 'CREATE_CATEGORY',
+            entity_type: 'category',
+            entity_id: data.id,
+            details: { category_name: name, description, display_order }
+        }]);
 
-    res.status(201).json(data);
+        res.status(201).json(data);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.put('/api/admin/categories/:id', authenticateAdmin, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { name, description, display_order, gradient_colors, is_active } = req.body;
+        
+        const updateData = {
+            updated_at: new Date().toISOString()
+        };
+        
+        if (name !== undefined) updateData.name = name.trim();
+        if (description !== undefined) updateData.description = description;
+        if (display_order !== undefined) updateData.display_order = display_order;
+        if (gradient_colors !== undefined) updateData.gradient_colors = gradient_colors;
+        if (is_active !== undefined) updateData.is_active = is_active;
+        
+        const { data, error } = await supabase
+            .from('categories')
+            .update(updateData)
+            .eq('id', id)
+            .select()
+            .single();
+
+        if (error) return res.status(500).json({ error: error.message });
+        if (!data) return res.status(404).json({ message: 'Category not found' });
+
+        await supabase.from('admin_logs').insert([{
+            admin_id: req.user.id,
+            action: 'UPDATE_CATEGORY',
+            entity_type: 'category',
+            entity_id: id,
+            details: { updated_fields: Object.keys(updateData) }
+        }]);
+
+        res.json(data);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.delete('/api/admin/categories/:id', authenticateAdmin, async (req, res) => {
+    try {
+        const { id } = req.params;
+        
+        // Check if category has products
+        const { data: products, error: productError } = await supabase
+            .from('products')
+            .select('id')
+            .eq('category_id', id)
+            .limit(1);
+            
+        if (productError) return res.status(500).json({ error: productError.message });
+        
+        if (products && products.length > 0) {
+            return res.status(400).json({ 
+                error: 'Cannot delete category with existing products. Please move or delete products first.' 
+            });
+        }
+        
+        const { error } = await supabase
+            .from('categories')
+            .delete()
+            .eq('id', id);
+
+        if (error) return res.status(500).json({ error: error.message });
+
+        await supabase.from('admin_logs').insert([{
+            admin_id: req.user.id,
+            action: 'DELETE_CATEGORY',
+            entity_type: 'category',
+            entity_id: id,
+            details: { deleted_at: new Date().toISOString() }
+        }]);
+
+        res.json({ message: 'Category deleted successfully' });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Category Image Management Routes
+app.post('/api/admin/categories/:id/images', authenticateAdmin, upload.single('image'), async (req, res) => {
+    try {
+        const { id: category_id } = req.params;
+        const { alt_text, is_primary = false } = req.body;
+        
+        if (!req.file) {
+            return res.status(400).json({ error: 'No image file provided' });
+        }
+        
+        // Verify category exists
+        const { data: category, error: categoryError } = await supabase
+            .from('categories')
+            .select('id')
+            .eq('id', category_id)
+            .single();
+            
+        if (categoryError || !category) {
+            return res.status(404).json({ error: 'Category not found' });
+        }
+        
+        // Get next sort order
+        const { data: existingImages, error: sortError } = await supabase
+            .from('category_images')
+            .select('sort_order')
+            .eq('category_id', category_id)
+            .order('sort_order', { ascending: false })
+            .limit(1);
+            
+        const next_sort_order = (existingImages && existingImages.length > 0) 
+            ? existingImages[0].sort_order + 1 
+            : 0;
+        
+        // If this is primary, unset other primary images
+        if (is_primary) {
+            await supabase
+                .from('category_images')
+                .update({ is_primary: false })
+                .eq('category_id', category_id);
+        }
+        
+        const image_url = `/category_images/${req.file.filename}`;
+        
+        const { data, error } = await supabase
+            .from('category_images')
+            .insert([{
+                category_id,
+                image_url,
+                sort_order: next_sort_order,
+                alt_text,
+                is_primary: is_primary === 'true' || is_primary === true
+            }])
+            .select()
+            .single();
+            
+        if (error) return res.status(500).json({ error: error.message });
+        
+        await supabase.from('admin_logs').insert([{
+            admin_id: req.user.id,
+            action: 'ADD_CATEGORY_IMAGE',
+            entity_type: 'category_image',
+            entity_id: data.id,
+            details: { category_id, image_url, is_primary }
+        }]);
+        
+        res.status(201).json(data);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.put('/api/admin/categories/:category_id/images/:image_id', authenticateAdmin, async (req, res) => {
+    try {
+        const { category_id, image_id } = req.params;
+        const { alt_text, is_primary, sort_order } = req.body;
+        
+        const updateData = { updated_at: new Date().toISOString() };
+        
+        if (alt_text !== undefined) updateData.alt_text = alt_text;
+        if (sort_order !== undefined) updateData.sort_order = sort_order;
+        if (is_primary !== undefined) {
+            updateData.is_primary = is_primary;
+            
+            // If setting as primary, unset others
+            if (is_primary) {
+                await supabase
+                    .from('category_images')
+                    .update({ is_primary: false })
+                    .eq('category_id', category_id)
+                    .neq('id', image_id);
+            }
+        }
+        
+        const { data, error } = await supabase
+            .from('category_images')
+            .update(updateData)
+            .eq('id', image_id)
+            .eq('category_id', category_id)
+            .select()
+            .single();
+            
+        if (error) return res.status(500).json({ error: error.message });
+        if (!data) return res.status(404).json({ message: 'Image not found' });
+        
+        await supabase.from('admin_logs').insert([{
+            admin_id: req.user.id,
+            action: 'UPDATE_CATEGORY_IMAGE',
+            entity_type: 'category_image',
+            entity_id: image_id,
+            details: { category_id, updated_fields: Object.keys(updateData) }
+        }]);
+        
+        res.json(data);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.delete('/api/admin/categories/:category_id/images/:image_id', authenticateAdmin, async (req, res) => {
+    try {
+        const { category_id, image_id } = req.params;
+        
+        // Get image details before deletion
+        const { data: image, error: getError } = await supabase
+            .from('category_images')
+            .select('image_url')
+            .eq('id', image_id)
+            .eq('category_id', category_id)
+            .single();
+            
+        if (getError || !image) {
+            return res.status(404).json({ message: 'Image not found' });
+        }
+        
+        const { error } = await supabase
+            .from('category_images')
+            .delete()
+            .eq('id', image_id)
+            .eq('category_id', category_id);
+            
+        if (error) return res.status(500).json({ error: error.message });
+        
+        // Try to delete physical file
+        try {
+            const imagePath = path.join(__dirname, '../frontend/public', image.image_url);
+            if (fs.existsSync(imagePath)) {
+                fs.unlinkSync(imagePath);
+            }
+        } catch (fileError) {
+            console.warn('Could not delete physical file:', fileError.message);
+        }
+        
+        await supabase.from('admin_logs').insert([{
+            admin_id: req.user.id,
+            action: 'DELETE_CATEGORY_IMAGE',
+            entity_type: 'category_image',
+            entity_id: image_id,
+            details: { category_id, image_url: image.image_url }
+        }]);
+        
+        res.json({ message: 'Image deleted successfully' });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
 });
 
 // Initialize default categories if none exist
@@ -640,11 +989,41 @@ app.post('/api/admin/init-categories', authenticateAdmin, async (req, res) => {
 
         if (existingCategories.length === 0) {
             const defaultCategories = [
-                { name: 'Nuts' },
-                { name: 'Dried Fruits' },
-                { name: 'Seeds' },
-                { name: 'Spices' },
-                { name: 'Traditional Sweets' }
+                { 
+                    name: 'Nuts', 
+                    description: 'Premium quality nuts including almonds, cashews, and walnuts',
+                    display_order: 1,
+                    gradient_colors: 'from-amber-400 to-orange-500',
+                    is_active: true
+                },
+                { 
+                    name: 'Dried Fruits', 
+                    description: 'Natural dried fruits with no added preservatives',
+                    display_order: 2,
+                    gradient_colors: 'from-red-400 to-pink-500',
+                    is_active: true
+                },
+                { 
+                    name: 'Seeds', 
+                    description: 'Nutritious seeds and kernels for healthy snacking',
+                    display_order: 3,
+                    gradient_colors: 'from-green-400 to-emerald-500',
+                    is_active: true
+                },
+                { 
+                    name: 'Spices', 
+                    description: 'Aromatic spices to enhance your culinary experience',
+                    display_order: 4,
+                    gradient_colors: 'from-yellow-400 to-amber-500',
+                    is_active: true
+                },
+                { 
+                    name: 'Traditional Sweets', 
+                    description: 'Authentic traditional sweets and confections',
+                    display_order: 5,
+                    gradient_colors: 'from-purple-400 to-indigo-500',
+                    is_active: true
+                }
             ];
 
             const { data, error } = await supabase

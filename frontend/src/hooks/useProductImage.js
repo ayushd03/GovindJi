@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { productsAPI } from '../services/api';
 
 export const useProductImage = (productId, fallbackImageUrl = null) => {
   const [primaryImage, setPrimaryImage] = useState(null);
@@ -13,8 +14,8 @@ export const useProductImage = (productId, fallbackImageUrl = null) => {
     const fetchPrimaryImage = async () => {
       setLoading(true);
       try {
-        const response = await fetch(`/api/products/${productId}/images`);
-        const images = await response.json();
+        const response = await productsAPI.getImages(productId);
+        const images = response.data;
         
         if (Array.isArray(images) && images.length > 0) {
           // Find primary image or use first image
