@@ -37,7 +37,7 @@ const Footer = () => {
     <footer className="bg-footer-bg text-white mt-auto">
       {/* Main Footer Content */}
       <motion.div 
-        className="container mx-auto px-4 py-16"
+        className="container mx-auto px-4 pt-20 pb-16"
         variants={stagger}
         initial="initial"
         whileInView="whileInView"

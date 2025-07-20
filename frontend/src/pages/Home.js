@@ -68,6 +68,12 @@ const Home = () => {
     transition: { duration: 0.8, ease: "easeOut" }
   };
 
+  const slideInFromRight = {
+    initial: { opacity: 0, x: 100 },
+    animate: { opacity: 1, x: 0 },
+    transition: { duration: 0.8, ease: "easeOut" }
+  };
+
   const stagger = {
     animate: {
       transition: {
@@ -94,13 +100,16 @@ const Home = () => {
       <motion.section 
         className="relative min-h-screen flex items-center justify-center overflow-hidden"
         style={{
-          backgroundImage: `linear-gradient(135deg, rgba(243, 156, 18, 0.9) 0%, rgba(230, 126, 34, 0.9) 100%), url(${process.env.PUBLIC_URL}/hero_bgg.webp)`
+          backgroundImage: `url(${process.env.PUBLIC_URL}/hero_bgg.webp)`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat'
         }}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 1 }}
       >
-        <div className="absolute inset-0 bg-black/20" />
+        <div className="absolute inset-0 bg-black/30" />
         
         {/* Floating decorative elements */}
         <motion.div
@@ -247,7 +256,7 @@ const Home = () => {
                 viewport={{ once: true }}
               >
                 {featuredProducts.map((product, index) => (
-                  <motion.div key={product.id} variants={fadeInUp}>
+                  <motion.div key={product.id} variants={slideInFromRight}>
                     <ProductCard product={product} />
                   </motion.div>
                 ))}

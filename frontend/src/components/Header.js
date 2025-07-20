@@ -59,7 +59,7 @@ const Header = () => {
               <img 
                 src="/Govindji_Logo.webp" 
                 alt="GovindJi Dry Fruits" 
-                className="h-12 w-auto transition-transform duration-300"
+                className="h-16 w-auto transition-transform duration-300"
               />
             </Link>
           </motion.div>
