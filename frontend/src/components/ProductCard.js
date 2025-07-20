@@ -1,10 +1,12 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
+import { useProductImage } from '../hooks/useProductImage';
 import './ProductCard.css';
 
 const ProductCard = ({ product }) => {
   const { addToCart } = useCart();
+  const { primaryImage, loading: imageLoading } = useProductImage(product.id, product.image_url);
 
   const handleAddToCart = (e) => {
     e.preventDefault();
@@ -16,13 +18,17 @@ const ProductCard = ({ product }) => {
     <div className="product-card">
       <Link to={`/products/${product.id}`} className="product-link">
         <div className="product-image">
-          <img 
-            src={product.image_url || '/placeholder-product.jpg'} 
-            alt={product.name}
-            onError={(e) => {
-              e.target.src = '/placeholder-product.jpg';
-            }}
-          />
+          {imageLoading ? (
+            <div className="image-skeleton"></div>
+          ) : (
+            <img 
+              src={primaryImage || '/placeholder-product.jpg'} 
+              alt={product.name}
+              onError={(e) => {
+                e.target.src = '/placeholder-product.jpg';
+              }}
+            />
+          )}
         </div>
         
         <div className="product-info">
