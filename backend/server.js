@@ -6,6 +6,7 @@ const path = require('path');
 const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
 const { createClient } = require('@supabase/supabase-js');
+const storageService = require('./services/StorageService');
 
 const app = express();
 const port = process.env.PORT || 3001;
@@ -19,32 +20,20 @@ app.use(cors());
 app.use(express.json({ limit: '25mb' }));
 app.use(express.urlencoded({ limit: '25mb', extended: true }));
 
-// Configure multer for file uploads
-const storage = multer.diskStorage({
-    destination: function (req, file, cb) {
-        // Determine upload path based on route
-        let uploadPath;
-        if (req.url.includes('/categories/')) {
-            uploadPath = path.join(__dirname, '../frontend/public/category_images');
-        } else {
-            uploadPath = path.join(__dirname, '../frontend/public/product_images');
-        }
-        
-        // Ensure directory exists
-        if (!fs.existsSync(uploadPath)) {
-            fs.mkdirSync(uploadPath, { recursive: true });
-        }
-        cb(null, uploadPath);
-    },
-    filename: function (req, file, cb) {
-        // Generate unique filename with original extension
-        const uniqueName = `${uuidv4()}${path.extname(file.originalname)}`;
-        cb(null, uniqueName);
+// Initialize storage service
+(async () => {
+    try {
+        await storageService.initialize();
+        console.log('✅ Storage service initialized successfully');
+    } catch (error) {
+        console.error('❌ Failed to initialize storage service:', error);
+        process.exit(1);
     }
-});
+})();
 
+// Configure multer for memory storage (for cloud upload)
 const upload = multer({
-    storage: storage,
+    storage: multer.memoryStorage(),
     limits: {
         fileSize: 25 * 1024 * 1024 // 25MB limit
     },
@@ -371,14 +360,30 @@ app.post('/api/admin/products/:id/images/upload', authenticateAdmin, upload.sing
                 .eq('product_id', id);
         }
         
-        // Create the image URL (relative path from public directory)
-        const imageUrl = `/product_images/${req.file.filename}`;
+        // Upload to cloud storage
+        const uploadResult = await storageService.uploadFile(
+            req.file.buffer,
+            req.file.originalname,
+            req.file.mimetype,
+            {
+                prefix: 'products',
+                uploadedBy: req.user.id,
+                metadata: {
+                    productId: id,
+                    altText: alt_text || ''
+                }
+            }
+        );
+
+        if (!uploadResult.success) {
+            throw new Error('Failed to upload file to cloud storage');
+        }
         
         const { data, error } = await supabase
             .from('product_images')
             .insert([{
                 product_id: id,
-                image_url: imageUrl,
+                image_url: uploadResult.url,
                 image_type: 'file',
                 sort_order: nextSortOrder,
                 alt_text: alt_text || '',
@@ -388,8 +393,12 @@ app.post('/api/admin/products/:id/images/upload', authenticateAdmin, upload.sing
             .single();
         
         if (error) {
-            // Delete the uploaded file if database insert fails
-            fs.unlinkSync(req.file.path);
+            // Delete the uploaded file from cloud storage if database insert fails
+            try {
+                await storageService.deleteFile(uploadResult.url);
+            } catch (deleteError) {
+                console.error('Failed to cleanup uploaded file:', deleteError);
+            }
             return res.status(500).json({ error: error.message });
         }
         
@@ -399,15 +408,16 @@ app.post('/api/admin/products/:id/images/upload', authenticateAdmin, upload.sing
             action: 'UPLOAD_PRODUCT_IMAGE',
             entity_type: 'product',
             entity_id: id,
-            details: { image_id: data.id, filename: req.file.filename }
+            details: { 
+                image_id: data.id, 
+                filename: uploadResult.fileName,
+                cloud_url: uploadResult.url 
+            }
         }]);
         
         res.status(201).json(data);
     } catch (error) {
-        // Delete the uploaded file if any error occurs
-        if (req.file && fs.existsSync(req.file.path)) {
-            fs.unlinkSync(req.file.path);
-        }
+        console.error('Product image upload error:', error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -543,11 +553,13 @@ app.delete('/api/admin/products/:productId/images/:imageId', authenticateAdmin, 
         
         if (error) return res.status(500).json({ error: error.message });
         
-        // If it was a file upload, delete the actual file
+        // If it was a file upload, delete from cloud storage
         if (imageData.image_type === 'file') {
-            const filePath = path.join(__dirname, '../frontend/public', imageData.image_url);
-            if (fs.existsSync(filePath)) {
-                fs.unlinkSync(filePath);
+            try {
+                await storageService.deleteFile(imageData.image_url);
+            } catch (deleteError) {
+                console.error('Failed to delete file from cloud storage:', deleteError);
+                // Continue with the response even if cloud deletion fails
             }
         }
         
@@ -1331,6 +1343,45 @@ app.post('/api/products/:id/reviews', authenticateToken, async (req, res) => {
 
     if (error) return res.status(500).json({ error: error.message });
     res.status(201).json(data);
+});
+
+// Storage health check endpoint
+app.get('/api/admin/storage/health', authenticateAdmin, async (req, res) => {
+    try {
+        const healthStatus = await storageService.healthCheck();
+        res.json(healthStatus);
+    } catch (error) {
+        res.status(500).json({
+            status: 'error',
+            error: error.message,
+            timestamp: new Date().toISOString()
+        });
+    }
+});
+
+// Storage configuration endpoint  
+app.get('/api/admin/storage/config', authenticateAdmin, async (req, res) => {
+    try {
+        const providerType = storageService.getProviderType();
+        const capabilities = storageService.getCapabilities();
+        
+        res.json({
+            provider: providerType,
+            capabilities,
+            initialized: storageService.initialized,
+            environment: {
+                STORAGE_PROVIDER: process.env.STORAGE_PROVIDER || 'auto-detected',
+                GCP_STORAGE_BUCKET: process.env.GCP_STORAGE_BUCKET ? '***configured***' : 'not set',
+                AWS_S3_BUCKET: process.env.AWS_S3_BUCKET ? '***configured***' : 'not set',
+                STORAGE_FOLDER: process.env.STORAGE_FOLDER || 'product-images'
+            }
+        });
+    } catch (error) {
+        res.status(500).json({
+            error: error.message,
+            initialized: false
+        });
+    }
 });
 
 app.listen(port, () => {
