@@ -2,7 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, useAnimation } from 'framer-motion';
 import { ArrowRight, Star, Shield, Truck, Heart, Award, Leaf, CheckCircle } from 'lucide-react';
-import ProductCard from '../components/ProductCard';
+import ProductCardNew from '../components/ProductCardNew';
+import { Button } from '../components/ui/button';
+import { Card, CardContent } from '../components/ui/card';
+import { Badge } from '../components/ui/badge';
 import { productsAPI, categoriesAPI } from '../services/api';
 
 const Home = () => {
@@ -206,14 +209,13 @@ const Home = () => {
               transition={{ duration: 0.8, delay: 0.8 }}
             >
               <Link to="/products">
-                <motion.button
-                  whileHover={{ scale: 1.05, y: -2 }}
-                  whileTap={{ scale: 0.95 }}
-                  className="bg-white text-gray-800 px-8 py-4 rounded-full font-semibold text-lg shadow-2xl hover:shadow-3xl transition-all duration-300 flex items-center space-x-2"
+                <Button
+                  size="lg"
+                  className="bg-white text-gray-800 hover:bg-white/90 px-8 py-4 rounded-full font-semibold text-lg shadow-2xl hover:shadow-3xl transition-all duration-300 inline-flex items-center space-x-2"
                 >
                   <span>Shop Now</span>
                   <ArrowRight className="w-5 h-5" />
-                </motion.button>
+                </Button>
               </Link>
               
               <motion.div
@@ -260,27 +262,32 @@ const Home = () => {
                 <motion.div
                   key={category.id || category.name}
                   variants={fadeInUp}
-                  whileHover={{ scale: 1.05, y: -5 }}
+                  whileHover={{ scale: 1.03, y: -3 }}
                   className="group cursor-pointer"
                 >
-                  <div 
-                    className={`relative h-48 rounded-2xl p-6 text-center shadow-lg group-hover:shadow-xl transition-all duration-300 bg-gradient-to-br ${bgConfig.gradient}`}
-                    style={{
-                      backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.3), rgba(0, 0, 0, 0.5)), url('${bgConfig.image}')`,
-                      backgroundSize: 'cover',
-                      backgroundPosition: 'center',
-                      backgroundBlendMode: 'overlay'
-                    }}
-                  >
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent rounded-2xl" />
-                    <div className="relative z-10 h-full flex flex-col justify-end">
-                      <h3 className="text-white font-bold text-xl mb-2 drop-shadow-lg">{category.name}</h3>
-                      <div className="text-white/90 text-sm font-medium opacity-80 group-hover:opacity-100 transition-opacity">
+                  <Card className="relative h-48 overflow-hidden border-0 shadow-md hover:shadow-lg transition-all duration-300">
+                    <div 
+                      className={`absolute inset-0 bg-gradient-to-br ${bgConfig.gradient}`}
+                      style={{
+                        backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.3), rgba(0, 0, 0, 0.5)), url('${bgConfig.image}')`,
+                        backgroundSize: 'cover',
+                        backgroundPosition: 'center',
+                        backgroundBlendMode: 'overlay'
+                      }}
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                    <CardContent className="relative z-10 h-full p-6 flex flex-col justify-end text-center">
+                      <h3 className="text-white font-bold text-xl mb-2 drop-shadow-lg">
+                        {category.name}
+                      </h3>
+                      <Badge 
+                        variant="secondary" 
+                        className="mx-auto bg-white/20 text-white border-white/30 hover:bg-white/30"
+                      >
                         Shop Now →
-                      </div>
-                    </div>
-                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 rounded-2xl transition-all duration-300" />
-                  </div>
+                      </Badge>
+                    </CardContent>
+                  </Card>
                 </motion.div>
               );
             })}
@@ -328,7 +335,7 @@ const Home = () => {
                       key={`${product.id}-${index}`} 
                       className="flex-shrink-0 w-80"
                       whileHover={{ 
-                        scale: 1.05,
+                        scale: 1.02,
                         zIndex: 10
                       }}
                       transition={{ 
@@ -337,7 +344,7 @@ const Home = () => {
                         damping: 20
                       }}
                     >
-                      <ProductCard product={product} />
+                      <ProductCardNew product={product} />
                     </motion.div>
                   ))}
                 </motion.div>
@@ -345,14 +352,14 @@ const Home = () => {
               
               <motion.div className="text-center" {...fadeInUp}>
                 <Link to="/products">
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    className="btn-secondary inline-flex items-center space-x-2"
+                  <Button
+                    variant="outline"
+                    size="lg"
+                    className="inline-flex items-center space-x-2"
                   >
                     <span>View All Products</span>
                     <ArrowRight className="w-5 h-5" />
-                  </motion.button>
+                  </Button>
                 </Link>
               </motion.div>
             </>
@@ -389,18 +396,22 @@ const Home = () => {
                 <motion.div
                   key={feature.title}
                   variants={fadeInUp}
-                  whileHover={{ y: -10 }}
-                  className="card text-center group hover:shadow-2xl"
+                  whileHover={{ y: -8 }}
+                  className="group"
                 >
-                  <div className={`inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-100 ${feature.color} mb-6 group-hover:scale-110 transition-transform duration-300`}>
-                    <IconComponent className="w-8 h-8" />
-                  </div>
-                  <h3 className="text-xl font-semibold text-primary-text mb-4">
-                    {feature.title}
-                  </h3>
-                  <p className="text-gray-600 leading-relaxed">
-                    {feature.description}
-                  </p>
+                  <Card className="text-center h-full border-0 shadow-md hover:shadow-xl transition-all duration-300">
+                    <CardContent className="p-6">
+                      <div className={`inline-flex items-center justify-center w-16 h-16 rounded-full bg-muted/30 ${feature.color} mb-6 group-hover:scale-110 transition-transform duration-300`}>
+                        <IconComponent className="w-8 h-8" />
+                      </div>
+                      <h3 className="text-xl font-semibold mb-4">
+                        {feature.title}
+                      </h3>
+                      <p className="text-muted-foreground leading-relaxed">
+                        {feature.description}
+                      </p>
+                    </CardContent>
+                  </Card>
                 </motion.div>
               );
             })}
@@ -423,14 +434,13 @@ const Home = () => {
               for their daily nutrition needs
             </p>
             <Link to="/products">
-              <motion.button
-                whileHover={{ scale: 1.05, y: -2 }}
-                whileTap={{ scale: 0.95 }}
-                className="bg-white text-gray-800 px-8 py-4 rounded-full font-semibold text-lg shadow-2xl hover:shadow-3xl transition-all duration-300 inline-flex items-center space-x-2"
+              <Button
+                size="lg"
+                className="bg-white text-gray-800 hover:bg-white/90 px-8 py-4 rounded-full font-semibold text-lg shadow-2xl hover:shadow-3xl transition-all duration-300 inline-flex items-center space-x-2"
               >
                 <span>Start Shopping</span>
                 <ArrowRight className="w-5 h-5" />
-              </motion.button>
+              </Button>
             </Link>
           </motion.div>
         </div>
