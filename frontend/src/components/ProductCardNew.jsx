@@ -59,24 +59,22 @@ const ProductCardNew = ({ product, className }) => {
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
       >
-        <Card className="overflow-hidden border-4 border-primary/10 hover:border-primary/40 shadow-xl hover:shadow-[0_25px_50px_-12px_rgba(0,0,0,0.25)] transition-all duration-600 bg-gradient-to-br from-white via-primary/5 to-secondary-accent/10 relative backdrop-blur-sm transform-gpu">
+        <Card className="overflow-hidden border-2 border-gray-200 hover:border-gray-300 shadow-lg hover:shadow-xl transition-all duration-300 bg-white relative">
           {/* Bold pattern background */}
           <div 
             className="absolute inset-0 opacity-[0.08] group-hover:opacity-[0.15] transition-opacity duration-500"
             style={{
-              backgroundImage: `radial-gradient(circle, #F39C12 2px, transparent 2px)`,
+              backgroundImage: `radial-gradient(circle, #2563eb 2px, transparent 2px)`,
               backgroundSize: '25px 25px'
             }}
           />
           
           {/* Strong gradient overlay for depth */}
-          <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-secondary-accent/15 opacity-60 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
+          <div className="absolute inset-0 bg-gradient-to-br from-gray-50/50 via-transparent to-gray-100/30 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
           
           {/* Premium border glow effect */}
-          <div className="absolute inset-0 bg-gradient-to-r from-primary/20 via-secondary-accent/15 to-primary/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none rounded-lg" />
           
           {/* Prominent corner accent */}
-          <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-primary/20 to-transparent opacity-30 group-hover:opacity-70 transition-opacity duration-500 pointer-events-none" />
           
           {/* Animated pulse ring */}
           <motion.div
@@ -111,7 +109,7 @@ const ProductCardNew = ({ product, className }) => {
               className="absolute top-2 left-1/2 transform -translate-x-1/2 z-20"
             >
               <Badge 
-                className="bg-gradient-to-r from-primary via-primary to-secondary-accent text-white shadow-2xl border-2 border-primary/50 px-3 py-1 text-sm font-bold"
+                className="bg-primary text-white shadow-lg border border-primary/20 px-3 py-1 text-sm font-bold"
               >
                 {getCartLabel()}
               </Badge>
@@ -149,12 +147,11 @@ const ProductCardNew = ({ product, className }) => {
 
           <Link to={`/products/${product.id}`} className="block">
             {/* Product Image */}
-            <div className="relative h-52 bg-gradient-to-br from-primary/10 via-white to-secondary-accent/10 overflow-hidden">
+            <div className="relative h-52 bg-gray-50 overflow-hidden">
               {/* Bold image border/frame effect */}
-              <div className="absolute inset-1 bg-gradient-to-br from-white/40 via-primary/10 to-white/40 rounded-lg opacity-50 group-hover:opacity-90 transition-opacity duration-500 pointer-events-none border-2 border-white/50" />
               
               {imageLoading ? (
-                <div className="w-full h-full bg-gradient-to-r from-primary/20 via-white to-secondary-accent/20 bg-[length:200%_100%] animate-pulse" />
+                <div className="w-full h-full bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 bg-[length:200%_100%] animate-pulse" />
               ) : (
                 <img
                   src={primaryImage || product.image_url || '/placeholder-product.jpg'}
@@ -169,12 +166,12 @@ const ProductCardNew = ({ product, className }) => {
               )}
               
               {/* Enhanced gradient overlay */}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-primary/10 opacity-70 group-hover:opacity-40 transition-opacity duration-500" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/10 via-transparent to-transparent opacity-50 group-hover:opacity-30 transition-opacity duration-300" />
               
               {/* Overlay with Quick Actions */}
               <motion.div 
                 className={cn(
-                  "absolute inset-0 bg-gradient-to-t from-black/70 via-primary/20 to-transparent flex items-center justify-center transition-all duration-500",
+                  "absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent flex items-center justify-center transition-all duration-300",
                   isHovered ? "opacity-100" : "opacity-0"
                 )}
                 initial={{ opacity: 0 }}
@@ -261,7 +258,7 @@ const ProductCardNew = ({ product, className }) => {
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
                     <motion.span 
-                      className="text-xl font-black bg-gradient-to-r from-primary via-secondary-accent to-primary bg-clip-text text-transparent drop-shadow-sm"
+                      className="text-xl font-black text-primary"
                       whileHover={{ scale: 1.1 }}
                       transition={{ type: "spring", stiffness: 400, damping: 10 }}
                     >
@@ -283,7 +280,6 @@ const ProductCardNew = ({ product, className }) => {
 
           <CardFooter className="p-4 pt-2 relative">
             {/* Bold footer gradient background */}
-            <div className="absolute inset-0 bg-gradient-to-t from-primary/10 via-secondary-accent/5 to-transparent opacity-50 group-hover:opacity-80 transition-opacity duration-500 pointer-events-none" />
             
             <motion.div
               className="w-full relative z-10"
@@ -293,14 +289,13 @@ const ProductCardNew = ({ product, className }) => {
             >
               <Button
                 onClick={handleAddToCart}
-                className="w-full h-12 bg-gradient-to-r from-primary via-primary to-secondary-accent hover:from-secondary-accent hover:via-primary hover:to-primary shadow-xl hover:shadow-2xl transition-all duration-500 border-2 border-primary/20 hover:border-primary/40 text-white font-bold text-base"
+                className="w-full h-12 bg-primary hover:bg-primary/90 shadow-lg hover:shadow-xl transition-all duration-300 border border-primary/20 hover:border-primary/40 text-white font-bold text-base"
                 size="lg"
               >
                 <ShoppingCart className="h-5 w-5 mr-2" />
                 <span>Add to Cart</span>
               </Button>
               {/* Button glow effect */}
-              <div className="absolute inset-0 bg-gradient-to-r from-primary to-secondary-accent rounded-lg blur-lg opacity-30 group-hover:opacity-50 transition-opacity duration-500 -z-10"></div>
             </motion.div>
           </CardFooter>
         </Card>

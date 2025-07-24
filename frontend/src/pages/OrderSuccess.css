@@ -84,12 +84,12 @@
 }
 
 .continue-shopping-btn {
-  background-color: #f4a261;
+  background-color: #2563eb;
   color: white;
 }
 
 .continue-shopping-btn:hover {
-  background-color: #e76f51;
+  background-color: #1d4ed8;
 }
 
 .view-orders-btn {

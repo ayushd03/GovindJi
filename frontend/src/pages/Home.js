@@ -185,7 +185,7 @@ const Home = () => {
               transition={{ duration: 0.8, delay: 0.4 }}
             >
               Welcome to{' '}
-              <span className="bg-gradient-to-r from-yellow-300 to-orange-300 bg-clip-text text-transparent">
+              <span className="bg-gradient-to-r from-orange-400 to-blue-500 bg-clip-text text-transparent">
                 GovindJi
               </span>
               <br />
@@ -415,33 +415,6 @@ const Home = () => {
                 </motion.div>
               );
             })}
-          </motion.div>
-        </div>
-      </motion.section>
-
-      {/* Call to Action Section */}
-      <motion.section 
-        className="pt-20 lg:pt-28 pb-12 lg:pb-16 bg-gradient-to-r from-primary-accent to-secondary-accent text-white"
-        {...fadeInUp}
-      >
-        <div className="container mx-auto px-1 text-center">
-          <motion.div {...fadeInUp}>
-            <h2 className="text-4xl md:text-5xl font-bold mb-6">
-              Ready to Experience Premium Quality?
-            </h2>
-            <p className="text-xl mb-8 max-w-2xl mx-auto opacity-90">
-              Join thousands of satisfied customers who trust GovindJi Dry Fruits 
-              for their daily nutrition needs
-            </p>
-            <Link to="/products">
-              <Button
-                size="lg"
-                className="bg-white text-gray-800 hover:bg-white/90 px-8 py-4 rounded-full font-semibold text-lg shadow-2xl hover:shadow-3xl transition-all duration-300 inline-flex items-center space-x-2"
-              >
-                <span>Start Shopping</span>
-                <ArrowRight className="w-5 h-5" />
-              </Button>
-            </Link>
           </motion.div>
         </div>
       </motion.section>

@@ -72,10 +72,10 @@ body {
 }
 
 .btn-secondary {
-  background-color: #f4a261;
+  background-color: #2563eb;
   color: white;
 }
 
 .btn-secondary:hover {
-  background-color: #e76f51;
+  background-color: #1d4ed8;
 }

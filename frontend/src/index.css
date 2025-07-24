@@ -15,7 +15,7 @@
   --card-foreground: 222.2 84% 4.9%;
   --popover: 0 0% 100%;
   --popover-foreground: 222.2 84% 4.9%;
-  --primary: 31 86% 51%;
+  --primary: 221 83% 53%;
   --primary-foreground: 0 0% 100%;
   --secondary: 210 40% 98%;
   --secondary-foreground: 222.2 84% 4.9%;
@@ -27,14 +27,14 @@
   --destructive-foreground: 210 40% 98%;
   --border: 214.3 31.8% 91.4%;
   --input: 214.3 31.8% 91.4%;
-  --ring: 31 86% 51%;
+  --ring: 221 83% 53%;
   --radius: 0.5rem;
 
   /* Legacy CSS Variables (for backwards compatibility) */
   --color-primary-bg: #FFFFFF;
   --color-primary-text: #212121;
-  --color-primary-accent: #F39C12;
-  --color-secondary-accent: #E67E22;
+  --color-primary-accent: #2563eb;
+  --color-secondary-accent: #1d4ed8;
   --color-footer-bg: #1E392A;
   --color-light-gray: #F8F9FA;
   --color-border: #E5E5E5;
@@ -138,6 +138,6 @@
   }
 
   .hero-section {
-    @apply min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-accent/10 to-secondary-accent/10;
+    @apply min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-blue-50/30;
   }
 }

@@ -102,7 +102,7 @@ const SizeSelectionDialog = ({ isOpen, onClose, product }) => {
                 )}
               >
                 {size.popular && (
-                  <div className="absolute -top-1 -right-1 w-2 h-2 bg-orange-500 rounded-full"></div>
+                  <div className="absolute -top-1 -right-1 w-2 h-2 bg-blue-500 rounded-full"></div>
                 )}
                 <div className="font-semibold">{size.label}</div>
                 <div className="text-xs opacity-80">₹{size.price.toFixed(0)}</div>

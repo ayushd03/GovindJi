@@ -85,7 +85,7 @@
 .price {
   font-size: 2.5rem;
   font-weight: 700;
-  color: #e76f51;
+  color: #1d4ed8;
 }
 
 .unit {
@@ -252,12 +252,12 @@
 }
 
 .add-to-cart-btn {
-  background: #f4a261;
+  background: #2563eb;
   color: white;
 }
 
 .add-to-cart-btn:hover {
-  background: #e76f51;
+  background: #1d4ed8;
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(231, 111, 81, 0.3);
 }

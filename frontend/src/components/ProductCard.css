@@ -77,12 +77,12 @@
 .product-price {
   font-size: 1.2rem;
   font-weight: bold;
-  color: #e76f51;
+  color: #1d4ed8;
   margin-bottom: 0.5rem;
 }
 
 .add-to-cart-btn {
-  background-color: #f4a261;
+  background-color: #2563eb;
   color: white;
   border: none;
   padding: 0.75rem;
@@ -97,7 +97,7 @@
 }
 
 .add-to-cart-btn:hover {
-  background-color: #e76f51;
+  background-color: #1d4ed8;
   transform: translateY(-2px);
   box-shadow: 0 4px 8px rgba(0,0,0,0.2);
 }
