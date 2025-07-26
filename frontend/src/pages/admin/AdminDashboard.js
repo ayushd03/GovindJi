@@ -21,6 +21,10 @@ const AdminDashboard = () => {
   const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
   useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+
+  useEffect(() => {
     fetchDashboardData();
   }, []);
 

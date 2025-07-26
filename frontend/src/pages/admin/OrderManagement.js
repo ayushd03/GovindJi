@@ -21,6 +21,10 @@ const OrderManagement = () => {
   const [selectedOrder, setSelectedOrder] = useState(null);
 
   useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+
+  useEffect(() => {
     fetchOrders();
   }, [selectedStatus]);
 

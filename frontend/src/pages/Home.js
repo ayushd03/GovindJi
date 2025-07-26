@@ -61,6 +61,10 @@ const Home = () => {
   }, [isHovered]);
 
   useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+
+  useEffect(() => {
     const fetchData = async () => {
       try {
         // Fetch products and categories in parallel

@@ -1,10 +1,14 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import './OrderSuccess.css';
 
 const OrderSuccess = () => {
   const location = useLocation();
   const order = location.state?.order;
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
 
   return (
     <div className="order-success-page">
