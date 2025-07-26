@@ -34,7 +34,7 @@ const Footer = () => {
   };
 
   return (
-    <footer className="bg-footer-bg text-white mt-auto">
+    <footer className="bg-footer-bg text-white mt-auto pt-8">
       {/* Main Footer Content */}
       <motion.div 
         className="container mx-auto px-2 pt-16 pb-16"
@@ -47,11 +47,6 @@ const Footer = () => {
           {/* Company Info */}
           <motion.div variants={fadeInUp} className="space-y-6">
             <div>
-              <img 
-                src="/Govindji_Logo.webp" 
-                alt="GovindJi Dry Fruits" 
-                className="h-12 w-auto mb-4 filter brightness-0 invert"
-              />
               <h3 className="text-xl font-bold text-primary-accent mb-3">
                 GovindJi Dry Fruits
               </h3>
