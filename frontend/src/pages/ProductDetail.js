@@ -4,6 +4,8 @@ import { useCart } from '../context/CartContext';
 import ProductImageGallery from '../components/ProductImageGallery';
 import './ProductDetail.css';
 
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+
 const ProductDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -20,7 +22,7 @@ const ProductDetail = () => {
   const fetchProduct = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`/api/products/${id}`);
+      const response = await fetch(`${API_BASE_URL}/api/products/${id}`);
       if (response.ok) {
         const data = await response.json();
         setProduct(data);

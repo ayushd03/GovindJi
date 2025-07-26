@@ -32,7 +32,8 @@ class StorageService {
 
       // Validate configuration
       const providerType = this.getProviderType();
-      const validation = StorageFactory.validateConfig(providerType, config);
+      const actualConfig = Object.keys(config).length > 0 ? config : StorageFactory.getConfigFromEnvironment(providerType);
+      const validation = StorageFactory.validateConfig(providerType, actualConfig);
       
       if (!validation.isValid) {
         console.error('Storage configuration errors:', validation.errors);

@@ -12,6 +12,8 @@ import {
   XMarkIcon
 } from '@heroicons/react/24/outline';
 
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+
 const OrderManagement = () => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -26,8 +28,8 @@ const OrderManagement = () => {
     try {
       const token = localStorage.getItem('authToken');
       const url = selectedStatus 
-        ? `/api/admin/orders?status=${selectedStatus}`
-        : '/api/admin/orders';
+        ? `${API_BASE_URL}/api/admin/orders?status=${selectedStatus}`
+        : `${API_BASE_URL}/api/admin/orders`;
       
       const response = await fetch(url, {
         headers: {
@@ -50,7 +52,7 @@ const OrderManagement = () => {
   const updateOrderStatus = async (orderId, newStatus) => {
     try {
       const token = localStorage.getItem('authToken');
-      const response = await fetch(`/api/admin/orders/${orderId}/status`, {
+      const response = await fetch(`${API_BASE_URL}/api/admin/orders/${orderId}/status`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,

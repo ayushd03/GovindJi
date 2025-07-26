@@ -13,6 +13,8 @@ import {
   CheckIcon
 } from '@heroicons/react/24/outline';
 
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+
 const CategoryManagement = () => {
   const { user } = useAuth();
   const [categories, setCategories] = useState([]);
@@ -49,7 +51,7 @@ const CategoryManagement = () => {
   const fetchCategories = async () => {
     try {
       const token = localStorage.getItem('authToken');
-      const response = await fetch('/api/admin/categories', {
+      const response = await fetch(`${API_BASE_URL}/api/admin/categories`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -112,8 +114,8 @@ const CategoryManagement = () => {
     try {
       const token = localStorage.getItem('authToken');
       const url = modalType === 'edit' 
-        ? `/api/admin/categories/${selectedCategory.id}`
-        : '/api/admin/categories';
+        ? `${API_BASE_URL}/api/admin/categories/${selectedCategory.id}`
+        : `${API_BASE_URL}/api/admin/categories`;
       
       const method = modalType === 'edit' ? 'PUT' : 'POST';
       
@@ -139,7 +141,7 @@ const CategoryManagement = () => {
           imageFormData.append('alt_text', `${savedCategory.name} category image`);
           imageFormData.append('is_primary', i === 0 ? 'true' : 'false');
           
-          await fetch(`/api/admin/categories/${savedCategory.id}/images`, {
+          await fetch(`${API_BASE_URL}/api/admin/categories/${savedCategory.id}/images`, {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${token}`
@@ -165,7 +167,7 @@ const CategoryManagement = () => {
     
     try {
       const token = localStorage.getItem('authToken');
-      const response = await fetch(`/api/admin/categories/${categoryId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/admin/categories/${categoryId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -186,7 +188,7 @@ const CategoryManagement = () => {
   const toggleStatus = async (category) => {
     try {
       const token = localStorage.getItem('authToken');
-      const response = await fetch(`/api/admin/categories/${category.id}`, {
+      const response = await fetch(`${API_BASE_URL}/api/admin/categories/${category.id}`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -210,7 +212,7 @@ const CategoryManagement = () => {
     
     try {
       const token = localStorage.getItem('authToken');
-      const response = await fetch(`/api/admin/categories/${categoryId}/images/${imageId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/admin/categories/${categoryId}/images/${imageId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`

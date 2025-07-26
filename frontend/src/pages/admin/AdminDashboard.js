@@ -18,6 +18,7 @@ const AdminDashboard = () => {
   const [dashboardData, setDashboardData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
   useEffect(() => {
     fetchDashboardData();
@@ -26,7 +27,7 @@ const AdminDashboard = () => {
   const fetchDashboardData = async () => {
     try {
       const token = localStorage.getItem('authToken');
-      const response = await fetch('/api/admin/dashboard', {
+      const response = await fetch(`${API_BASE_URL}/api/admin/dashboard`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -49,7 +50,7 @@ const AdminDashboard = () => {
   const initializeCategories = async () => {
     try {
       const token = localStorage.getItem('authToken');
-      const response = await fetch('/api/admin/init-categories', {
+      const response = await fetch(`${API_BASE_URL}/api/admin/init-categories`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,

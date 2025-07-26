@@ -864,7 +864,22 @@ app.post('/api/admin/categories/:id/images', authenticateAdmin, upload.single('i
                 .eq('category_id', category_id);
         }
         
-        const image_url = `/category_images/${req.file.filename}`;
+        // Upload to cloud storage
+        const uploadResult = await storageService.uploadFile(
+            req.file.buffer,
+            req.file.originalname,
+            req.file.mimetype,
+            {
+                prefix: 'category_images',
+                uploadedBy: req.user.id,
+                metadata: {
+                    categoryId: category_id,
+                    altText: alt_text || ''
+                }
+            }
+        );
+        
+        const image_url = uploadResult.url;
         
         const { data, error } = await supabase
             .from('category_images')
@@ -885,11 +900,18 @@ app.post('/api/admin/categories/:id/images', authenticateAdmin, upload.single('i
             action: 'ADD_CATEGORY_IMAGE',
             entity_type: 'category_image',
             entity_id: data.id,
-            details: { category_id, image_url, is_primary }
+            details: { 
+                category_id, 
+                image_url, 
+                is_primary,
+                file_name: uploadResult.fileName,
+                file_size: uploadResult.size
+            }
         }]);
         
         res.status(201).json(data);
     } catch (error) {
+        console.error('Category image upload error:', error);
         res.status(500).json({ error: error.message });
     }
 });

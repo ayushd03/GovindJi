@@ -47,7 +47,8 @@ const ImageGalleryManager = ({ productId, isOpen, onClose, onImagesUpdate }) => 
         formData.append('alt_text', file.name);
         formData.append('is_primary', Array.isArray(images) && images.length === 0); // First image is primary
 
-        const response = await fetch(`/api/admin/products/${productId}/images/upload`, {
+        const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+        const response = await fetch(`${API_BASE_URL}/api/admin/products/${productId}/images/upload`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`
@@ -75,7 +76,8 @@ const ImageGalleryManager = ({ productId, isOpen, onClose, onImagesUpdate }) => 
     const token = localStorage.getItem('authToken');
 
     try {
-      const response = await fetch(`/api/admin/products/${productId}/images/url`, {
+      const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+      const response = await fetch(`${API_BASE_URL}/api/admin/products/${productId}/images/url`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -103,7 +105,8 @@ const ImageGalleryManager = ({ productId, isOpen, onClose, onImagesUpdate }) => 
 
     const token = localStorage.getItem('authToken');
     try {
-      const response = await fetch(`/api/admin/products/${productId}/images/${imageId}`, {
+      const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+      const response = await fetch(`${API_BASE_URL}/api/admin/products/${productId}/images/${imageId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -122,7 +125,8 @@ const ImageGalleryManager = ({ productId, isOpen, onClose, onImagesUpdate }) => 
   const handleSetPrimary = async (imageId) => {
     const token = localStorage.getItem('authToken');
     try {
-      const response = await fetch(`/api/admin/products/${productId}/images/${imageId}/primary`, {
+      const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+      const response = await fetch(`${API_BASE_URL}/api/admin/products/${productId}/images/${imageId}/primary`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -174,7 +178,8 @@ const ImageGalleryManager = ({ productId, isOpen, onClose, onImagesUpdate }) => 
     // Update backend
     const token = localStorage.getItem('authToken');
     try {
-      await fetch(`/api/admin/products/${productId}/images/reorder`, {
+      const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+      await fetch(`${API_BASE_URL}/api/admin/products/${productId}/images/reorder`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,

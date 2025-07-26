@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(npx:*)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(node:*)"
     ],
     "deny": []
   }

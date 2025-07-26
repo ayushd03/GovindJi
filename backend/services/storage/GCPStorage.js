@@ -66,18 +66,12 @@ class GCPStorage extends StorageInterface {
             ...options.metadata
           }
         },
-        public: options.makePublic !== false, // Default to public
         resumable: false, // Use simple upload for small files
         validation: 'crc32c'
       };
 
       // Upload file
       await file.save(fileBuffer, uploadOptions);
-
-      // Make file public if requested (default)
-      if (options.makePublic !== false) {
-        await file.makePublic();
-      }
 
       // Get the public URL
       const publicUrl = this.getPublicUrl(filePath);

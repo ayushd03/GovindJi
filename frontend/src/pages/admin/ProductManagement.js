@@ -15,6 +15,8 @@ import {
 } from '@heroicons/react/24/outline';
 import { categoriesAPI } from '../../services/api';
 
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+
 const ProductManagement = () => {
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -45,7 +47,7 @@ const ProductManagement = () => {
   const fetchProducts = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/products');
+      const response = await fetch(`${API_BASE_URL}/api/products`);
       const data = await response.json();
       setProducts(data);
     } catch (error) {
@@ -87,8 +89,8 @@ const ProductManagement = () => {
     
     try {
       const url = editingProduct 
-        ? `/api/admin/products/${editingProduct.id}`
-        : '/api/admin/products';
+        ? `${API_BASE_URL}/api/admin/products/${editingProduct.id}`
+        : `${API_BASE_URL}/api/admin/products`;
       
       const method = editingProduct ? 'PUT' : 'POST';
       
@@ -135,7 +137,7 @@ const ProductManagement = () => {
     const token = localStorage.getItem('authToken');
     
     try {
-      const response = await fetch(`/api/admin/products/${productId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/admin/products/${productId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`
