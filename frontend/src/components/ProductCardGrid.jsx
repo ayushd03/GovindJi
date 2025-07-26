@@ -266,7 +266,7 @@ const ProductCardGrid = ({ product, className, viewMode = 'grid' }) => {
 
           <Link to={`/products/${product.id}`} className="block relative z-10 flex-1 flex flex-col">
             {/* Product Image */}
-            <div className="relative h-48 bg-gradient-to-br from-gray-50 to-gray-100 overflow-hidden rounded-t-lg">
+            <div className="relative h-72 bg-gradient-to-br from-gray-50 to-gray-100 overflow-hidden rounded-t-lg">
               {imageLoading ? (
                 <div className="w-full h-full bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 bg-[length:200%_100%] animate-pulse" />
               ) : (
@@ -311,10 +311,10 @@ const ProductCardGrid = ({ product, className, viewMode = 'grid' }) => {
               <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/25 to-transparent -skew-x-12 translate-x-full group-hover:translate-x-[-200%] transition-transform duration-800 ease-out" />
             </div>
 
-            <CardContent className="p-4 relative flex-1 flex flex-col">
+            <CardContent className="p-3 relative flex-1 flex flex-col">
               <div className="relative z-10 flex-1 flex flex-col">
                 {/* Rating */}
-                <div className="flex items-center gap-1 mb-2">
+                <div className="flex items-center gap-1 mb-1.5">
                   <div className="flex items-center">
                     {[...Array(5)].map((_, i) => (
                       <Star
@@ -334,20 +334,12 @@ const ProductCardGrid = ({ product, className, viewMode = 'grid' }) => {
                 </div>
 
                 {/* Product Name */}
-                <h3 className="font-heading font-semibold text-sm text-gray-900 mb-2 line-clamp-2 group-hover:text-blue-600 transition-colors duration-300 leading-tight tracking-tight flex-1">
+                <h3 className="font-heading font-semibold text-sm text-gray-900 mb-1.5 line-clamp-2 group-hover:text-blue-600 transition-colors duration-300 leading-tight tracking-tight flex-1">
                   {product.name}
                 </h3>
 
-                {/* Product Description */}
-                <p className="text-xs text-gray-600 mb-3 line-clamp-2 leading-relaxed font-body">
-                  {product.description && product.description.length > 60
-                    ? `${product.description.substring(0, 60)}...`
-                    : product.description
-                  }
-                </p>
-
                 {/* Price Section */}
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between mt-auto">
                   <div className="flex items-baseline gap-1.5">
                     <span className="text-lg font-bold text-gray-900 font-heading tracking-tight">
                       ₹{parseFloat(product.price).toFixed(2)}
@@ -366,7 +358,7 @@ const ProductCardGrid = ({ product, className, viewMode = 'grid' }) => {
             </CardContent>
           </Link>
 
-          <CardFooter className="p-4 pt-0 relative">
+          <CardFooter className="p-3 pt-0 relative">
             <motion.div
               className="w-full relative z-10"
               whileHover={{ scale: 1.02 }}
