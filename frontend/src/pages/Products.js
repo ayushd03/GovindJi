@@ -57,6 +57,11 @@ const Products = () => {
     fetchData();
   }, []);
 
+  // Scroll to top when component mounts
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+
   // Handle category auto-selection from navigation state
   useEffect(() => {
     if (location.state?.selectedCategoryId && categories.length > 0) {
