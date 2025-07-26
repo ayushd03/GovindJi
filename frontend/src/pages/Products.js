@@ -27,6 +27,8 @@ const Products = () => {
   
   const [showMobileFilters, setShowMobileFilters] = useState(false);
   const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'list'
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(12);
   
   const sortOptions = [
     { id: 'name', name: 'Name (A-Z)' },
@@ -127,6 +129,7 @@ const Products = () => {
     });
     
     setFilteredProducts(result);
+    setCurrentPage(1); // Reset to first page when filters change
   }, [products, filters]);
   
   const handleFilterChange = (key, value) => {
@@ -190,6 +193,17 @@ const Products = () => {
     return count;
   };
 
+  // Pagination calculations
+  const totalPages = Math.ceil(filteredProducts.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const currentProducts = filteredProducts.slice(startIndex, endIndex);
+
+  const handlePageChange = (page) => {
+    setCurrentPage(page);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -205,102 +219,6 @@ const Products = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-        {/* Simple Results Bar */}
-        {filteredProducts.length > 0 && (
-          <motion.div 
-            className="mb-4"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3 }}
-          >
-            <div className="text-center">
-              <p className="text-sm text-gray-600">
-                {filters.search ? (
-                  <>Showing {filteredProducts.length} result{filteredProducts.length !== 1 ? 's' : ''} for "{filters.search}"</>
-                ) : (
-                  <>{filteredProducts.length} product{filteredProducts.length !== 1 ? 's' : ''} available</>
-                )}
-                {getActiveFiltersCount() > 0 && (
-                  <span className="text-blue-600 ml-1">• {getActiveFiltersCount()} filter{getActiveFiltersCount() > 1 ? 's' : ''} applied</span>
-                )}
-              </p>
-            </div>
-          </motion.div>
-        )}
-
-        {/* Enhanced Active Filters */}
-        {getActiveFiltersCount() > 0 && (
-          <motion.div 
-            className="mb-8"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, delay: 0.2 }}
-          >
-            <div className="flex flex-wrap items-center gap-3 justify-center">
-              <span className="text-sm font-medium text-gray-700 font-heading">Active filters:</span>
-              
-              {filters.search && (
-                <Badge className="bg-blue-50 text-blue-700 border border-blue-200 px-3 py-1.5 text-sm font-medium rounded-lg hover:bg-blue-100 transition-colors">
-                  Search: "{filters.search}"
-                  <button
-                    onClick={() => removeFilter('search')}
-                    className="ml-2 inline-flex items-center p-0.5 rounded-full hover:bg-blue-200 transition-colors"
-                  >
-                    <XMarkIcon className="h-3 w-3" />
-                  </button>
-                </Badge>
-              )}
-              
-              {filters.categories.map(categoryId => {
-                const category = categories.find(c => c.id === categoryId);
-                return category ? (
-                  <Badge key={categoryId} className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-3 py-1.5 text-sm font-medium rounded-lg hover:bg-emerald-100 transition-colors">
-                    {category.name}
-                    <button
-                      onClick={() => removeFilter('category', categoryId)}
-                      className="ml-2 inline-flex items-center p-0.5 rounded-full hover:bg-emerald-200 transition-colors"
-                    >
-                      <XMarkIcon className="h-3 w-3" />
-                    </button>
-                  </Badge>
-                ) : null;
-              })}
-              
-              {(filters.priceRange.min || filters.priceRange.max) && (
-                <Badge className="bg-purple-50 text-purple-700 border border-purple-200 px-3 py-1.5 text-sm font-medium rounded-lg hover:bg-purple-100 transition-colors">
-                  Price: ₹{filters.priceRange.min || '0'} - ₹{filters.priceRange.max || '∞'}
-                  <button
-                    onClick={() => removeFilter('price')}
-                    className="ml-2 inline-flex items-center p-0.5 rounded-full hover:bg-purple-200 transition-colors"
-                  >
-                    <XMarkIcon className="h-3 w-3" />
-                  </button>
-                </Badge>
-              )}
-              
-              {(filters.weightRange.min || filters.weightRange.max) && (
-                <Badge className="bg-orange-50 text-orange-700 border border-orange-200 px-3 py-1.5 text-sm font-medium rounded-lg hover:bg-orange-100 transition-colors">
-                  Weight: {filters.weightRange.min || '0'} - {filters.weightRange.max || '∞'} kg
-                  <button
-                    onClick={() => removeFilter('weight')}
-                    className="ml-2 inline-flex items-center p-0.5 rounded-full hover:bg-orange-200 transition-colors"
-                  >
-                    <XMarkIcon className="h-3 w-3" />
-                  </button>
-                </Badge>
-              )}
-              
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={clearFilters}
-                className="text-sm text-gray-500 hover:text-gray-700 hover:bg-gray-100 font-medium px-3 py-1.5 rounded-lg transition-colors"
-              >
-                Clear all
-              </Button>
-            </div>
-          </motion.div>
-        )}
 
         <div className="lg:grid lg:grid-cols-4 lg:gap-x-8 xl:gap-x-10">
           {/* Mobile filter toggle */}
@@ -329,6 +247,62 @@ const Products = () => {
             <Card className="bg-white/80 backdrop-blur-sm border border-gray-200/50 shadow-lg sticky top-8">
               <CardContent className="p-6">
                 <div className="space-y-4">
+                  {/* Results Summary */}
+                  <div className="pb-3 border-b border-gray-200">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-sm text-gray-600">
+                        {filters.search ? (
+                          <>Showing {filteredProducts.length} result{filteredProducts.length !== 1 ? 's' : ''} for "{filters.search}"</>
+                        ) : (
+                          <>{filteredProducts.length} product{filteredProducts.length !== 1 ? 's' : ''} available</>
+                        )}
+                      </p>
+                    </div>
+                    {getActiveFiltersCount() > 0 && (
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-xs text-gray-500">{getActiveFiltersCount()} filter{getActiveFiltersCount() > 1 ? 's' : ''} applied:</span>
+                        {filters.search && (
+                          <Badge variant="secondary" className="text-xs px-2 py-0.5">
+                            Search: "{filters.search}"
+                            <button onClick={() => removeFilter('search')} className="ml-1">
+                              <XMarkIcon className="h-3 w-3" />
+                            </button>
+                          </Badge>
+                        )}
+                        {filters.categories.map(categoryId => {
+                          const category = categories.find(c => c.id === categoryId);
+                          return category ? (
+                            <Badge key={categoryId} variant="secondary" className="text-xs px-2 py-0.5">
+                              {category.name}
+                              <button onClick={() => removeFilter('category', categoryId)} className="ml-1">
+                                <XMarkIcon className="h-3 w-3" />
+                              </button>
+                            </Badge>
+                          ) : null;
+                        })}
+                        {(filters.priceRange.min || filters.priceRange.max) && (
+                          <Badge variant="secondary" className="text-xs px-2 py-0.5">
+                            Price: ₹{filters.priceRange.min || '0'} - ₹{filters.priceRange.max || '∞'}
+                            <button onClick={() => removeFilter('price')} className="ml-1">
+                              <XMarkIcon className="h-3 w-3" />
+                            </button>
+                          </Badge>
+                        )}
+                        {(filters.weightRange.min || filters.weightRange.max) && (
+                          <Badge variant="secondary" className="text-xs px-2 py-0.5">
+                            Weight: {filters.weightRange.min || '0'} - {filters.weightRange.max || '∞'} kg
+                            <button onClick={() => removeFilter('weight')} className="ml-1">
+                              <XMarkIcon className="h-3 w-3" />
+                            </button>
+                          </Badge>
+                        )}
+                        <Button variant="ghost" size="sm" onClick={clearFilters} className="text-xs px-2 py-0.5 h-auto">
+                          Clear all
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                  
                   {/* View Toggle */}
                   <div className="flex items-center justify-between">
                     <h3 className="text-lg font-heading font-semibold text-gray-900">View</h3>
@@ -488,7 +462,7 @@ const Products = () => {
                 <div className="text-red-600 text-lg font-medium mb-2">{error}</div>
                 <p className="text-gray-500">Please try again later or contact support.</p>
               </motion.div>
-            ) : filteredProducts.length === 0 ? (
+            ) : currentProducts.length === 0 ? (
               <motion.div 
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -521,7 +495,7 @@ const Products = () => {
                 >
                   {viewMode === 'list' ? (
                     <div className="space-y-4">
-                      {filteredProducts.map((product, index) => (
+                      {currentProducts.map((product, index) => (
                         <motion.div
                           key={product.id}
                           initial={{ opacity: 0, y: 20 }}
@@ -534,7 +508,7 @@ const Products = () => {
                     </div>
                   ) : (
                     <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-                      {filteredProducts.map((product, index) => (
+                      {currentProducts.map((product, index) => (
                         <motion.div
                           key={product.id}
                           initial={{ opacity: 0, y: 20 }}
@@ -548,18 +522,66 @@ const Products = () => {
                   )}
                 </motion.div>
 
-                {/* Enhanced Footer */}
-                {filteredProducts.length > 12 && (
+                {/* Pagination */}
+                {totalPages > 1 && (
                   <motion.div 
-                    className="mt-12 text-center"
+                    className="mt-8"
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     transition={{ duration: 0.4, delay: 0.7 }}
                   >
-                    <div className="bg-white/60 backdrop-blur-sm rounded-xl p-6 border border-gray-200/50">
-                      <p className="text-sm text-gray-500 font-body">
-                        Showing all <span className="font-semibold text-gray-700">{filteredProducts.length}</span> premium products
-                      </p>
+                    <div className="flex items-center justify-between">
+                      <div className="text-sm text-gray-500">
+                        Showing {startIndex + 1} to {Math.min(endIndex, filteredProducts.length)} of {filteredProducts.length} products
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handlePageChange(currentPage - 1)}
+                          disabled={currentPage === 1}
+                          className="px-3 py-1.5 text-sm"
+                        >
+                          Previous
+                        </Button>
+                        
+                        <div className="flex items-center space-x-1">
+                          {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                            let pageNum;
+                            if (totalPages <= 5) {
+                              pageNum = i + 1;
+                            } else if (currentPage <= 3) {
+                              pageNum = i + 1;
+                            } else if (currentPage >= totalPages - 2) {
+                              pageNum = totalPages - 4 + i;
+                            } else {
+                              pageNum = currentPage - 2 + i;
+                            }
+                            
+                            return (
+                              <Button
+                                key={pageNum}
+                                variant={currentPage === pageNum ? "default" : "outline"}
+                                size="sm"
+                                onClick={() => handlePageChange(pageNum)}
+                                className="px-3 py-1.5 text-sm min-w-[2.5rem]"
+                              >
+                                {pageNum}
+                              </Button>
+                            );
+                          })}
+                        </div>
+                        
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handlePageChange(currentPage + 1)}
+                          disabled={currentPage === totalPages}
+                          className="px-3 py-1.5 text-sm"
+                        >
+                          Next
+                        </Button>
+                      </div>
                     </div>
                   </motion.div>
                 )}
