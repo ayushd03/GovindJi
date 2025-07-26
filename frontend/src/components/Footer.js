@@ -47,7 +47,7 @@ const Footer = () => {
           {/* Company Info */}
           <motion.div variants={fadeInUp} className="space-y-6">
             <div>
-              <h3 className="text-xl font-bold text-primary-accent mb-3">
+              <h3 className="text-xl font-bold text-amber-400 mb-3">
                 GovindJi Dry Fruits
               </h3>
               <p className="text-gray-300 leading-relaxed">
@@ -58,7 +58,7 @@ const Footer = () => {
             
             {/* Social Media */}
             <div>
-              <h4 className="text-lg font-semibold mb-4 text-primary-accent">Follow Us</h4>
+              <h4 className="text-lg font-semibold mb-4 text-amber-400">Follow Us</h4>
               <div className="flex space-x-4">
                 {[
                   { icon: Facebook, href: '#', label: 'Facebook' },
@@ -73,7 +73,7 @@ const Footer = () => {
                       href={social.href}
                       whileHover={{ scale: 1.1, y: -2 }}
                       whileTap={{ scale: 0.9 }}
-                      className="w-10 h-10 bg-white/10 rounded-full flex items-center justify-center hover:bg-primary-accent transition-all duration-300"
+                      className="w-10 h-10 bg-white/10 rounded-full flex items-center justify-center hover:bg-amber-500 transition-all duration-300"
                       aria-label={social.label}
                     >
                       <IconComponent className="w-5 h-5" />
@@ -86,7 +86,7 @@ const Footer = () => {
 
           {/* Quick Links */}
           <motion.div variants={fadeInUp}>
-            <h4 className="text-lg font-semibold mb-6 text-primary-accent">Quick Links</h4>
+            <h4 className="text-lg font-semibold mb-6 text-amber-400">Quick Links</h4>
             <ul className="space-y-3">
               {[
                 { name: 'All Products', href: '/products' },
@@ -98,7 +98,7 @@ const Footer = () => {
                 <li key={link.name}>
                   <Link
                     to={link.href}
-                    className="text-gray-300 hover:text-primary-accent transition-colors duration-300 inline-flex items-center group"
+                    className="text-gray-300 hover:text-amber-400 transition-colors duration-300 inline-flex items-center group"
                   >
                     <span className="group-hover:translate-x-1 transition-transform duration-300">
                       {link.name}
@@ -111,7 +111,7 @@ const Footer = () => {
 
           {/* Customer Service */}
           <motion.div variants={fadeInUp}>
-            <h4 className="text-lg font-semibold mb-6 text-primary-accent">Customer Service</h4>
+            <h4 className="text-lg font-semibold mb-6 text-amber-400">Customer Service</h4>
             <ul className="space-y-3">
               {[
                 { name: 'Help Center', href: '/help' },
@@ -124,7 +124,7 @@ const Footer = () => {
                 <li key={link.name}>
                   <Link
                     to={link.href}
-                    className="text-gray-300 hover:text-primary-accent transition-colors duration-300 inline-flex items-center group"
+                    className="text-gray-300 hover:text-amber-400 transition-colors duration-300 inline-flex items-center group"
                   >
                     <span className="group-hover:translate-x-1 transition-transform duration-300">
                       {link.name}
@@ -137,10 +137,10 @@ const Footer = () => {
 
           {/* Contact Info */}
           <motion.div variants={fadeInUp}>
-            <h4 className="text-lg font-semibold mb-6 text-primary-accent">Get In Touch</h4>
+            <h4 className="text-lg font-semibold mb-6 text-amber-400">Get In Touch</h4>
             <div className="space-y-4">
               <div className="flex items-start space-x-3">
-                <MapPin className="w-5 h-5 text-primary-accent mt-1 flex-shrink-0" />
+                <MapPin className="w-5 h-5 text-amber-400 mt-1 flex-shrink-0" />
                 <div>
                   <p className="text-gray-300 leading-relaxed">
                     PV82+M8J, Marothia Bazar,<br />
@@ -151,27 +151,27 @@ const Footer = () => {
               </div>
               
               <div className="flex items-center space-x-3">
-                <Phone className="w-5 h-5 text-primary-accent flex-shrink-0" />
+                <Phone className="w-5 h-5 text-amber-400 flex-shrink-0" />
                 <a 
                   href="tel:+919340637575" 
-                  className="text-gray-300 hover:text-primary-accent transition-colors duration-300"
+                  className="text-gray-300 hover:text-amber-400 transition-colors duration-300"
                 >
                   093406 37575
                 </a>
               </div>
               
               <div className="flex items-center space-x-3">
-                <Mail className="w-5 h-5 text-primary-accent flex-shrink-0" />
+                <Mail className="w-5 h-5 text-amber-400 flex-shrink-0" />
                 <a 
                   href="mailto:info@govindjidryfruit.com" 
-                  className="text-gray-300 hover:text-primary-accent transition-colors duration-300"
+                  className="text-gray-300 hover:text-amber-400 transition-colors duration-300"
                 >
                   info@govindjidryfruit.com
                 </a>
               </div>
               
               <div className="flex items-start space-x-3">
-                <div className="w-5 h-5 text-primary-accent mt-1 flex-shrink-0">🕐</div>
+                <div className="w-5 h-5 text-amber-400 mt-1 flex-shrink-0">🕐</div>
                 <div>
                   <p className="text-gray-300 leading-relaxed">
                     Closed ⋅ Opens 9 am Mon
@@ -182,17 +182,17 @@ const Footer = () => {
 
             {/* Newsletter Signup */}
             <div className="mt-6">
-              <h5 className="text-sm font-semibold mb-3 text-primary-accent">Newsletter</h5>
+              <h5 className="text-sm font-semibold mb-3 text-amber-400">Newsletter</h5>
               <div className="flex">
                 <input
                   type="email"
                   placeholder="Your email address"
-                  className="flex-1 px-3 py-2 bg-white/10 border border-white/20 rounded-l-lg text-white placeholder-gray-400 focus:outline-none focus:border-primary-accent transition-colors duration-300"
+                  className="flex-1 px-3 py-2 bg-white/10 border border-white/20 rounded-l-lg text-white placeholder-gray-400 focus:outline-none focus:border-amber-400 transition-colors duration-300"
                 />
                 <motion.button
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
-                  className="px-4 py-2 bg-primary-accent text-white rounded-r-lg hover:bg-secondary-accent transition-colors duration-300 font-medium"
+                  className="px-4 py-2 bg-amber-500 text-white rounded-r-lg hover:bg-amber-600 transition-colors duration-300 font-medium"
                 >
                   Subscribe
                 </motion.button>
@@ -219,13 +219,13 @@ const Footer = () => {
             <div className="flex items-center space-x-6">
               <Link 
                 to="/privacy" 
-                className="text-gray-300 hover:text-primary-accent transition-colors duration-300 text-sm"
+                className="text-gray-300 hover:text-amber-400 transition-colors duration-300 text-sm"
               >
                 Privacy Policy
               </Link>
               <Link 
                 to="/terms"
-                className="text-gray-300 hover:text-primary-accent transition-colors duration-300 text-sm"
+                className="text-gray-300 hover:text-amber-400 transition-colors duration-300 text-sm"
               >
                 Terms & Conditions
               </Link>
@@ -233,7 +233,7 @@ const Footer = () => {
                 onClick={scrollToTop}
                 whileHover={{ scale: 1.1, y: -2 }}
                 whileTap={{ scale: 0.9 }}
-                className="w-10 h-10 bg-primary-accent rounded-full flex items-center justify-center hover:bg-secondary-accent transition-all duration-300 shadow-lg"
+                className="w-10 h-10 bg-amber-500 rounded-full flex items-center justify-center hover:bg-amber-600 transition-all duration-300 shadow-lg"
                 aria-label="Scroll to top"
               >
                 <ArrowUp className="w-5 h-5" />
