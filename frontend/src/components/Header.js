@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Search, ShoppingCart, User, Menu, X, ChevronDown } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
+import AuthModal from './AuthModal';
 
 const Header = () => {
   const { user, logout, isAuthenticated } = useAuth();
@@ -13,6 +14,7 @@ const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -141,19 +143,14 @@ const Header = () => {
                 </AnimatePresence>
               </div>
             ) : (
-              <div className="flex items-center space-x-4">
-                <Link 
-                  to="/login" 
-                  className="text-primary-text hover:text-primary-accent transition-colors duration-300 font-medium"
+              <div className="flex items-center">
+                <button
+                  onClick={() => setIsAuthModalOpen(true)}
+                  className="flex items-center space-x-2 text-primary-text hover:text-primary-accent transition-all duration-300 font-medium px-4 py-2 rounded-full hover:bg-gray-100/50"
                 >
-                  Login
-                </Link>
-                <Link 
-                  to="/signup" 
-                  className="btn-primary"
-                >
-                  Sign Up
-                </Link>
+                  <User className="w-5 h-5" />
+                  <span>Sign In</span>
+                </button>
               </div>
             )}
             
@@ -253,21 +250,17 @@ const Header = () => {
                   </div>
                 </>
               ) : (
-                <div className="border-t border-gray-100 pt-4 space-y-2">
-                  <Link 
-                    to="/login" 
-                    className="block text-primary-text hover:text-primary-accent transition-colors duration-300 py-2"
-                    onClick={() => setIsMenuOpen(false)}
+                <div className="border-t border-gray-100 pt-4">
+                  <button
+                    onClick={() => {
+                      setIsMenuOpen(false);
+                      setIsAuthModalOpen(true);
+                    }}
+                    className="flex items-center justify-center space-x-2 text-primary-text hover:text-primary-accent transition-all duration-300 py-3 rounded-lg hover:bg-gray-100/50 w-full"
                   >
-                    Login
-                  </Link>
-                  <Link 
-                    to="/signup" 
-                    className="block btn-primary text-center"
-                    onClick={() => setIsMenuOpen(false)}
-                  >
-                    Sign Up
-                  </Link>
+                    <User className="w-5 h-5" />
+                    <span className="font-medium">Sign In</span>
+                  </button>
                 </div>
               )}
               
@@ -285,6 +278,12 @@ const Header = () => {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Auth Modal */}
+      <AuthModal 
+        isOpen={isAuthModalOpen} 
+        onClose={() => setIsAuthModalOpen(false)} 
+      />
     </motion.header>
   );
 };
