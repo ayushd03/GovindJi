@@ -187,7 +187,7 @@ const Home = () => {
           transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
         />
 
-        <div className="relative z-10 container mx-auto px-1 text-center text-white">
+        <div className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-8 text-center text-white">
           <motion.div
             initial={{ opacity: 0, y: 50 }}
             animate={{ opacity: 1, y: 0 }}
@@ -254,7 +254,7 @@ const Home = () => {
         className="section-padding bg-gradient-to-br from-light-gray to-white"
         {...fadeInUp}
       >
-        <div className="container mx-auto px-1">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <motion.div className="text-center mb-16" {...fadeInUp}>
             <h2 className="text-4xl md:text-5xl font-bold text-primary-text mb-4">
               Shop by Category
@@ -317,7 +317,7 @@ const Home = () => {
 
       {/* Featured Products Section */}
       <motion.section className="section-padding bg-white" {...fadeInUp}>
-        <div className="container mx-auto px-1">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <motion.div className="text-center mb-16" {...fadeInUp}>
             <h2 className="text-4xl md:text-5xl font-bold text-primary-text mb-4">
               Featured Products
@@ -397,7 +397,7 @@ const Home = () => {
         className="section-padding bg-gradient-to-br from-primary-accent/5 to-secondary-accent/5"
         {...fadeInUp}
       >
-        <div className="container mx-auto px-1">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <motion.div className="text-center mb-16" {...fadeInUp}>
             <h2 className="text-4xl md:text-5xl font-bold text-primary-text mb-4">
               Why Choose GovindJi Dry Fruits?

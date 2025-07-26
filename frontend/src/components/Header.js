@@ -48,7 +48,7 @@ const Header = () => {
       animate={{ y: 0 }}
       transition={{ duration: 0.5 }}
     >
-      <div className="container mx-auto px-1">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-20">
           {/* Logo */}
           <motion.div
@@ -213,7 +213,7 @@ const Header = () => {
             exit={{ opacity: 0, height: 0 }}
             className="lg:hidden bg-white/95 backdrop-blur-md border-t border-gray-100/50"
           >
-            <div className="container mx-auto px-1 py-4 space-y-4">
+            <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4 space-y-4">
               <Link 
                 to="/products" 
                 className="block text-primary-text hover:text-primary-accent transition-colors duration-300 font-medium py-2"

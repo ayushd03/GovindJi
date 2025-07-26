@@ -276,7 +276,7 @@ const Products = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50">
-      <div className="max-w-full mx-auto px-2 sm:px-3 lg:px-4 py-4">
+      <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8 py-4">
 
         <div className="lg:grid lg:grid-cols-5 lg:gap-x-4 xl:gap-x-6">
           {/* Mobile filter toggle */}
