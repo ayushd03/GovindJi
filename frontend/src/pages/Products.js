@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { MagnifyingGlassIcon, XMarkIcon, ViewColumnsIcon, ListBulletIcon, FunnelIcon } from '@heroicons/react/24/outline';
 import ProductCardGrid from '../components/ProductCardGrid';
@@ -15,6 +15,7 @@ const Products = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
   
   const [filters, setFilters] = useState({
     search: searchParams.get('search') || '',
@@ -55,6 +56,16 @@ const Products = () => {
 
     fetchData();
   }, []);
+
+  // Handle category auto-selection from navigation state
+  useEffect(() => {
+    if (location.state?.selectedCategoryId && categories.length > 0) {
+      setFilters(prev => ({
+        ...prev,
+        categories: [location.state.selectedCategoryId]
+      }));
+    }
+  }, [location.state, categories]);
   
   useEffect(() => {
     let result = [...products];

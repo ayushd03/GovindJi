@@ -272,36 +272,41 @@ const Home = () => {
             {(categories || []).map((category, index) => {
               const bgConfig = getCategoryBackground(category);
               return (
-                <motion.div
+                <Link 
+                  to="/products" 
+                  state={{ selectedCategoryId: category.id }}
                   key={category.id || category.name}
-                  variants={fadeInUp}
-                  whileHover={{ scale: 1.03, y: -3 }}
-                  className="group cursor-pointer"
                 >
-                  <Card className="relative h-48 overflow-hidden border-0 shadow-md hover:shadow-lg transition-all duration-300">
-                    <div 
-                      className={`absolute inset-0 bg-gradient-to-br ${bgConfig.gradient}`}
-                      style={{
-                        backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.3), rgba(0, 0, 0, 0.5)), url('${bgConfig.image}')`,
-                        backgroundSize: 'cover',
-                        backgroundPosition: 'center',
-                        backgroundBlendMode: 'overlay'
-                      }}
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-                    <CardContent className="relative z-10 h-full p-6 flex flex-col justify-end text-center">
-                      <h3 className="text-white font-bold text-xl mb-2 drop-shadow-lg">
-                        {category.name}
-                      </h3>
-                      <Badge 
-                        variant="secondary" 
-                        className="mx-auto bg-white/20 text-white border-white/30 hover:bg-white/30"
-                      >
-                        Shop Now →
-                      </Badge>
-                    </CardContent>
-                  </Card>
-                </motion.div>
+                  <motion.div
+                    variants={fadeInUp}
+                    whileHover={{ scale: 1.03, y: -3 }}
+                    className="group cursor-pointer"
+                  >
+                    <Card className="relative h-48 overflow-hidden border-0 shadow-md hover:shadow-lg transition-all duration-300">
+                      <div 
+                        className={`absolute inset-0 bg-gradient-to-br ${bgConfig.gradient}`}
+                        style={{
+                          backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.3), rgba(0, 0, 0, 0.5)), url('${bgConfig.image}')`,
+                          backgroundSize: 'cover',
+                          backgroundPosition: 'center',
+                          backgroundBlendMode: 'overlay'
+                        }}
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                      <CardContent className="relative z-10 h-full p-6 flex flex-col justify-end text-center">
+                        <h3 className="text-white font-bold text-xl mb-2 drop-shadow-lg">
+                          {category.name}
+                        </h3>
+                        <Badge 
+                          variant="secondary" 
+                          className="mx-auto bg-white/20 text-white border-white/30 hover:bg-white/30"
+                        >
+                          Shop Now →
+                        </Badge>
+                      </CardContent>
+                    </Card>
+                  </motion.div>
+                </Link>
               );
             })}
           </motion.div>
