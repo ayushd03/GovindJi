@@ -276,9 +276,9 @@ const Products = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+      <div className="max-w-full mx-auto px-2 sm:px-3 lg:px-4 py-4">
 
-        <div className="lg:grid lg:grid-cols-4 lg:gap-x-8 xl:gap-x-10">
+        <div className="lg:grid lg:grid-cols-5 lg:gap-x-4 xl:gap-x-6">
           {/* Mobile filter toggle */}
           <div className="lg:hidden mb-3">
             <Button
@@ -537,7 +537,7 @@ const Products = () => {
           </motion.div>
 
           {/* Products Section */}
-          <div className="lg:col-span-3">
+          <div className="lg:col-span-4">
             {error ? (
               <motion.div 
                 initial={{ opacity: 0, y: 20 }}
@@ -592,7 +592,7 @@ const Products = () => {
                       ))}
                     </div>
                   ) : (
-                    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
                       {currentProducts.map((product, index) => (
                         <motion.div
                           key={product.id}

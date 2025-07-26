@@ -110,7 +110,7 @@
 /* Custom Component Classes using Tailwind's @layer directive */
 @layer components {
   .container {
-    @apply max-w-container mx-auto px-4 md:px-6 lg:px-8;
+    @apply max-w-container mx-auto px-2 md:px-3 lg:px-4;
   }
 
   .btn-primary {
