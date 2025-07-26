@@ -16,6 +16,53 @@ const Products = () => {
   const [error, setError] = useState(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();
+
+  // Fuzzy search function
+  const fuzzySearch = (searchTerm, text) => {
+    if (!searchTerm || !text) return false;
+    
+    const search = searchTerm.toLowerCase().trim();
+    const target = text.toLowerCase();
+    
+    // Exact match (highest priority)
+    if (target.includes(search)) return true;
+    
+    // Split search term into words for multi-word matching
+    const searchWords = search.split(/\s+/).filter(word => word.length > 0);
+    
+    // Check if all search words are present (word order independent)
+    const allWordsMatch = searchWords.every(word => target.includes(word));
+    if (allWordsMatch) return true;
+    
+    // Fuzzy character matching (allows for typos)
+    // Remove spaces and check if most characters match in order
+    const searchChars = search.replace(/\s/g, '');
+    const targetChars = target.replace(/\s/g, '');
+    
+    if (searchChars.length <= 2) {
+      // For short searches, require exact substring match
+      return targetChars.includes(searchChars);
+    }
+    
+    // For longer searches, allow some character mismatches
+    let matchCount = 0;
+    let targetIndex = 0;
+    
+    for (let i = 0; i < searchChars.length && targetIndex < targetChars.length; i++) {
+      const char = searchChars[i];
+      while (targetIndex < targetChars.length && targetChars[targetIndex] !== char) {
+        targetIndex++;
+      }
+      if (targetIndex < targetChars.length) {
+        matchCount++;
+        targetIndex++;
+      }
+    }
+    
+    // Require at least 80% character match for fuzzy matching
+    const matchRatio = matchCount / searchChars.length;
+    return matchRatio >= 0.8;
+  };
   
   const [filters, setFilters] = useState({
     search: searchParams.get('search') || '',
@@ -64,6 +111,17 @@ const Products = () => {
     window.scrollTo(0, 0);
   }, []);
 
+  // Handle URL search params initialization
+  useEffect(() => {
+    const searchFromUrl = searchParams.get('search');
+    if (searchFromUrl && searchFromUrl !== filters.search) {
+      setFilters(prev => ({
+        ...prev,
+        search: searchFromUrl
+      }));
+    }
+  }, [searchParams, filters.search]);
+
   // Handle category auto-selection from navigation state
   useEffect(() => {
     if (location.state?.selectedCategoryId && categories.length > 0) {
@@ -79,10 +137,10 @@ const Products = () => {
     
     // Apply search filter
     if (filters.search) {
-      result = result.filter(product =>
-        product.name.toLowerCase().includes(filters.search.toLowerCase()) ||
-        product.description?.toLowerCase().includes(filters.search.toLowerCase())
-      );
+      result = result.filter(product => {
+        const searchableText = `${product.name} ${product.description || ''}`;
+        return fuzzySearch(filters.search, searchableText);
+      });
     }
     
     // Apply category filter (multiple selections)
@@ -345,6 +403,33 @@ const Products = () => {
                 </div>
 
                 <div className="space-y-6">
+                  {/* Search Input */}
+                  <div>
+                    <label className="block text-sm font-heading font-semibold text-gray-900 mb-4 tracking-tight">
+                      Search Products
+                    </label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <MagnifyingGlassIcon className="h-4 w-4 text-gray-400" />
+                      </div>
+                      <input
+                        type="text"
+                        placeholder="Search by name or description..."
+                        className="w-full pl-10 pr-4 py-2.5 text-sm border border-gray-200 rounded-lg shadow-sm bg-gray-50/50 focus:border-blue-500 focus:ring-blue-500 focus:bg-white transition-all duration-200 font-body"
+                        value={filters.search}
+                        onChange={(e) => handleFilterChange('search', e.target.value)}
+                      />
+                      {filters.search && (
+                        <button
+                          onClick={() => handleFilterChange('search', '')}
+                          className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                        >
+                          <XMarkIcon className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
                   {/* Categories Filter - Multiple Selection */}
                   <div>
                     <label className="block text-sm font-heading font-semibold text-gray-900 mb-4 tracking-tight">
