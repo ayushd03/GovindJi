@@ -40,13 +40,17 @@ const ImageGalleryManager = ({ productId, isOpen, onClose, onImagesUpdate }) => 
 
     setUploading(true);
     const token = localStorage.getItem('authToken');
+    const uploadProgress = { current: 0, total: files.length };
 
     try {
-      for (const file of files) {
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        uploadProgress.current = i + 1;
+        
         const formData = new FormData();
         formData.append('image', file);
-        formData.append('alt_text', file.name);
-        formData.append('is_primary', Array.isArray(images) && images.length === 0); // First image is primary
+        formData.append('alt_text', file.name.replace(/\.[^/.]+$/, ''));
+        formData.append('is_primary', Array.isArray(images) && images.length === 0 && i === 0); // First image is primary
 
         const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
         const response = await fetch(`${API_BASE_URL}/api/admin/products/${productId}/images/upload`, {
@@ -58,7 +62,7 @@ const ImageGalleryManager = ({ productId, isOpen, onClose, onImagesUpdate }) => 
         });
 
         if (!response.ok) {
-          throw new Error('Upload failed');
+          throw new Error(`Upload failed for ${file.name}`);
         }
       }
 
@@ -222,9 +226,25 @@ const ImageGalleryManager = ({ productId, isOpen, onClose, onImagesUpdate }) => 
         </div>
 
         <div className="upload-section">
+          <div className="upload-header">
+            <h3>📷 Product Image Management</h3>
+            <p>Add multiple high-quality images to showcase your products effectively</p>
+          </div>
+          
+          <div className="upload-stats">
+            <div className="stat-item">
+              <span className="stat-number">{Array.isArray(images) ? images.length : 0}</span>
+              <span className="stat-label">Images Uploaded</span>
+            </div>
+            <div className="stat-item">
+              <span className="stat-number">{Array.isArray(images) ? images.filter(img => img.is_primary).length : 0}</span>
+              <span className="stat-label">Primary Image</span>
+            </div>
+          </div>
+
           <div className="upload-options">
             <div 
-              className="upload-dropzone"
+              className="upload-dropzone enhanced"
               onDragOver={(e) => e.preventDefault()}
               onDrop={handleDragDropUpload}
             >
@@ -238,23 +258,36 @@ const ImageGalleryManager = ({ productId, isOpen, onClose, onImagesUpdate }) => 
               />
               <label htmlFor="imageUpload" className="upload-label">
                 {uploading ? (
-                  <div className="uploading">Uploading...</div>
+                  <div className="uploading">
+                    <div className="upload-spinner"></div>
+                    <p>Uploading images...</p>
+                    <small>Please wait while we process your images</small>
+                  </div>
                 ) : (
                   <>
-                    <div className="upload-icon">📸</div>
-                    <p>Click to upload or drag & drop images here</p>
-                    <small>Supports: JPG, PNG, GIF (Max 5MB each)</small>
+                    <div className="upload-icon">🖼️</div>
+                    <p className="upload-title">Upload Product Images</p>
+                    <p className="upload-subtitle">Drag & drop multiple images or click to browse</p>
+                    <div className="upload-formats">
+                      <span className="format-tag">JPG</span>
+                      <span className="format-tag">PNG</span>
+                      <span className="format-tag">GIF</span>
+                      <span className="format-tag">Max 5MB each</span>
+                    </div>
                   </>
                 )}
               </label>
             </div>
 
-            <button 
-              className="url-btn"
-              onClick={() => setShowUrlInput(!showUrlInput)}
-            >
-              {showUrlInput ? 'Cancel' : 'Add by URL'}
-            </button>
+            <div className="upload-actions">
+              <button 
+                className="url-btn"
+                onClick={() => setShowUrlInput(!showUrlInput)}
+                disabled={uploading}
+              >
+                🔗 {showUrlInput ? 'Cancel URL' : 'Add by URL'}
+              </button>
+            </div>
           </div>
 
           {showUrlInput && (
@@ -293,17 +326,33 @@ const ImageGalleryManager = ({ productId, isOpen, onClose, onImagesUpdate }) => 
 
         <div className="images-grid">
           {loading ? (
-            <div className="loading">Loading images...</div>
+            <div className="loading">
+              <div className="loading-spinner"></div>
+              <p>Loading your product images...</p>
+            </div>
           ) : !Array.isArray(images) || images.length === 0 ? (
             <div className="no-images">
-              <p>No images uploaded yet.</p>
-              <p>Upload your first image to get started!</p>
+              <div className="no-images-icon">🖼️</div>
+              <h3>No Product Images Yet</h3>
+              <p>Start by uploading high-quality images of your product</p>
+              <div className="tips">
+                <p><strong>💡 Tips for great product photos:</strong></p>
+                <ul>
+                  <li>Use good lighting and clear backgrounds</li>
+                  <li>Show multiple angles of your product</li>
+                  <li>Include close-up details</li>
+                  <li>Set the best image as primary</li>
+                </ul>
+              </div>
             </div>
           ) : (
             <div className="image-list">
-              <p className="drag-instruction">
-                Drag and drop images to reorder them
-              </p>
+              <div className="images-header">
+                <h3>📦 Product Image Gallery</h3>
+                <p className="drag-instruction">
+                  💫 Drag and drop to reorder • The first image is your primary display image
+                </p>
+              </div>
               {images.map((image, index) => (
                 <div
                   key={image.id}

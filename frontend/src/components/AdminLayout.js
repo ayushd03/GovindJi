@@ -15,7 +15,8 @@ import {
   ArrowRightOnRectangleIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
-  TagIcon
+  TagIcon,
+  PhotoIcon
 } from '@heroicons/react/24/outline';
 
 const AdminLayout = ({ children }) => {
@@ -33,6 +34,7 @@ const AdminLayout = ({ children }) => {
     { path: '/admin', label: 'Dashboard', icon: ChartBarIcon },
     { path: '/admin/categories', label: 'Categories', icon: TagIcon },
     { path: '/admin/products', label: 'Products', icon: CubeIcon },
+    { path: '/admin/images', label: 'Image Management', icon: PhotoIcon },
     { path: '/admin/orders', label: 'Orders', icon: ShoppingCartIcon },
     { path: '/admin/inventory', label: 'Inventory', icon: ClipboardDocumentListIcon },
     { path: '/admin/customers', label: 'Customers', icon: UsersIcon },
