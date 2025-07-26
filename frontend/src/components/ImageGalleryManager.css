@@ -59,94 +59,27 @@
 .upload-section {
   padding: 24px;
   border-bottom: 1px solid #e5e5e5;
-  background: linear-gradient(135deg, #f8f9ff 0%, #f0f8ff 100%);
-}
-
-.upload-header {
-  text-align: center;
-  margin-bottom: 20px;
-}
-
-.upload-header h3 {
-  margin: 0 0 8px 0;
-  color: #2c3e50;
-  font-size: 1.4rem;
-  font-weight: 600;
-}
-
-.upload-header p {
-  margin: 0;
-  color: #64748b;
-  font-size: 0.95rem;
-}
-
-.upload-stats {
-  display: flex;
-  justify-content: center;
-  gap: 32px;
-  margin-bottom: 24px;
-  padding: 16px;
-  background: rgba(255, 255, 255, 0.7);
-  border-radius: 12px;
-  border: 1px solid rgba(59, 130, 246, 0.1);
-}
-
-.stat-item {
-  text-align: center;
-}
-
-.stat-number {
-  display: block;
-  font-size: 1.8rem;
-  font-weight: 700;
-  color: #3b82f6;
-  line-height: 1;
-}
-
-.stat-label {
-  display: block;
-  font-size: 0.8rem;
-  color: #64748b;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin-top: 4px;
+  background: #fafafa;
 }
 
 .upload-options {
   display: flex;
-  gap: 20px;
+  gap: 16px;
   align-items: stretch;
   margin-bottom: 16px;
 }
 
-.upload-actions {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  min-width: 140px;
-}
-
 .upload-dropzone {
   flex: 1;
-  border: 2px dashed #d1d5db;
-  border-radius: 12px;
+  border: 2px dashed #ddd;
+  border-radius: 8px;
   transition: all 0.3s;
   background: white;
-  position: relative;
 }
 
-.upload-dropzone.enhanced {
-  border: 3px dashed #e2e8f0;
-  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
-}
-
-.upload-dropzone:hover,
-.upload-dropzone.enhanced:hover {
-  border-color: #3b82f6;
-  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
-  transform: translateY(-2px);
-  box-shadow: 0 8px 25px rgba(59, 130, 246, 0.15);
+.upload-dropzone:hover {
+  border-color: #007bff;
+  background: #f8f9ff;
 }
 
 .upload-label {
@@ -154,44 +87,12 @@
   padding: 40px 20px;
   text-align: center;
   cursor: pointer;
-  color: #64748b;
-  transition: all 0.3s;
-}
-
-.upload-title {
-  font-size: 1.1rem;
-  font-weight: 600;
-  color: #1e293b;
-  margin: 8px 0 4px 0;
-}
-
-.upload-subtitle {
-  font-size: 0.9rem;
-  color: #64748b;
-  margin: 0 0 16px 0;
-}
-
-.upload-formats {
-  display: flex;
-  justify-content: center;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-
-.format-tag {
-  background: #e0e7ff;
-  color: #4338ca;
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 0.75rem;
-  font-weight: 500;
-  text-transform: uppercase;
+  color: #666;
 }
 
 .upload-icon {
-  font-size: 3.5rem;
-  margin-bottom: 16px;
-  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+  font-size: 3rem;
+  margin-bottom: 12px;
 }
 
 .upload-label p {
@@ -206,50 +107,24 @@
 }
 
 .uploading {
-  color: #3b82f6;
+  color: #007bff;
   font-weight: 500;
-}
-
-.upload-spinner {
-  width: 40px;
-  height: 40px;
-  border: 4px solid #e5e7eb;
-  border-top: 4px solid #3b82f6;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-  margin: 0 auto 16px;
-}
-
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
 }
 
 .url-btn {
-  padding: 12px 20px;
-  background: #64748b;
+  padding: 12px 24px;
+  background: #6c757d;
   color: white;
   border: none;
-  border-radius: 8px;
+  border-radius: 6px;
   cursor: pointer;
   font-weight: 500;
-  transition: all 0.2s;
+  transition: background 0.2s;
   white-space: nowrap;
-  font-size: 0.9rem;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-.url-btn:hover:not(:disabled) {
-  background: #475569;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
-}
-
-.url-btn:disabled {
-  background: #9ca3af;
-  cursor: not-allowed;
-  transform: none;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+.url-btn:hover {
+  background: #5a6268;
 }
 
 /* URL Form */
@@ -302,96 +177,26 @@
   min-height: 200px;
 }
 
-.loading {
-  text-align: center;
-  padding: 60px 20px;
-  color: #64748b;
-}
-
-.loading-spinner {
-  width: 48px;
-  height: 48px;
-  border: 4px solid #e5e7eb;
-  border-top: 4px solid #3b82f6;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-  margin: 0 auto 20px;
-}
-
+.loading,
 .no-images {
   text-align: center;
   padding: 40px 20px;
-  color: #64748b;
-  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
-  border-radius: 12px;
-  margin: 20px;
-}
-
-.no-images-icon {
-  font-size: 4rem;
-  margin-bottom: 16px;
-  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
-}
-
-.no-images h3 {
-  margin: 0 0 12px 0;
-  color: #1e293b;
-  font-size: 1.3rem;
-  font-weight: 600;
+  color: #666;
 }
 
 .no-images p {
   margin: 8px 0;
-  font-size: 0.95rem;
-}
-
-.tips {
-  background: rgba(255, 255, 255, 0.8);
-  border-radius: 8px;
-  padding: 16px;
-  margin-top: 20px;
-  text-align: left;
-  border: 1px solid rgba(59, 130, 246, 0.1);
-}
-
-.tips p {
-  margin: 0 0 8px 0;
-  font-weight: 600;
-  color: #1e293b;
-}
-
-.tips ul {
-  margin: 0;
-  padding-left: 20px;
-  color: #475569;
-}
-
-.tips li {
-  margin: 4px 0;
-  font-size: 0.85rem;
-}
-
-.images-header {
-  text-align: center;
-  margin-bottom: 24px;
-}
-
-.images-header h3 {
-  margin: 0 0 8px 0;
-  color: #1e293b;
-  font-size: 1.2rem;
-  font-weight: 600;
 }
 
 .drag-instruction {
-  color: #64748b;
-  font-size: 0.9rem;
-  margin: 0;
-  padding: 12px 16px;
-  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
-  border-radius: 8px;
-  border: 1px solid rgba(59, 130, 246, 0.2);
-  display: inline-block;
+  text-align: center;
+  color: #666;
+  font-style: italic;
+  margin-bottom: 20px;
+  padding: 12px;
+  background: #f8f9fa;
+  border-radius: 6px;
+  border-left: 4px solid #007bff;
 }
 
 .image-list {
@@ -538,14 +343,6 @@
     flex-direction: column;
   }
   
-  .upload-actions {
-    min-width: auto;
-  }
-  
-  .upload-stats {
-    gap: 20px;
-  }
-  
   .image-list {
     grid-template-columns: 1fr;
   }
@@ -557,11 +354,6 @@
   .upload-section,
   .images-grid {
     padding: 16px;
-  }
-  
-  .format-tag {
-    font-size: 0.7rem;
-    padding: 3px 6px;
   }
 }
 

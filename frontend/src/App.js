@@ -19,7 +19,6 @@ import AdminDashboard from './pages/admin/AdminDashboard';
 import ProductManagement from './pages/admin/ProductManagement';
 import OrderManagement from './pages/admin/OrderManagement';
 import CategoryManagement from './pages/admin/CategoryManagement';
-import ImageManagement from './pages/admin/ImageManagement';
 import './App.css';
 
 const ProtectedRoute = ({ children }) => {
@@ -68,7 +67,6 @@ const AppContent = () => {
               <Routes>
                 <Route path="/" element={<AdminDashboard />} />
                 <Route path="/products" element={<ProductManagement />} />
-                <Route path="/images" element={<ImageManagement />} />
                 <Route path="/orders" element={<OrderManagement />} />
                 <Route path="/categories" element={<CategoryManagement />} />
               </Routes>
