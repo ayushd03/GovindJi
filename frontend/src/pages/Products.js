@@ -361,26 +361,33 @@ const Products = () => {
                       Categories
                     </label>
                     <div className="space-y-2 max-h-48 overflow-y-auto">
-                      {categories.map((category) => (
-                        <label key={category.id} className="flex items-center group cursor-pointer p-2 rounded-md hover:bg-gray-100 transition-colors">
-                          <input
-                            type="checkbox"
-                            className="w-4 h-4 rounded border-2 border-gray-300 text-blue-600 shadow-sm focus:border-blue-500 focus:ring-blue-500 transition-colors cursor-pointer"
-                            checked={filters.categories.includes(category.id)}
-                            onChange={() => toggleCategoryFilter(category.id)}
-                          />
-                          <span 
-                            className="ml-3 text-sm font-medium cursor-pointer leading-tight"
-                            style={{
-                              color: '#111827',
-                              opacity: 1,
-                              visibility: 'visible'
-                            }}
+                      {categories.map((category) => {
+                        const isSelected = filters.categories.includes(category.id);
+                        return (
+                          <div 
+                            key={category.id} 
+                            className="flex items-center group cursor-pointer p-2 rounded-md hover:bg-gray-50 transition-colors"
                           >
-                            {category.name}
-                          </span>
-                        </label>
-                      ))}
+                            <input
+                              type="checkbox"
+                              id={`category-${category.id}`}
+                              className="w-4 h-4 rounded border-2 border-gray-300 text-blue-600 shadow-sm focus:border-blue-500 focus:ring-blue-500 transition-colors cursor-pointer"
+                              checked={isSelected}
+                              onChange={() => toggleCategoryFilter(category.id)}
+                            />
+                            <label 
+                              htmlFor={`category-${category.id}`}
+                              className={`ml-3 text-sm cursor-pointer leading-tight transition-colors ${
+                                isSelected 
+                                  ? 'text-gray-900 font-semibold' 
+                                  : 'text-gray-500 font-light'
+                              }`}
+                            >
+                              {category.name}
+                            </label>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
 
