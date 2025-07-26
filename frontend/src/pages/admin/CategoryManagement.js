@@ -360,7 +360,7 @@ const CategoryManagement = () => {
       {/* Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-xl max-w-lg w-full max-h-[85vh] overflow-y-auto">
             <div className="p-6">
               {/* Modal Header */}
               <div className="flex items-center justify-between mb-6">
@@ -426,28 +426,19 @@ const CategoryManagement = () => {
                   {/* Gradient Colors */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Background Gradient
+                      Background Color
                     </label>
-                    <div className="grid grid-cols-2 gap-2">
+                    <select
+                      value={formData.gradient_colors}
+                      onChange={(e) => setFormData({ ...formData, gradient_colors: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    >
                       {gradientOptions.map((option) => (
-                        <label key={option.value} className="cursor-pointer">
-                          <input
-                            type="radio"
-                            value={option.value}
-                            checked={formData.gradient_colors === option.value}
-                            onChange={(e) => setFormData({ ...formData, gradient_colors: e.target.value })}
-                            className="sr-only"
-                          />
-                          <div className={`${option.preview} h-8 rounded-lg border-2 ${
-                            formData.gradient_colors === option.value ? 'border-blue-500' : 'border-gray-300'
-                          } flex items-center justify-center`}>
-                            <span className="text-white text-xs font-medium drop-shadow">
-                              {option.label}
-                            </span>
-                          </div>
-                        </label>
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
                       ))}
-                    </div>
+                    </select>
                   </div>
 
                   {/* Status */}
@@ -466,19 +457,36 @@ const CategoryManagement = () => {
 
                   {/* Images Upload */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
                       Category Images
                     </label>
-                    <input
-                      type="file"
-                      multiple
-                      accept="image/*"
-                      onChange={(e) => setImageFiles([...e.target.files])}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">
-                      You can upload multiple images. The first image will be set as primary.
-                    </p>
+                    <div className="relative">
+                      <input
+                        type="file"
+                        multiple
+                        accept="image/*"
+                        onChange={(e) => setImageFiles([...e.target.files])}
+                        className="sr-only"
+                        id="image-upload"
+                      />
+                      <label
+                        htmlFor="image-upload"
+                        className="flex flex-col items-center justify-center w-full h-20 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100 focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-500 transition-colors"
+                      >
+                        <div className="flex items-center space-x-2">
+                          <PhotoIcon className="w-5 h-5 text-gray-400" />
+                          <span className="text-sm font-medium text-gray-600">
+                            {imageFiles.length > 0 ? `${imageFiles.length} files selected` : 'Choose files or drag here'}
+                          </span>
+                        </div>
+                        <span className="text-xs text-gray-500 mt-1">PNG, JPG up to 10MB each</span>
+                      </label>
+                    </div>
+                    {imageFiles.length > 0 && (
+                      <p className="text-xs text-blue-600 mt-2">
+                        First image will be set as primary display image.
+                      </p>
+                    )}
                   </div>
 
                   {/* Submit Buttons */}
