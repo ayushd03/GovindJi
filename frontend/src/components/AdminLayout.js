@@ -31,8 +31,8 @@ const AdminLayout = ({ children }) => {
 
   const menuItems = [
     { path: '/admin', label: 'Dashboard', icon: ChartBarIcon },
-    { path: '/admin/products', label: 'Products', icon: CubeIcon },
     { path: '/admin/categories', label: 'Categories', icon: TagIcon },
+    { path: '/admin/products', label: 'Products', icon: CubeIcon },
     { path: '/admin/orders', label: 'Orders', icon: ShoppingCartIcon },
     { path: '/admin/inventory', label: 'Inventory', icon: ClipboardDocumentListIcon },
     { path: '/admin/customers', label: 'Customers', icon: UsersIcon },
