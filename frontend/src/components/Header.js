@@ -7,7 +7,7 @@ import { useCart } from '../context/CartContext';
 
 const Header = () => {
   const { user, logout, isAuthenticated } = useAuth();
-  const { getCartItemsCount } = useCart();
+  const { getCartItemsCount, openCartPopup } = useCart();
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -158,10 +158,11 @@ const Header = () => {
             )}
             
             {/* Cart Button */}
-            <Link to="/cart" className="relative">
+            <div className="relative">
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
+                onClick={openCartPopup}
                 className="flex items-center space-x-2 bg-primary-accent text-white px-4 py-2 rounded-full hover:bg-secondary-accent transition-all duration-300 shadow-md hover:shadow-lg"
               >
                 <ShoppingCart className="w-5 h-5" data-cart-icon />
@@ -176,7 +177,7 @@ const Header = () => {
                   </motion.span>
                 )}
               </motion.button>
-            </Link>
+            </div>
           </nav>
 
           {/* Mobile Menu Button */}
@@ -270,14 +271,16 @@ const Header = () => {
                 </div>
               )}
               
-              <Link 
-                to="/cart" 
-                className="flex items-center justify-center space-x-2 bg-primary-accent text-white py-3 rounded-full hover:bg-secondary-accent transition-all duration-300 shadow-md"
-                onClick={() => setIsMenuOpen(false)}
+              <button 
+                onClick={() => {
+                  setIsMenuOpen(false);
+                  openCartPopup();
+                }}
+                className="flex items-center justify-center space-x-2 bg-primary-accent text-white py-3 rounded-full hover:bg-secondary-accent transition-all duration-300 shadow-md w-full"
               >
                 <ShoppingCart className="w-5 h-5" data-cart-icon />
                 <span className="font-medium">Cart ({cartItemsCount})</span>
-              </Link>
+              </button>
             </div>
           </motion.div>
         )}

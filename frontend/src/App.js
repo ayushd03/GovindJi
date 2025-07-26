@@ -1,17 +1,17 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import { CartProvider } from './context/CartContext';
+import { CartProvider, useCart } from './context/CartContext';
 import Header from './components/Header';
 import Footer from './components/Footer';
 import AdminLayout from './components/AdminLayout';
 import CartNotification from './components/CartNotification';
+import CartPopup from './components/CartPopup';
 import Home from './pages/Home';
 import Products from './pages/Products';
 import ProductDetail from './pages/ProductDetail';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
-import Cart from './pages/Cart';
 import Checkout from './pages/Checkout';
 import OrderSuccess from './pages/OrderSuccess';
 import Orders from './pages/Orders';
@@ -52,64 +52,72 @@ const AdminRoute = ({ children }) => {
   return children;
 };
 
+const AppContent = () => {
+  const { isCartPopupOpen, closeCartPopup } = useCart();
+
+  return (
+    <div className="App">
+      <CartNotification />
+      <CartPopup isOpen={isCartPopupOpen} onClose={closeCartPopup} />
+      <Routes>
+        {/* Admin Routes */}
+        <Route path="/admin/*" element={
+          <AdminRoute>
+            <AdminLayout>
+              <Routes>
+                <Route path="/" element={<AdminDashboard />} />
+                <Route path="/products" element={<ProductManagement />} />
+                <Route path="/orders" element={<OrderManagement />} />
+                <Route path="/categories" element={<CategoryManagement />} />
+              </Routes>
+            </AdminLayout>
+          </AdminRoute>
+        } />
+        
+        {/* Public Routes */}
+        <Route path="/*" element={
+          <>
+            <Header />
+            <main className="main-content pt-20">
+              <Routes>
+                <Route path="/" element={<Home />} />
+                <Route path="/products" element={<Products />} />
+                <Route path="/products/:id" element={<ProductDetail />} />
+                <Route path="/login" element={<Login />} />
+                <Route path="/signup" element={<Signup />} />
+                <Route 
+                  path="/checkout" 
+                  element={
+                    <ProtectedRoute>
+                      <Checkout />
+                    </ProtectedRoute>
+                  } 
+                />
+                <Route path="/order-success" element={<OrderSuccess />} />
+                <Route 
+                  path="/orders" 
+                  element={
+                    <ProtectedRoute>
+                      <Orders />
+                    </ProtectedRoute>
+                  } 
+                />
+              </Routes>
+            </main>
+            <Footer />
+          </>
+        } />
+      </Routes>
+    </div>
+  );
+};
+
 function App() {
   return (
     <AuthProvider>
       <CartProvider>
         <Router>
-          <div className="App">
-            <CartNotification />
-            <Routes>
-              {/* Admin Routes */}
-              <Route path="/admin/*" element={
-                <AdminRoute>
-                  <AdminLayout>
-                    <Routes>
-                      <Route path="/" element={<AdminDashboard />} />
-                      <Route path="/products" element={<ProductManagement />} />
-                      <Route path="/orders" element={<OrderManagement />} />
-                      <Route path="/categories" element={<CategoryManagement />} />
-                    </Routes>
-                  </AdminLayout>
-                </AdminRoute>
-              } />
-              
-              {/* Public Routes */}
-              <Route path="/*" element={
-                <>
-                  <Header />
-                  <main className="main-content pt-20">
-                    <Routes>
-                      <Route path="/" element={<Home />} />
-                      <Route path="/products" element={<Products />} />
-                      <Route path="/products/:id" element={<ProductDetail />} />
-                      <Route path="/login" element={<Login />} />
-                      <Route path="/signup" element={<Signup />} />
-                      <Route path="/cart" element={<Cart />} />
-                      <Route 
-                        path="/checkout" 
-                        element={
-                          <ProtectedRoute>
-                            <Checkout />
-                          </ProtectedRoute>
-                        } 
-                      />
-                      <Route path="/order-success" element={<OrderSuccess />} />
-                      <Route 
-                        path="/orders" 
-                        element={
-                          <ProtectedRoute>
-                            <Orders />
-                          </ProtectedRoute>
-                        } 
-                      />
-                    </Routes>
-                  </main>
-                  <Footer />
-                </>
-              } />
-            </Routes>
-          </div>
+          <AppContent />
         </Router>
       </CartProvider>
     </AuthProvider>

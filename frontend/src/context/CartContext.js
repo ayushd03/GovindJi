@@ -13,6 +13,7 @@ export const useCart = () => {
 export const CartProvider = ({ children }) => {
   const [cartItems, setCartItems] = useState([]);
   const [cartNotification, setCartNotification] = useState(null);
+  const [isCartPopupOpen, setIsCartPopupOpen] = useState(false);
 
   useEffect(() => {
     const savedCart = localStorage.getItem('cartItems');
@@ -96,6 +97,9 @@ export const CartProvider = ({ children }) => {
     return { totalQuantity, items: productItems };
   };
 
+  const openCartPopup = () => setIsCartPopupOpen(true);
+  const closeCartPopup = () => setIsCartPopupOpen(false);
+
   const value = {
     cartItems,
     addToCart,
@@ -106,6 +110,9 @@ export const CartProvider = ({ children }) => {
     getCartItemsCount,
     getProductCartInfo,
     cartNotification,
+    isCartPopupOpen,
+    openCartPopup,
+    closeCartPopup,
   };
 
   return (
