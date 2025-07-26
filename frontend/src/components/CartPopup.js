@@ -103,7 +103,7 @@ const CartPopup = ({ isOpen, onClose }) => {
                         
                         <div className="cart-item-details">
                           <h4>{item.name}</h4>
-                          <p className="cart-item-price">${parseFloat(item.price).toFixed(2)}</p>
+                          <p className="cart-item-price">₹{parseFloat(item.price).toFixed(2)}</p>
                           
                           <div className="cart-item-actions">
                             <div className="quantity-controls">
@@ -133,7 +133,7 @@ const CartPopup = ({ isOpen, onClose }) => {
                         </div>
                         
                         <div className="cart-item-total">
-                          ${(parseFloat(item.price) * item.quantity).toFixed(2)}
+                          ₹{(parseFloat(item.price) * item.quantity).toFixed(2)}
                         </div>
                       </motion.div>
                     ))}
@@ -143,7 +143,7 @@ const CartPopup = ({ isOpen, onClose }) => {
                   <div className="cart-summary-popup">
                     <div className="summary-row">
                       <span>Subtotal:</span>
-                      <span>${getCartTotal().toFixed(2)}</span>
+                      <span>₹{getCartTotal().toFixed(2)}</span>
                     </div>
                     <div className="summary-row">
                       <span>Shipping:</span>
@@ -151,7 +151,7 @@ const CartPopup = ({ isOpen, onClose }) => {
                     </div>
                     <div className="summary-row total-row">
                       <span>Total:</span>
-                      <span>${getCartTotal().toFixed(2)}</span>
+                      <span>₹{getCartTotal().toFixed(2)}</span>
                     </div>
                     
                     <div className="cart-popup-actions">

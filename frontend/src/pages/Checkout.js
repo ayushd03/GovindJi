@@ -218,7 +218,7 @@ const Checkout = () => {
                     <p>Qty: {item.quantity}</p>
                   </div>
                   <div className="item-price">
-                    ${(parseFloat(item.price) * item.quantity).toFixed(2)}
+                    ₹{(parseFloat(item.price) * item.quantity).toFixed(2)}
                   </div>
                 </div>
               ))}
@@ -227,7 +227,7 @@ const Checkout = () => {
             <div className="summary-totals">
               <div className="summary-row">
                 <span>Subtotal:</span>
-                <span>${getCartTotal().toFixed(2)}</span>
+                <span>₹{getCartTotal().toFixed(2)}</span>
               </div>
               <div className="summary-row">
                 <span>Shipping:</span>
@@ -235,7 +235,7 @@ const Checkout = () => {
               </div>
               <div className="summary-row total">
                 <span>Total:</span>
-                <span>${getCartTotal().toFixed(2)}</span>
+                <span>₹{getCartTotal().toFixed(2)}</span>
               </div>
             </div>
           </div>
