@@ -14,37 +14,50 @@ const Home = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isHovered, setIsHovered] = useState(false);
+  const [currentPosition, setCurrentPosition] = useState(-320);
   const controls = useAnimation();
+
+  // Animation function to start from current position
+  const startAnimation = async (fromPosition = -320) => {
+    if (featuredProducts.length === 0) return;
+    
+    const endPosition = -320 * (featuredProducts.length + 1);
+    const distance = Math.abs(endPosition - fromPosition);
+    const totalDistance = Math.abs(endPosition - (-320));
+    const remainingDuration = (distance / totalDistance) * featuredProducts.length * 6;
+    
+    await controls.start({
+      x: endPosition,
+      transition: {
+        duration: remainingDuration,
+        ease: "linear"
+      }
+    });
+    
+    // Restart from beginning after reaching end
+    if (!isHovered) {
+      controls.set({ x: -320 });
+      setCurrentPosition(-320);
+      startAnimation(-320);
+    }
+  };
 
   // Start animation when products are loaded
   useEffect(() => {
     if (featuredProducts.length > 0 && !isHovered) {
-      controls.start({
-        x: [-320, -320 * (featuredProducts.length + 1)],
-        transition: {
-          duration: featuredProducts.length * 6,
-          repeat: Infinity,
-          ease: "linear"
-        }
-      });
+      startAnimation(currentPosition);
     }
-  }, [featuredProducts, isHovered, controls]);
+  }, [featuredProducts]);
 
   // Handle hover state
   useEffect(() => {
     if (isHovered) {
       controls.stop();
     } else if (featuredProducts.length > 0) {
-      controls.start({
-        x: [-320, -320 * (featuredProducts.length + 1)],
-        transition: {
-          duration: featuredProducts.length * 6,
-          repeat: Infinity,
-          ease: "linear"
-        }
-      });
+      // Continue from current position
+      startAnimation(currentPosition);
     }
-  }, [isHovered, featuredProducts.length, controls]);
+  }, [isHovered]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -325,6 +338,11 @@ const Home = () => {
                 <motion.div 
                   className="flex gap-8 will-change-transform"
                   animate={controls}
+                  onUpdate={(latest) => {
+                    if (isHovered && latest.x !== undefined) {
+                      setCurrentPosition(latest.x);
+                    }
+                  }}
                   style={{
                     width: `${(featuredProducts.length * 2 + 2) * 320}px`
                   }}
