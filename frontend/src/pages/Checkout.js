@@ -43,7 +43,7 @@ const Checkout = () => {
         total_amount: getCartTotal(),
         status: 'pending',
         items: cartItems.map(item => ({
-          product_id: item.id,
+          product_id: item.originalId || item.id,
           quantity: item.quantity,
           price: item.price,
         })),
