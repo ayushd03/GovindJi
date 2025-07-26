@@ -188,51 +188,29 @@ const Products = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
-        {/* Premium Header */}
-        <motion.div 
-          className="text-center mb-8 lg:mb-12"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-        >
-          <h1 className="text-3xl lg:text-4xl xl:text-5xl font-heading font-bold text-gray-900 mb-4 tracking-tight">
-            {filters.search ? (
-              <>
-                Search Results for <span className="text-blue-600">"{filters.search}"</span>
-              </>
-            ) : (
-              'Premium Products'
-            )}
-          </h1>
-          <p className="text-lg lg:text-xl text-gray-600 font-body max-w-2xl mx-auto">
-            {filteredProducts.length} premium product{filteredProducts.length !== 1 ? 's' : ''} 
-            {getActiveFiltersCount() > 0 && (
-              <span className="text-blue-600 font-medium"> with your selected filters</span>
-            )}
-          </p>
-        </motion.div>
-
-        {/* Premium Search Bar */}
-        <motion.div 
-          className="max-w-2xl mx-auto mb-8"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.1 }}
-        >
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-              <MagnifyingGlassIcon className="h-5 w-5 text-gray-400" />
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+        {/* Simple Results Bar */}
+        {filteredProducts.length > 0 && (
+          <motion.div 
+            className="mb-4"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+          >
+            <div className="text-center">
+              <p className="text-sm text-gray-600">
+                {filters.search ? (
+                  <>Showing {filteredProducts.length} result{filteredProducts.length !== 1 ? 's' : ''} for "{filters.search}"</>
+                ) : (
+                  <>{filteredProducts.length} product{filteredProducts.length !== 1 ? 's' : ''} available</>
+                )}
+                {getActiveFiltersCount() > 0 && (
+                  <span className="text-blue-600 ml-1">• {getActiveFiltersCount()} filter{getActiveFiltersCount() > 1 ? 's' : ''} applied</span>
+                )}
+              </p>
             </div>
-            <input
-              type="text"
-              className="block w-full pl-12 pr-4 py-4 border border-gray-200 rounded-xl shadow-sm bg-white/80 backdrop-blur-sm placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base font-body transition-all duration-300"
-              placeholder="Search premium dry fruits and nuts..."
-              value={filters.search}
-              onChange={(e) => handleFilterChange('search', e.target.value)}
-            />
-          </div>
-        </motion.div>
+          </motion.div>
+        )}
 
         {/* Enhanced Active Filters */}
         {getActiveFiltersCount() > 0 && (
@@ -309,45 +287,20 @@ const Products = () => {
         )}
 
         <div className="lg:grid lg:grid-cols-4 lg:gap-x-8 xl:gap-x-10">
-          {/* Mobile controls */}
-          <div className="lg:hidden mb-6 space-y-4">
-            {/* Mobile filter button */}
+          {/* Mobile filter toggle */}
+          <div className="lg:hidden mb-3">
             <Button
               variant="outline"
               onClick={() => setShowMobileFilters(!showMobileFilters)}
-              className="flex items-center justify-center w-full px-4 py-3 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl shadow-sm hover:bg-gray-50 transition-all duration-300"
+              className="flex items-center justify-center w-full px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-md shadow-sm hover:bg-gray-50 transition-all duration-200"
             >
-              <FunnelIcon className="w-5 h-5 mr-2" />
-              Filters {getActiveFiltersCount() > 0 && (
+              <FunnelIcon className="w-4 h-4 mr-2" />
+              {showMobileFilters ? 'Hide' : 'Show'} Filters & View {getActiveFiltersCount() > 0 && (
                 <Badge className="ml-2 bg-blue-100 text-blue-700 px-2 py-0.5 text-xs rounded-full">
                   {getActiveFiltersCount()}
                 </Badge>
               )}
             </Button>
-            
-            {/* Mobile view toggle */}
-            <div className="flex items-center justify-center">
-              <div className="bg-white border border-gray-200 rounded-xl p-1 shadow-sm">
-                <Button
-                  variant={viewMode === 'grid' ? 'default' : 'ghost'}
-                  size="sm"
-                  onClick={() => setViewMode('grid')}
-                  className="px-3 py-2 rounded-lg transition-all duration-200"
-                >
-                  <ViewColumnsIcon className="w-4 h-4 mr-1.5" />
-                  Grid
-                </Button>
-                <Button
-                  variant={viewMode === 'list' ? 'default' : 'ghost'}
-                  size="sm"
-                  onClick={() => setViewMode('list')}
-                  className="px-3 py-2 rounded-lg transition-all duration-200"
-                >
-                  <ListBulletIcon className="w-4 h-4 mr-1.5" />
-                  List
-                </Button>
-              </div>
-            </div>
           </div>
 
           {/* Premium Filters Sidebar */}
@@ -359,18 +312,46 @@ const Products = () => {
           >
             <Card className="bg-white/80 backdrop-blur-sm border border-gray-200/50 shadow-lg sticky top-8">
               <CardContent className="p-6">
-                <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-xl font-heading font-semibold text-gray-900 tracking-tight">Filters</h3>
-                  {getActiveFiltersCount() > 0 && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={clearFilters}
-                      className="text-sm text-red-600 hover:text-red-700 hover:bg-red-50 font-medium px-3 py-1.5 rounded-lg transition-colors"
-                    >
-                      Clear all ({getActiveFiltersCount()})
-                    </Button>
-                  )}
+                <div className="space-y-4">
+                  {/* View Toggle */}
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-heading font-semibold text-gray-900">View</h3>
+                    <div className="bg-gray-100 border border-gray-200 rounded-md p-0.5">
+                      <Button
+                        variant={viewMode === 'grid' ? 'default' : 'ghost'}
+                        size="sm"
+                        onClick={() => setViewMode('grid')}
+                        className="px-2 py-1.5 rounded-sm transition-all duration-200 h-auto text-xs"
+                      >
+                        <ViewColumnsIcon className="w-3.5 h-3.5 mr-1" />
+                        Grid
+                      </Button>
+                      <Button
+                        variant={viewMode === 'list' ? 'default' : 'ghost'}
+                        size="sm"
+                        onClick={() => setViewMode('list')}
+                        className="px-2 py-1.5 rounded-sm transition-all duration-200 h-auto text-xs"
+                      >
+                        <ListBulletIcon className="w-3.5 h-3.5 mr-1" />
+                        List
+                      </Button>
+                    </div>
+                  </div>
+                  
+                  {/* Filters Header */}
+                  <div className="flex items-center justify-between pt-2 border-t border-gray-200">
+                    <h3 className="text-lg font-heading font-semibold text-gray-900">Filters</h3>
+                    {getActiveFiltersCount() > 0 && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={clearFilters}
+                        className="text-xs text-red-600 hover:text-red-700 hover:bg-red-50 font-medium px-2 py-1 rounded-md transition-colors"
+                      >
+                        Clear ({getActiveFiltersCount()})
+                      </Button>
+                    )}
+                  </div>
                 </div>
 
                 <div className="space-y-6">
@@ -379,16 +360,23 @@ const Products = () => {
                     <label className="block text-sm font-heading font-semibold text-gray-900 mb-4 tracking-tight">
                       Categories
                     </label>
-                    <div className="space-y-3 max-h-48 overflow-y-auto">
+                    <div className="space-y-2 max-h-48 overflow-y-auto">
                       {categories.map((category) => (
-                        <label key={category.id} className="flex items-center group cursor-pointer">
+                        <label key={category.id} className="flex items-center group cursor-pointer p-2 rounded-md hover:bg-gray-100 transition-colors">
                           <input
                             type="checkbox"
-                            className="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-500 focus:ring-blue-500 transition-colors"
+                            className="w-4 h-4 rounded border-2 border-gray-300 text-blue-600 shadow-sm focus:border-blue-500 focus:ring-blue-500 transition-colors cursor-pointer"
                             checked={filters.categories.includes(category.id)}
                             onChange={() => toggleCategoryFilter(category.id)}
                           />
-                          <span className="ml-3 text-sm text-gray-700 group-hover:text-gray-900 font-body transition-colors">
+                          <span 
+                            className="ml-3 text-sm font-medium cursor-pointer leading-tight"
+                            style={{
+                              color: '#111827',
+                              opacity: 1,
+                              visibility: 'visible'
+                            }}
+                          >
                             {category.name}
                           </span>
                         </label>
@@ -501,47 +489,6 @@ const Products = () => {
               </motion.div>
             ) : (
               <>
-                {/* Enhanced Results Summary and View Toggle */}
-                <motion.div 
-                  className="mb-8"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.4, delay: 0.4 }}
-                >
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white/60 backdrop-blur-sm rounded-xl p-4 border border-gray-200/50">
-                    <p className="text-sm text-gray-700 font-body">
-                      Showing <span className="font-semibold text-gray-900">{filteredProducts.length}</span> 
-                      {filteredProducts.length === 1 ? ' product' : ' products'}
-                      {getActiveFiltersCount() > 0 && (
-                        <span className="text-blue-600 font-medium"> with {getActiveFiltersCount()} filter{getActiveFiltersCount() > 1 ? 's' : ''}</span>
-                      )}
-                    </p>
-                    
-                    {/* Desktop View Toggle */}
-                    <div className="hidden lg:flex items-center">
-                      <div className="bg-white border border-gray-200 rounded-lg p-1 shadow-sm">
-                        <Button
-                          variant={viewMode === 'grid' ? 'default' : 'ghost'}
-                          size="sm"
-                          onClick={() => setViewMode('grid')}
-                          className="px-3 py-1.5 rounded-md transition-all duration-200"
-                        >
-                          <ViewColumnsIcon className="w-4 h-4 mr-1.5" />
-                          Grid
-                        </Button>
-                        <Button
-                          variant={viewMode === 'list' ? 'default' : 'ghost'}
-                          size="sm"
-                          onClick={() => setViewMode('list')}
-                          className="px-3 py-1.5 rounded-md transition-all duration-200"
-                        >
-                          <ListBulletIcon className="w-4 h-4 mr-1.5" />
-                          List
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                </motion.div>
 
                 {/* Premium Products Grid */}
                 <motion.div
