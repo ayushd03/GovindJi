@@ -88,12 +88,23 @@ class StorageService {
         await this.storage.createBucketIfNotExists();
       }
 
-      // Test basic operations
-      const testBuffer = Buffer.from('test-connection', 'utf8');
+      // Test basic operations with a minimal PNG image
+      const testBuffer = Buffer.from([
+        0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, // PNG signature
+        0x00, 0x00, 0x00, 0x0D, // IHDR chunk size
+        0x49, 0x48, 0x44, 0x52, // IHDR
+        0x00, 0x00, 0x00, 0x01, // width 1
+        0x00, 0x00, 0x00, 0x01, // height 1
+        0x08, 0x02, 0x00, 0x00, 0x00, // bit depth, color type, compression, filter, interlace
+        0x90, 0x77, 0x53, 0xDE, // CRC
+        0x00, 0x00, 0x00, 0x00, // IEND chunk size
+        0x49, 0x45, 0x4E, 0x44, // IEND
+        0xAE, 0x42, 0x60, 0x82  // CRC
+      ]);
       const result = await this.storage.uploadFile(
         testBuffer, 
-        'test-connection.txt', 
-        'text/plain',
+        'test-connection.png', 
+        'image/png',
         { prefix: 'health-check' }
       );
 

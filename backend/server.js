@@ -20,6 +20,9 @@ app.use(cors());
 app.use(express.json({ limit: '25mb' }));
 app.use(express.urlencoded({ limit: '25mb', extended: true }));
 
+// Serve uploaded images statically
+app.use('/product-images', express.static(path.join(__dirname, 'uploads/product-images')));
+
 // Initialize storage service
 (async () => {
     try {
@@ -338,7 +341,7 @@ app.post('/api/admin/products/:id/images/upload', authenticateAdmin, upload.sing
     if (!req.file) {
         return res.status(400).json({ error: 'No image file provided' });
     }
-    
+
     try {
         // Get the highest sort_order for this product
         const { data: existingImages, error: sortError } = await supabase
@@ -382,7 +385,7 @@ app.post('/api/admin/products/:id/images/upload', authenticateAdmin, upload.sing
         const { data, error } = await supabase
             .from('product_images')
             .insert([{
-                product_id: id,
+                product_id: id, // Keep as string since it's UUID
                 image_url: uploadResult.url,
                 image_type: 'file',
                 sort_order: nextSortOrder,
@@ -392,8 +395,9 @@ app.post('/api/admin/products/:id/images/upload', authenticateAdmin, upload.sing
             .select()
             .single();
         
-        if (error) {
+        if (error || !data) {
             // Delete the uploaded file from cloud storage if database insert fails
+            console.error('Failed to insert image into database:', error);
             try {
                 await storageService.deleteFile(uploadResult.url);
             } catch (deleteError) {
