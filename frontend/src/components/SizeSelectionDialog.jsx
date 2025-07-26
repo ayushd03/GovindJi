@@ -13,7 +13,7 @@ import { Badge } from './ui/badge';
 import { useCart } from '../context/CartContext';
 import { cn } from '../lib/utils';
 
-const SizeSelectionDialog = ({ isOpen, onClose, product }) => {
+const SizeSelectionDialog = ({ isOpen, onClose, product, onAddToCart }) => {
   const [selectedSize, setSelectedSize] = useState('');
   const [quantity, setQuantity] = useState(1);
   const [isAdding, setIsAdding] = useState(false);
@@ -51,12 +51,17 @@ const SizeSelectionDialog = ({ isOpen, onClose, product }) => {
     };
 
     try {
-      await addToCart(productWithSize, quantity);
+      if (onAddToCart) {
+        // Use custom onAddToCart if provided
+        await onAddToCart(productWithSize, quantity);
+      } else {
+        // Fallback to default cart context
+        await addToCart(productWithSize, quantity);
+        onClose();
+      }
       
-      // Close dialog after successful add
       setTimeout(() => {
         setIsAdding(false);
-        onClose();
       }, 500);
     } catch (error) {
       console.error('Error adding to cart:', error);
