@@ -81,11 +81,18 @@ const SizeSelectionDialog = ({ isOpen, onClose, product, onAddToCart }) => {
 
         {/* Product Info - Compact */}
         <div className="flex items-center gap-3 px-4 pb-3">
-          <img
-            src={product?.image_url || '/placeholder-product.jpg'}
-            alt={product?.name}
-            className="w-12 h-12 object-cover rounded-md"
-          />
+          {product?.image_url ? (
+            <img
+              src={product.image_url}
+              alt={product?.name}
+              className="w-12 h-12 object-cover rounded-md"
+              onError={(e) => e.target.style.display = 'none'}
+            />
+          ) : (
+            <div className="w-12 h-12 bg-gray-100 flex items-center justify-center rounded-md">
+              <div className="text-gray-400 text-lg">📦</div>
+            </div>
+          )}
           <div className="flex-1 min-w-0">
             <h4 className="font-medium text-sm truncate">{product?.name}</h4>
             <p className="text-xs text-muted-foreground">Qty: {quantity}</p>

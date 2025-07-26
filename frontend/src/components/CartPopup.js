@@ -4,6 +4,7 @@ import { X, Plus, Minus, ShoppingBag } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
+import { getImageUrl, handleImageError } from '../utils/imageUtils';
 import './CartPopup.css';
 
 const CartPopup = ({ isOpen, onClose }) => {
@@ -92,13 +93,20 @@ const CartPopup = ({ isOpen, onClose }) => {
                         className="cart-item-popup"
                       >
                         <div className="cart-item-image">
-                          <img 
-                            src={item.image_url || '/placeholder-product.jpg'} 
-                            alt={item.name}
-                            onError={(e) => {
-                              e.target.src = '/placeholder-product.jpg';
-                            }}
-                          />
+                          {getImageUrl(item.image_url, 'product') ? (
+                            <img 
+                              src={getImageUrl(item.image_url, 'product')} 
+                              alt={item.name}
+                              onError={(e) => handleImageError(e, 'product')}
+                            />
+                          ) : (
+                            <div className="w-full h-full bg-gray-100 flex items-center justify-center">
+                              <div className="text-gray-400 text-center">
+                                <div className="text-2xl mb-1">📦</div>
+                                <div className="text-xs">No image</div>
+                              </div>
+                            </div>
+                          )}
                         </div>
                         
                         <div className="cart-item-details">

@@ -125,11 +125,18 @@ const SizeSelectionPopup = ({
           </div>
 
           <div className="flex items-center mb-6 p-4 bg-gray-50 rounded-xl">
-            <img
-              src={product?.image_url || '/placeholder-product.jpg'}
-              alt={product?.name}
-              className="w-16 h-16 object-cover rounded-lg mr-4"
-            />
+            {product?.image_url ? (
+              <img
+                src={product.image_url}
+                alt={product?.name}
+                className="w-16 h-16 object-cover rounded-lg mr-4"
+                onError={(e) => e.target.style.display = 'none'}
+              />
+            ) : (
+              <div className="w-16 h-16 bg-gray-100 flex items-center justify-center rounded-lg mr-4">
+                <div className="text-gray-400 text-2xl">📦</div>
+              </div>
+            )}
             <div>
               <h4 className="font-semibold text-gray-800">{product?.name}</h4>
               <p className="text-sm text-gray-600">Quantity: {quantity}</p>

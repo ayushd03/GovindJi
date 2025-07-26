@@ -4,6 +4,9 @@
   box-sizing: border-box;
 }
 
+/* Import image error handling styles */
+@import './components/ImageErrorStyles.css';
+
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
     'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',

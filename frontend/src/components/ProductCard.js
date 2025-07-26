@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { ShoppingCart, Star, Heart, Eye } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useProductImage } from '../hooks/useProductImage';
+import { handleImageError } from '../utils/imageUtils';
 import SizeSelectionPopup from './SizeSelectionPopup';
 
 const ProductCard = ({ product }) => {
@@ -114,19 +115,24 @@ const ProductCard = ({ product }) => {
               transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
             />
           ) : (
-            <motion.img
-              src={primaryImage || product.image_url || '/placeholder-product.jpg'}
-              alt={product.name}
-              className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-              onError={(e) => {
-                if (e.target && e.target.src !== '/placeholder-product.jpg') {
-                  e.target.src = '/placeholder-product.jpg';
-                }
-              }}
-              initial={{ opacity: 0, scale: 1.1 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.5 }}
-            />
+            {primaryImage || product.image_url ? (
+              <motion.img
+                src={primaryImage || product.image_url}
+                alt={product.name}
+                className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                onError={(e) => handleImageError(e, 'product')}
+                initial={{ opacity: 0, scale: 1.1 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.5 }}
+              />
+            ) : (
+              <div className="w-full h-full bg-gray-100 flex items-center justify-center">
+                <div className="text-gray-400 text-center">
+                  <div className="text-4xl mb-2">📦</div>
+                  <div className="text-sm">No image</div>
+                </div>
+              </div>
+            )}
           )}
           
           {/* Overlay with Quick Actions */}

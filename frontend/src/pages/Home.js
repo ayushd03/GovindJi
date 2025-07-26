@@ -7,6 +7,7 @@ import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
 import { productsAPI, categoriesAPI } from '../services/api';
+import { getImageUrl } from '../utils/imageUtils';
 
 const Home = () => {
   const [featuredProducts, setFeaturedProducts] = useState([]);
@@ -89,10 +90,11 @@ const Home = () => {
   const getCategoryBackground = (category) => {
     // Use primary image if available, otherwise fallback to gradient
     const primaryImage = category.primary_image || category.category_images?.[0]?.image_url;
+    const processedImage = primaryImage ? getImageUrl(primaryImage, 'category') : null;
     const gradient = category.gradient_colors || 'from-gray-400 to-gray-600';
     
     return {
-      image: primaryImage,
+      image: processedImage,
       gradient: gradient
     };
   };

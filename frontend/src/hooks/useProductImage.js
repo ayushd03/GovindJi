@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { productsAPI } from '../services/api';
+import { getPrimaryImageUrl, getImageUrl } from '../utils/imageUtils';
 
 export const useProductImage = (productId, fallbackImageUrl = null) => {
   const [primaryImage, setPrimaryImage] = useState(null);
@@ -18,17 +19,18 @@ export const useProductImage = (productId, fallbackImageUrl = null) => {
         const images = response.data;
         
         if (Array.isArray(images) && images.length > 0) {
-          // Find primary image or use first image
-          const primary = images.find(img => img.is_primary) || images[0];
-          setPrimaryImage(primary.image_url);
-        } else if (fallbackImageUrl) {
-          setPrimaryImage(fallbackImageUrl);
+          // Use utility function to get primary image URL
+          const primaryImageUrl = getPrimaryImageUrl(images, fallbackImageUrl, 'product');
+          setPrimaryImage(primaryImageUrl);
         } else {
-          setPrimaryImage(null);
+          // Use fallback or null if no fallback
+          const fallbackUrl = getImageUrl(fallbackImageUrl, 'product');
+          setPrimaryImage(fallbackUrl);
         }
       } catch (error) {
         console.error('Error fetching product image:', error);
-        setPrimaryImage(fallbackImageUrl);
+        const fallbackUrl = getImageUrl(fallbackImageUrl, 'product');
+        setPrimaryImage(fallbackUrl);
       } finally {
         setLoading(false);
       }

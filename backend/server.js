@@ -22,6 +22,8 @@ app.use(express.urlencoded({ limit: '25mb', extended: true }));
 
 // Serve uploaded images statically
 app.use('/product-images', express.static(path.join(__dirname, 'uploads/product-images')));
+app.use('/category-images', express.static(path.join(__dirname, 'uploads/category-images')));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Initialize storage service
 (async () => {

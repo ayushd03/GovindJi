@@ -7,6 +7,7 @@ import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { useCart } from '../context/CartContext';
 import { useProductImage } from '../hooks/useProductImage';
+import { handleImageError } from '../utils/imageUtils';
 import { cn } from '../lib/utils';
 import SizeSelectionDialog from './SizeSelectionDialog';
 
@@ -71,17 +72,20 @@ const ProductCardGrid = ({ product, className, viewMode = 'grid' }) => {
                 <div className="relative w-24 h-24 bg-gradient-to-br from-gray-50 to-gray-100 overflow-hidden rounded-lg">
                   {imageLoading ? (
                     <div className="w-full h-full bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 bg-[length:200%_100%] animate-pulse" />
-                  ) : (
+                  ) : primaryImage || product.image_url ? (
                     <img
-                      src={primaryImage || product.image_url || '/placeholder-product.jpg'}
+                      src={primaryImage || product.image_url}
                       alt={product.name}
                       className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                      onError={(e) => {
-                        if (e.target && e.target.src !== '/placeholder-product.jpg') {
-                          e.target.src = '/placeholder-product.jpg';
-                        }
-                      }}
+                      onError={(e) => handleImageError(e, 'product')}
                     />
+                  ) : (
+                    <div className="w-full h-full bg-gray-100 flex items-center justify-center">
+                      <div className="text-gray-400 text-center text-xs">
+                        <div className="text-2xl mb-1">📦</div>
+                        <div>No image</div>
+                      </div>
+                    </div>
                   )}
                 </div>
               </Link>
@@ -269,17 +273,20 @@ const ProductCardGrid = ({ product, className, viewMode = 'grid' }) => {
             <div className="relative h-72 bg-gradient-to-br from-gray-50 to-gray-100 overflow-hidden rounded-t-lg">
               {imageLoading ? (
                 <div className="w-full h-full bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 bg-[length:200%_100%] animate-pulse" />
-              ) : (
+              ) : primaryImage || product.image_url ? (
                 <motion.img
-                  src={primaryImage || product.image_url || '/placeholder-product.jpg'}
+                  src={primaryImage || product.image_url}
                   alt={product.name}
                   className="w-full h-full object-cover transition-all duration-400 group-hover:scale-105"
-                  onError={(e) => {
-                    if (e.target && e.target.src !== '/placeholder-product.jpg') {
-                      e.target.src = '/placeholder-product.jpg';
-                    }
-                  }}
+                  onError={(e) => handleImageError(e, 'product')}
                 />
+              ) : (
+                <div className="w-full h-full bg-gray-100 flex items-center justify-center">
+                  <div className="text-gray-400 text-center">
+                    <div className="text-4xl mb-2">📦</div>
+                    <div className="text-sm">No image</div>
+                  </div>
+                </div>
               )}
               
               {/* Quick view overlay */}

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { productsAPI } from '../services/api';
+import { getImageUrl, handleImageError } from '../utils/imageUtils';
 import './ImageGalleryManager.css';
 
 const ImageGalleryManager = ({ productId, isOpen, onClose, onImagesUpdate }) => {
@@ -313,15 +314,20 @@ const ImageGalleryManager = ({ productId, isOpen, onClose, onImagesUpdate }) => 
                   onDrop={(e) => handleDrop(e, index)}
                 >
                   <div className="image-preview">
-                    <img 
-                      src={image.image_url} 
-                      alt={image.alt_text || 'Product image'}
-                      onError={(e) => {
-                        if (e.target && e.target.src !== '/placeholder-product.jpg') {
-                          e.target.src = '/placeholder-product.jpg';
-                        }
-                      }}
-                    />
+                    {image.image_url ? (
+                      <img 
+                        src={getImageUrl(image.image_url, 'product')} 
+                        alt={image.alt_text || 'Product image'}
+                        onError={(e) => handleImageError(e, 'product')}
+                      />
+                    ) : (
+                      <div className="no-image-placeholder bg-gray-100 flex items-center justify-center">
+                        <div className="text-gray-400 text-center">
+                          <div className="text-2xl mb-1">📦</div>
+                          <div className="text-xs">No image</div>
+                        </div>
+                      </div>
+                    )}
                     {image.is_primary && (
                       <div className="primary-badge">Primary</div>
                     )}

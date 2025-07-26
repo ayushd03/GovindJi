@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { productsAPI } from '../services/api';
+import { getImageUrl, handleImageError } from '../utils/imageUtils';
 import './ProductImageGallery.css';
 
 const ProductImageGallery = ({ productId, fallbackImageUrl = null }) => {
@@ -33,18 +34,21 @@ const ProductImageGallery = ({ productId, fallbackImageUrl = null }) => {
       const data = response.data;
       
       if (data && data.length > 0) {
-        // Sort by sort_order and prioritize primary image
+        // Sort by sort_order and prioritize primary image, and process URLs
         const sortedImages = data.sort((a, b) => {
           if (a.is_primary && !b.is_primary) return -1;
           if (!a.is_primary && b.is_primary) return 1;
           return a.sort_order - b.sort_order;
-        });
+        }).map(img => ({
+          ...img,
+          image_url: getImageUrl(img.image_url, 'product')
+        }));
         setImages(sortedImages);
       } else if (fallbackImageUrl) {
         // Use fallback image if no images found
         setImages([{ 
           id: 'fallback', 
-          image_url: fallbackImageUrl, 
+          image_url: getImageUrl(fallbackImageUrl, 'product'), 
           alt_text: 'Product image',
           is_primary: true 
         }]);
@@ -56,7 +60,7 @@ const ProductImageGallery = ({ productId, fallbackImageUrl = null }) => {
       if (fallbackImageUrl) {
         setImages([{ 
           id: 'fallback', 
-          image_url: fallbackImageUrl, 
+          image_url: getImageUrl(fallbackImageUrl, 'product'), 
           alt_text: 'Product image',
           is_primary: true 
         }]);
@@ -115,9 +119,11 @@ const ProductImageGallery = ({ productId, fallbackImageUrl = null }) => {
   if (images.length === 0) {
     return (
       <div className="product-image-gallery no-images">
-        <div className="no-image-placeholder">
-          <span>📦</span>
-          <p>No image available</p>
+        <div className="no-image-placeholder bg-gray-100 flex items-center justify-center h-64 rounded-lg">
+          <div className="text-gray-400 text-center">
+            <div className="text-4xl mb-2">📦</div>
+            <p className="text-sm">No image available</p>
+          </div>
         </div>
       </div>
     );
@@ -137,9 +143,7 @@ const ProductImageGallery = ({ productId, fallbackImageUrl = null }) => {
             src={currentImage.image_url}
             alt={currentImage.alt_text || 'Product image'}
             className="main-image"
-            onError={(e) => {
-              e.target.src = '/placeholder-image.png';
-            }}
+            onError={(e) => handleImageError(e, 'product')}
           />
           
           {/* Overlay indicators */}
@@ -202,9 +206,7 @@ const ProductImageGallery = ({ productId, fallbackImageUrl = null }) => {
                   <img
                     src={image.image_url}
                     alt={image.alt_text || `Product image ${index + 1}`}
-                    onError={(e) => {
-                      e.target.src = '/placeholder-image.png';
-                    }}
+                    onError={(e) => handleImageError(e, 'product')}
                   />
                   {image.is_primary && (
                     <div className="primary-badge">★</div>

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { ordersAPI } from '../services/api';
+import { getImageUrl, handleImageError } from '../utils/imageUtils';
 import './Checkout.css';
 
 const Checkout = () => {
@@ -206,13 +207,19 @@ const Checkout = () => {
             <div className="order-items">
               {cartItems.map(item => (
                 <div key={item.id} className="order-item">
-                  <img 
-                    src={item.image_url || '/placeholder-product.jpg'} 
-                    alt={item.name}
-                    onError={(e) => {
-                      e.target.src = '/placeholder-product.jpg';
-                    }}
-                  />
+                  {getImageUrl(item.image_url, 'product') ? (
+                    <img 
+                      src={getImageUrl(item.image_url, 'product')} 
+                      alt={item.name}
+                      onError={(e) => handleImageError(e, 'product')}
+                    />
+                  ) : (
+                    <div className="w-16 h-16 bg-gray-100 flex items-center justify-center rounded">
+                      <div className="text-gray-400 text-center">
+                        <div className="text-lg">📦</div>
+                      </div>
+                    </div>
+                  )}
                   <div className="item-info">
                     <h4>{item.name}</h4>
                     <p>Qty: {item.quantity}</p>
