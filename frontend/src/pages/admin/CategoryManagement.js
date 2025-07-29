@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import ImageUploadManager from '../../components/ImageUploadManager';
 import {
   PlusIcon,
   PencilIcon,
@@ -31,6 +32,8 @@ const CategoryManagement = () => {
     is_active: true
   });
   const [imageFiles, setImageFiles] = useState([]);
+  const [urlImages, setUrlImages] = useState([]);
+  const [imageProcessingSettings, setImageProcessingSettings] = useState({});
   const [uploading, setUploading] = useState(false);
 
   const gradientOptions = [
@@ -96,6 +99,8 @@ const CategoryManagement = () => {
     
     setShowModal(true);
     setImageFiles([]);
+    setUrlImages([]);
+    setImageProcessingSettings({});
   };
 
   const closeModal = () => {
@@ -109,6 +114,8 @@ const CategoryManagement = () => {
       is_active: true
     });
     setImageFiles([]);
+    setUrlImages([]);
+    setImageProcessingSettings({});
   };
 
   const handleSubmit = async (e) => {
@@ -145,12 +152,37 @@ const CategoryManagement = () => {
           imageFormData.append('alt_text', `${savedCategory.name} category image`);
           imageFormData.append('is_primary', i === 0 ? 'true' : 'false');
           
+          // Add processing settings
+          if (Object.keys(imageProcessingSettings).length > 0) {
+            imageFormData.append('processing_settings', JSON.stringify(imageProcessingSettings));
+          }
+          
           await fetch(`${API_BASE_URL}/api/admin/categories/${savedCategory.id}/images`, {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${token}`
             },
             body: imageFormData
+          });
+        }
+      }
+      
+      // Add URL images if any
+      if (urlImages.length > 0) {
+        for (let i = 0; i < urlImages.length; i++) {
+          const urlImage = urlImages[i];
+          await fetch(`${API_BASE_URL}/api/admin/categories/${savedCategory.id}/images/url`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              image_url: urlImage.url,
+              alt_text: urlImage.altText || `${savedCategory.name} category image`,
+              is_primary: urlImage.isPrimary || (imageFiles.length === 0 && i === 0),
+              processing_settings: urlImage.settings || imageProcessingSettings
+            })
           });
         }
       }
@@ -464,28 +496,29 @@ const CategoryManagement = () => {
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Category Images
                     </label>
-                    <div className="relative">
-                      <input
-                        type="file"
-                        multiple
-                        accept="image/*"
-                        onChange={(e) => setImageFiles([...e.target.files])}
-                        className="sr-only"
-                        id="image-upload"
-                      />
-                      <label
-                        htmlFor="image-upload"
-                        className="flex flex-col items-center justify-center w-full h-20 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100 focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-500 transition-colors"
-                      >
-                        <div className="flex items-center space-x-2">
-                          <PhotoIcon className="w-5 h-5 text-gray-400" />
-                          <span className="text-sm font-medium text-gray-600">
-                            {imageFiles.length > 0 ? `${imageFiles.length} files selected` : 'Choose files or drag here'}
-                          </span>
-                        </div>
-                        <span className="text-xs text-gray-500 mt-1">PNG, JPG up to 10MB each</span>
-                      </label>
-                    </div>
+                    <ImageUploadManager
+                      onFilesSelected={(files, settings) => {
+                        setImageFiles(files);
+                        setImageProcessingSettings(settings);
+                      }}
+                      onUrlSubmit={(urlData) => {
+                        setUrlImages(prev => [...prev, urlData]);
+                      }}
+                      multiple={true}
+                      maxFiles={5}
+                      showAdvancedSettings={true}
+                      defaultSettings={{
+                        compression: {
+                          enabled: true,
+                          quality: 90,
+                          maxWidth: 1200,
+                          maxHeight: 800
+                        },
+                        format: {
+                          outputFormat: 'webp'
+                        }
+                      }}
+                    />
                     {imageFiles.length > 0 && (
                       <p className="text-xs text-blue-600 mt-2">
                         First image will be set as primary display image.

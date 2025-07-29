@@ -111,11 +111,13 @@ const AuthModal = ({ isOpen, onClose }) => {
       } else {
         await signup(formData.email, formData.password, formData.name);
       }
+      // Only close modal on successful authentication
       handleClose();
     } catch (error) {
       setErrors({ 
         submit: error.message || `${isLogin ? 'Login' : 'Signup'} failed. Please try again.`
       });
+      // Don't close modal on error - let user see the error message
     } finally {
       setIsLoading(false);
     }
@@ -173,6 +175,7 @@ const AuthModal = ({ isOpen, onClose }) => {
             <h2 className="text-2xl font-bold text-gray-900 text-center mb-6">
               {isLogin ? 'Welcome Back' : 'Create Account'}
             </h2>
+            
             <div className="flex bg-gray-100 rounded-lg p-1">
               <button
                 type="button"
@@ -199,133 +202,232 @@ const AuthModal = ({ isOpen, onClose }) => {
             </div>
           </div>
 
+                      {/* Step Indicator for Signup */}
+            {!isLogin && (
+              <div className="flex items-center justify-center mb-6">
+                <div className="flex items-center space-x-4">
+                  <div className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-semibold transition-all duration-300 ${
+                    signupStep >= 1 ? 'bg-primary-accent text-white' : 'bg-gray-200 text-gray-600'
+                  }`}>
+                    1
+                  </div>
+                  <div className={`w-16 h-1 rounded transition-all duration-300 ${
+                    signupStep >= 2 ? 'bg-primary-accent' : 'bg-gray-200'
+                  }`}></div>
+                  <div className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-semibold transition-all duration-300 ${
+                    signupStep >= 2 ? 'bg-primary-accent text-white' : 'bg-gray-200 text-gray-600'
+                  }`}>
+                    2
+                  </div>
+                </div>
+                <div className="ml-4 text-sm font-medium text-gray-600">
+                  Step {signupStep} of 2
+                </div>
+              </div>
+            )}
+
+
           {/* Form */}
-          <form onSubmit={handleSubmit} className="px-6 pb-8 min-h-[400px] flex flex-col">
-            <div className="space-y-5 flex-1">
-              {/* Name field for signup */}
-              {!isLogin && (
-                <div>
-                  <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
-                    Full Name
-                  </label>
-                  <div className="relative">
-                    <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                    <input
-                      type="text"
-                      id="name"
-                      name="name"
-                      value={formData.name}
-                      onChange={handleChange}
-                      className={`w-full pl-10 pr-4 py-4 border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-accent focus:border-primary-accent transition-all duration-300 bg-gray-50 hover:bg-white ${
-                        errors.name ? 'border-red-500 bg-red-50' : 'border-gray-200 hover:border-gray-300'
-                      }`}
-                      placeholder="Enter your full name"
-                    />
-                  </div>
-                  {errors.name && <p className="mt-1 text-sm text-red-600">{errors.name}</p>}
-                </div>
-              )}
+          <form onSubmit={handleSubmit} className="px-6 pb-8 flex-1 flex flex-col">
+            <div className="flex-1 overflow-hidden">
+              <motion.div
+                key={isLogin ? 'login' : `signup-${signupStep}`}
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ duration: 0.3 }}
+                className="space-y-5 h-full"
+              >
+                {isLogin ? (
+                  // Login Form
+                  <>
+                    {/* Email field */}
+                    <div>
+                      <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+                        Email Address
+                      </label>
+                      <div className="relative">
+                        <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                        <input
+                          type="email"
+                          id="email"
+                          name="email"
+                          value={formData.email}
+                          onChange={handleChange}
+                          className={`w-full pl-10 pr-4 py-4 border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-accent focus:border-primary-accent transition-all duration-300 bg-gray-50 hover:bg-white ${
+                            errors.email ? 'border-red-500 bg-red-50' : 'border-gray-200 hover:border-gray-300'
+                          }`}
+                          placeholder="Enter your email"
+                        />
+                      </div>
+                      {errors.email && <p className="mt-1 text-sm text-red-600">{errors.email}</p>}
+                    </div>
 
-              {/* Email field */}
-              <div>
-                <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-                  Email Address
-                </label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                  <input
-                    type="email"
-                    id="email"
-                    name="email"
-                    value={formData.email}
-                    onChange={handleChange}
-                    className={`w-full pl-10 pr-4 py-4 border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-accent focus:border-primary-accent transition-all duration-300 bg-gray-50 hover:bg-white ${
-                      errors.email ? 'border-red-500 bg-red-50' : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                    placeholder="Enter your email"
-                  />
-                </div>
-                {errors.email && <p className="mt-1 text-sm text-red-600">{errors.email}</p>}
+                    {/* Password field */}
+                    <div>
+                      <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
+                        Password
+                      </label>
+                      <div className="relative">
+                        <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                        <input
+                          type={showPassword ? 'text' : 'password'}
+                          id="password"
+                          name="password"
+                          value={formData.password}
+                          onChange={handleChange}
+                          className={`w-full pl-10 pr-12 py-4 border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-accent focus:border-primary-accent transition-all duration-300 bg-gray-50 hover:bg-white ${
+                            errors.password ? 'border-red-500 bg-red-50' : 'border-gray-200 hover:border-gray-300'
+                          }`}
+                          placeholder="Enter your password"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                        >
+                          {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                        </button>
+                      </div>
+                      {errors.password && <p className="mt-1 text-sm text-red-600">{errors.password}</p>}
+                    </div>
+                  </>
+                ) : (
+                  // Signup Form - Multi Step
+                  <>
+                    {signupStep === 1 && (
+                      <>
+                        {/* Email field */}
+                        <div>
+                          <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+                            Email Address
+                          </label>
+                          <div className="relative">
+                            <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-5" />
+                            <input
+                              type="email"
+                              id="email"
+                              name="email"
+                              value={formData.email}
+                              onChange={handleChange}
+                              className={`w-full pl-10 pr-4 py-4 border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-accent focus:border-primary-accent transition-all duration-300 bg-gray-50 hover:bg-white ${
+                                errors.email ? 'border-red-500 bg-red-50' : 'border-gray-200 hover:border-gray-300'
+                              }`}
+                              placeholder="Enter your email"
+                            />
+                          </div>
+                          {errors.email && <p className="mt-1 text-sm text-red-600">{errors.email}</p>}
+                        </div>
+
+                        {/* Name field */}
+                        <div>
+                          <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
+                            Full Name
+                          </label>
+                          <div className="relative">
+                            <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                            <input
+                              type="text"
+                              id="name"
+                              name="name"
+                              value={formData.name}
+                              onChange={handleChange}
+                              className={`w-full pl-10 pr-4 py-4 border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-accent focus:border-primary-accent transition-all duration-300 bg-gray-50 hover:bg-white ${
+                                errors.name ? 'border-red-500 bg-red-50' : 'border-gray-200 hover:border-gray-300'
+                              }`}
+                              placeholder="Enter your full name"
+                            />
+                          </div>
+                          {errors.name && <p className="mt-1 text-sm text-red-600">{errors.name}</p>}
+                        </div>
+                      </>
+                    )}
+
+                    {signupStep === 2 && (
+                      <>
+                        {/* Password field */}
+                        <div>
+                          <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
+                            Password
+                          </label>
+                          <div className="relative">
+                            <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                            <input
+                              type={showPassword ? 'text' : 'password'}
+                              id="password"
+                              name="password"
+                              value={formData.password}
+                              onChange={handleChange}
+                              className={`w-full pl-10 pr-12 py-4 border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-accent focus:border-primary-accent transition-all duration-300 bg-gray-50 hover:bg-white ${
+                                errors.password ? 'border-red-500 bg-red-50' : 'border-gray-200 hover:border-gray-300'
+                              }`}
+                              placeholder="Enter your password"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowPassword(!showPassword)}
+                              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                            >
+                              {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                            </button>
+                          </div>
+                          {errors.password && <p className="mt-1 text-sm text-red-600">{errors.password}</p>}
+                        </div>
+
+                        {/* Confirm Password field */}
+                        <div>
+                          <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-2">
+                            Confirm Password
+                          </label>
+                          <div className="relative">
+                            <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                            <input
+                              type={showConfirmPassword ? 'text' : 'password'}
+                              id="confirmPassword"
+                              name="confirmPassword"
+                              value={formData.confirmPassword}
+                              onChange={handleChange}
+                              className={`w-full pl-10 pr-12 py-4 border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-accent focus:border-primary-accent transition-all duration-300 bg-gray-50 hover:bg-white ${
+                                errors.confirmPassword ? 'border-red-500 bg-red-50' : 'border-gray-200 hover:border-gray-300'
+                              }`}
+                              placeholder="Confirm your password"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                            >
+                              {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                            </button>
+                          </div>
+                          {errors.confirmPassword && <p className="mt-1 text-sm text-red-600">{errors.confirmPassword}</p>}
+                        </div>
+                      </>
+                    )}
+                  </>
+                )}
+              </motion.div>
+            </div>
+
+            {/* Submit Error */}
+            {errors.submit && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-lg mb-4">
+                <p className="text-sm text-red-600">{errors.submit}</p>
               </div>
+            )}
 
-              {/* Password field */}
-              <div>
-                <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
-                  Password
-                </label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    id="password"
-                    name="password"
-                    value={formData.password}
-                    onChange={handleChange}
-                    className={`w-full pl-10 pr-12 py-4 border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-accent focus:border-primary-accent transition-all duration-300 bg-gray-50 hover:bg-white ${
-                      errors.password ? 'border-red-500 bg-red-50' : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                    placeholder="Enter your password"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                  >
-                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                  </button>
-                </div>
-                {errors.password && <p className="mt-1 text-sm text-red-600">{errors.password}</p>}
-              </div>
-
-              {/* Confirm Password field for signup */}
-              {!isLogin && (
-                <div>
-                  <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-2">
-                    Confirm Password
-                  </label>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                    <input
-                      type={showConfirmPassword ? 'text' : 'password'}
-                      id="confirmPassword"
-                      name="confirmPassword"
-                      value={formData.confirmPassword}
-                      onChange={handleChange}
-                      className={`w-full pl-10 pr-12 py-4 border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-accent focus:border-primary-accent transition-all duration-300 bg-gray-50 hover:bg-white ${
-                        errors.confirmPassword ? 'border-red-500 bg-red-50' : 'border-gray-200 hover:border-gray-300'
-                      }`}
-                      placeholder="Confirm your password"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                    >
-                      {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                    </button>
-                  </div>
-                  {errors.confirmPassword && <p className="mt-1 text-sm text-red-600">{errors.confirmPassword}</p>}
-                </div>
-              )}
-
-              {/* Submit Error */}
-              {errors.submit && (
-                <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-                  <p className="text-sm text-red-600">{errors.submit}</p>
-                </div>
-              )}
-
-              {/* Action Buttons */}
+            {/* Action Buttons */}
+            <div className="mt-6">
               {!isLogin && signupStep === 1 ? (
                 <button
                   type="button"
                   onClick={handleNextStep}
-                  className="w-full bg-gradient-to-r from-primary-accent to-secondary-accent text-white py-4 px-4 rounded-xl font-semibold hover:from-secondary-accent hover:to-primary-accent focus:outline-none focus:ring-2 focus:ring-primary-accent focus:ring-offset-2 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl mt-6"
+                  className="w-full bg-gradient-to-r from-primary-accent to-secondary-accent text-white py-4 px-4 rounded-xl font-semibold hover:from-secondary-accent hover:to-primary-accent focus:outline-none focus:ring-2 focus:ring-primary-accent focus:ring-offset-2 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl"
                 >
                   Continue
                 </button>
               ) : !isLogin && signupStep === 2 ? (
-                <div className="space-y-3 mt-6">
+                <div className="space-y-3">
                   <button
                     type="submit"
                     disabled={isLoading}
@@ -352,7 +454,7 @@ const AuthModal = ({ isOpen, onClose }) => {
                 <button
                   type="submit"
                   disabled={isLoading}
-                  className="w-full bg-gradient-to-r from-primary-accent to-secondary-accent text-white py-4 px-4 rounded-xl font-semibold hover:from-secondary-accent hover:to-primary-accent focus:outline-none focus:ring-2 focus:ring-primary-accent focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl mt-6"
+                  className="w-full bg-gradient-to-r from-primary-accent to-secondary-accent text-white py-4 px-4 rounded-xl font-semibold hover:from-secondary-accent hover:to-primary-accent focus:outline-none focus:ring-2 focus:ring-primary-accent focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl"
                 >
                   {isLoading ? (
                     <div className="flex items-center justify-center">

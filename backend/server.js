@@ -365,11 +365,84 @@ app.post('/api/admin/products/:id/images/upload', authenticateAdmin, upload.sing
                 .eq('product_id', id);
         }
         
-        // Upload to cloud storage
+        // Process image before upload
+        let processedBuffer = req.file.buffer;
+        let processedMimeType = req.file.mimetype;
+        let processedFilename = req.file.originalname;
+        
+        // Check if processing settings are provided
+        const processingSettings = req.body.processing_settings ? 
+            JSON.parse(req.body.processing_settings) : 
+            { mode: 'auto', targetFileSize: 150 * 1024 }; // Default to auto mode with 150KB target
+        
+        try {
+            const ImageProcessingWrapper = require('./services/ImageProcessingWrapper');
+            const imageProcessor = new ImageProcessingWrapper();
+            
+            // Check if Python is available, use fallback if not
+            let processResult;
+            const isPythonAvailable = await imageProcessor.checkPythonAvailability();
+            
+            if (isPythonAvailable) {
+                processResult = await imageProcessor.processImage(
+                    req.file.buffer,
+                    processingSettings
+                );
+            } else {
+                console.log('Python not available, using Sharp fallback processing');
+                processResult = await imageProcessor.simpleFallbackResize(
+                    req.file.buffer,
+                    processingSettings
+                );
+            }
+            
+            if (processResult.success) {
+                if (processResult.fallback && processResult.processed_buffer) {
+                    // Sharp fallback processing - buffer is directly available
+                    processedBuffer = processResult.processed_buffer;
+                    processedMimeType = 'image/webp';
+                    
+                    const originalName = req.file.originalname.split('.')[0];
+                    processedFilename = `${originalName}.webp`;
+                    
+                    console.log(`Image processed with Sharp fallback: ${processResult.original.file_size} -> ${processResult.processed.file_size} bytes (${processResult.compression_ratio}% reduction)`);
+                } else {
+                    // Python processing - read from file
+                    const fs = require('fs');
+                    processedBuffer = await fs.promises.readFile(processResult.output_path);
+                    
+                    // Update MIME type based on processed format
+                    const processedFormat = processResult.processed.format.toLowerCase();
+                    processedMimeType = `image/${processedFormat === 'jpeg' ? 'jpeg' : processedFormat}`;
+                    
+                    // Update filename with processed extension
+                    const originalName = req.file.originalname.split('.')[0];
+                    const extension = processedFormat === 'jpeg' ? 'jpg' : processedFormat;
+                    processedFilename = `${originalName}.${extension}`;
+                    
+                    console.log(`Image processed with Python: ${processResult.original.file_size} -> ${processResult.processed.file_size} bytes (${processResult.compression_ratio}% reduction)`);
+                    
+                    // Clean up processed file
+                    try {
+                        await fs.promises.unlink(processResult.output_path);
+                    } catch (cleanupError) {
+                        console.warn('Could not clean up processed file:', cleanupError.message);
+                    }
+                }
+            } else {
+                console.warn('Image processing failed, using original:', processResult.error);
+                // Continue with original file if processing fails
+            }
+        } catch (processingError) {
+            console.warn('Image processing error, using original:', processingError.message);
+            // Continue with original file if processing fails
+        }
+
+        // Upload to cloud storage (now with processed image)
         const uploadResult = await storageService.uploadFile(
-            req.file.buffer,
-            req.file.originalname,
-            req.file.mimetype,
+            processedBuffer,
+            processedFilename,
+            processedMimeType,
             {
                 prefix: 'products',
                 uploadedBy: req.user.id,
@@ -870,11 +943,84 @@ app.post('/api/admin/categories/:id/images', authenticateAdmin, upload.single('i
                 .eq('category_id', category_id);
         }
         
-        // Upload to cloud storage
+        // Process image before upload
+        let processedBuffer = req.file.buffer;
+        let processedMimeType = req.file.mimetype;
+        let processedFilename = req.file.originalname;
+        
+        // Check if processing settings are provided
+        const processingSettings = req.body.processing_settings ? 
+            JSON.parse(req.body.processing_settings) : 
+            { mode: 'auto', targetFileSize: 150 * 1024 }; // Default to auto mode with 150KB target
+        
+        try {
+            const ImageProcessingWrapper = require('./services/ImageProcessingWrapper');
+            const imageProcessor = new ImageProcessingWrapper();
+            
+            // Check if Python is available, use fallback if not
+            let processResult;
+            const isPythonAvailable = await imageProcessor.checkPythonAvailability();
+            
+            if (isPythonAvailable) {
+                processResult = await imageProcessor.processImage(
+                    req.file.buffer,
+                    processingSettings
+                );
+            } else {
+                console.log('Python not available, using Sharp fallback processing');
+                processResult = await imageProcessor.simpleFallbackResize(
+                    req.file.buffer,
+                    processingSettings
+                );
+            }
+            
+            if (processResult.success) {
+                if (processResult.fallback && processResult.processed_buffer) {
+                    // Sharp fallback processing - buffer is directly available
+                    processedBuffer = processResult.processed_buffer;
+                    processedMimeType = 'image/webp';
+                    
+                    const originalName = req.file.originalname.split('.')[0];
+                    processedFilename = `${originalName}.webp`;
+                    
+                    console.log(`Category image processed with Sharp fallback: ${processResult.original.file_size} -> ${processResult.processed.file_size} bytes (${processResult.compression_ratio}% reduction)`);
+                } else {
+                    // Python processing - read from file
+                    const fs = require('fs');
+                    processedBuffer = await fs.promises.readFile(processResult.output_path);
+                    
+                    // Update MIME type based on processed format
+                    const processedFormat = processResult.processed.format.toLowerCase();
+                    processedMimeType = `image/${processedFormat === 'jpeg' ? 'jpeg' : processedFormat}`;
+                    
+                    // Update filename with processed extension
+                    const originalName = req.file.originalname.split('.')[0];
+                    const extension = processedFormat === 'jpeg' ? 'jpg' : processedFormat;
+                    processedFilename = `${originalName}.${extension}`;
+                    
+                    console.log(`Category image processed with Python: ${processResult.original.file_size} -> ${processResult.processed.file_size} bytes (${processResult.compression_ratio}% reduction)`);
+                    
+                    // Clean up processed file
+                    try {
+                        await fs.promises.unlink(processResult.output_path);
+                    } catch (cleanupError) {
+                        console.warn('Could not clean up processed file:', cleanupError.message);
+                    }
+                }
+            } else {
+                console.warn('Category image processing failed, using original:', processResult.error);
+                // Continue with original file if processing fails
+            }
+        } catch (processingError) {
+            console.warn('Category image processing error, using original:', processingError.message);
+            // Continue with original file if processing fails
+        }
+        
+        // Upload to cloud storage (now with processed image)
         const uploadResult = await storageService.uploadFile(
-            req.file.buffer,
-            req.file.originalname,
-            req.file.mimetype,
+            processedBuffer,
+            processedFilename,
+            processedMimeType,
             {
                 prefix: 'category_images',
                 uploadedBy: req.user.id,
@@ -918,6 +1064,80 @@ app.post('/api/admin/categories/:id/images', authenticateAdmin, upload.single('i
         res.status(201).json(data);
     } catch (error) {
         console.error('Category image upload error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Add category image by URL
+app.post('/api/admin/categories/:id/images/url', authenticateAdmin, async (req, res) => {
+    const { id: category_id } = req.params;
+    const { image_url, alt_text, is_primary, processing_settings } = req.body;
+    
+    if (!image_url) {
+        return res.status(400).json({ error: 'Image URL is required' });
+    }
+    
+    try {
+        // Verify category exists
+        const { data: category, error: categoryError } = await supabase
+            .from('categories')
+            .select('id')
+            .eq('id', category_id)
+            .single();
+            
+        if (categoryError || !category) {
+            return res.status(404).json({ error: 'Category not found' });
+        }
+        
+        // Get next sort order
+        const { data: existingImages, error: sortError } = await supabase
+            .from('category_images')
+            .select('sort_order')
+            .eq('category_id', category_id)
+            .order('sort_order', { ascending: false })
+            .limit(1);
+            
+        const next_sort_order = (existingImages && existingImages.length > 0) 
+            ? existingImages[0].sort_order + 1 
+            : 0;
+        
+        // If this is primary, unset other primary images
+        if (is_primary) {
+            await supabase
+                .from('category_images')
+                .update({ is_primary: false })
+                .eq('category_id', category_id);
+        }
+        
+        // For URL images, we'll store the original URL
+        // But we could also process it if needed in the future
+        
+        const { data, error } = await supabase
+            .from('category_images')
+            .insert([{
+                category_id,
+                image_url,
+                sort_order: next_sort_order,
+                alt_text: alt_text || '',
+                is_primary: is_primary || false,
+                image_type: 'url'
+            }])
+            .select()
+            .single();
+
+        if (error) return res.status(500).json({ error: error.message });
+
+        await supabase.from('admin_logs').insert([{
+            admin_id: req.user.id,
+            action: 'ADD_CATEGORY_IMAGE_URL',
+            entity_type: 'category_image',
+            entity_id: data.id,
+            details: { category_id, image_url, alt_text }
+        }]);
+
+        res.status(201).json(data);
+    } catch (error) {
+        console.error('Category image URL upload error:', error);
         res.status(500).json({ error: error.message });
     }
 });

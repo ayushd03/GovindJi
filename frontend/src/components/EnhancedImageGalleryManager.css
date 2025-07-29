@@ -1,0 +1,102 @@
+.enhanced-image-gallery-modal {
+  @apply fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50;
+}
+
+.enhanced-image-gallery-content {
+  @apply bg-white rounded-xl shadow-xl max-w-6xl w-full max-h-[90vh] overflow-hidden flex flex-col;
+}
+
+.gallery-header {
+  @apply flex items-center justify-between p-6 border-b border-gray-200;
+}
+
+.close-btn {
+  @apply transition-colors duration-200;
+}
+
+.upload-section {
+  @apply p-6 border-b border-gray-200;
+}
+
+.uploading-indicator {
+  @apply mt-4 bg-blue-50 border border-blue-200 rounded-lg;
+}
+
+.images-grid {
+  @apply flex-1 overflow-y-auto p-6;
+}
+
+.loading {
+  @apply min-h-32;
+}
+
+.no-images {
+  @apply min-h-48;
+}
+
+.image-list {
+  @apply space-y-4;
+}
+
+.drag-instruction {
+  @apply font-medium;
+}
+
+.images-grid-container {
+  @apply grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4;
+}
+
+.image-item {
+  @apply bg-white border-2 border-gray-200 rounded-lg overflow-hidden transition-all duration-200 hover:shadow-md cursor-move;
+}
+
+.image-item.primary {
+  @apply border-blue-500 ring-2 ring-blue-200;
+}
+
+.image-item:hover {
+  @apply border-gray-300;
+}
+
+.image-preview {
+  @apply relative h-32 bg-gray-100;
+}
+
+.primary-badge {
+  @apply absolute top-2 left-2 bg-blue-600 text-white text-xs px-2 py-1 rounded-full font-medium;
+}
+
+.image-info {
+  @apply p-3 space-y-1;
+}
+
+.image-actions {
+  @apply p-3 pt-0 space-y-2;
+}
+
+.primary-btn {
+  @apply w-full text-xs bg-blue-50 text-blue-700 border border-blue-200 rounded-md py-1 px-2 hover:bg-blue-100 transition-colors duration-200;
+}
+
+.delete-btn {
+  @apply w-full flex items-center justify-center text-xs bg-red-50 text-red-700 border border-red-200 rounded-md py-1 px-2 hover:bg-red-100 transition-colors duration-200;
+}
+
+.gallery-footer {
+  @apply p-6 border-t border-gray-200 flex justify-end;
+}
+
+/* Responsive adjustments */
+@media (max-width: 640px) {
+  .enhanced-image-gallery-content {
+    @apply max-h-[95vh] m-2;
+  }
+  
+  .images-grid-container {
+    @apply grid-cols-2;
+  }
+  
+  .image-preview {
+    @apply h-24;
+  }
+}

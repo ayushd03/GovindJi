@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import ImageGalleryManager from '../../components/ImageGalleryManager';
+import EnhancedImageGalleryManager from '../../components/EnhancedImageGalleryManager';
 import ProductImagePreview from '../../components/ProductImagePreview';
 import { Dialog, Transition } from '@headlessui/react';
 import {
@@ -632,8 +632,8 @@ const ProductManagement = () => {
         </Dialog>
       </Transition>
 
-      {/* Image Gallery Manager Modal */}
-      <ImageGalleryManager
+      {/* Enhanced Image Gallery Manager Modal */}
+      <EnhancedImageGalleryManager
         productId={selectedProductForImages?.id}
         isOpen={showImageGallery}
         onClose={handleCloseImageGallery}
