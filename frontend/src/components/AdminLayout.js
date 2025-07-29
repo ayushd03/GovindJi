@@ -122,34 +122,6 @@ const AdminLayout = ({ children }) => {
       <div className={`flex-1 ${sidebarOpen ? 'lg:ml-0' : 'lg:ml-0'} transition-all duration-300`}>
         {/* Header */}
         <header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-40">
-          <div className="flex items-center justify-between px-6 py-4">
-            <div className="flex items-center space-x-4">
-              <button
-                onClick={() => setSidebarOpen(!sidebarOpen)}
-                className="lg:hidden p-2 rounded-lg text-gray-500 hover:bg-gray-100 transition-colors duration-200"
-              >
-                <Bars3Icon className="w-6 h-6" />
-              </button>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">Admin Panel</h1>
-                <p className="text-sm text-gray-500">Manage your dry fruits business</p>
-              </div>
-            </div>
-            
-            <div className="flex items-center space-x-4">
-              <div className="text-right">
-                <p className="text-sm font-medium text-gray-900">
-                  {user?.user_metadata?.name || user?.email}
-                </p>
-                <p className="text-xs text-gray-500">Administrator</p>
-              </div>
-              <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-                <span className="text-sm font-medium text-white">
-                  {(user?.user_metadata?.name || user?.email || 'A').charAt(0).toUpperCase()}
-                </span>
-              </div>
-            </div>
-          </div>
         </header>
 
         {/* Page Content */}

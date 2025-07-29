@@ -1253,6 +1253,46 @@ app.post('/api/auth/login', async (req, res) => {
     }
 });
 
+// Token validation route
+app.get('/api/auth/validate', authenticateToken, async (req, res) => {
+    try {
+        // If we reach here, the token is valid (authenticateToken middleware passed)
+        res.json({ 
+            valid: true, 
+            user: req.user,
+            message: 'Token is valid' 
+        });
+    } catch (error) {
+        console.error('Token validation error:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// Token refresh route
+app.post('/api/auth/refresh', async (req, res) => {
+    const { refresh_token } = req.body;
+    
+    if (!refresh_token) {
+        return res.status(400).json({ error: 'Refresh token is required' });
+    }
+    
+    try {
+        const { data, error } = await supabase.auth.refreshSession({
+            refresh_token: refresh_token
+        });
+        
+        if (error) {
+            console.error('Token refresh error:', error);
+            return res.status(401).json({ error: error.message });
+        }
+        
+        res.json(data);
+    } catch (error) {
+        console.error('Token refresh error:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
 // Order Routes (protected by authentication middleware)
 app.post('/api/orders', authenticateToken, async (req, res) => {
     const { total_amount, status, items } = req.body;

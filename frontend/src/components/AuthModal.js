@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 
 const AuthModal = ({ isOpen, onClose }) => {
   const [isLogin, setIsLogin] = useState(true);
+  const [signupStep, setSignupStep] = useState(1);
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -28,6 +29,7 @@ const AuthModal = ({ isOpen, onClose }) => {
     setErrors({});
     setShowPassword(false);
     setShowConfirmPassword(false);
+    setSignupStep(1);
   };
 
   const handleClose = () => {
@@ -38,6 +40,33 @@ const AuthModal = ({ isOpen, onClose }) => {
   const handleTabSwitch = (isLoginTab) => {
     setIsLogin(isLoginTab);
     resetForm();
+  };
+
+  const handleNextStep = () => {
+    if (!isLogin && signupStep === 1) {
+      // Validate email and name
+      const newErrors = {};
+      if (!formData.email) {
+        newErrors.email = 'Email is required';
+      } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
+        newErrors.email = 'Please enter a valid email';
+      }
+      if (!formData.name) {
+        newErrors.name = 'Name is required';
+      }
+      
+      setErrors(newErrors);
+      if (Object.keys(newErrors).length === 0) {
+        setSignupStep(2);
+      }
+    }
+  };
+
+  const handlePrevStep = () => {
+    if (!isLogin && signupStep === 2) {
+      setSignupStep(1);
+      setErrors({});
+    }
   };
 
   const validateForm = () => {
@@ -116,7 +145,7 @@ const AuthModal = ({ isOpen, onClose }) => {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 flex items-center justify-center p-4"
+        className="fixed inset-0 z-50 flex items-center justify-center p-4 min-h-screen"
         onClick={handleClose}
       >
         {/* Backdrop */}
@@ -128,26 +157,29 @@ const AuthModal = ({ isOpen, onClose }) => {
           animate={{ scale: 1, opacity: 1, y: 0 }}
           exit={{ scale: 0.95, opacity: 0, y: 20 }}
           transition={{ duration: 0.3, ease: 'easeOut' }}
-          className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden"
+          className="relative w-full max-w-md h-[580px] bg-white rounded-2xl shadow-2xl overflow-hidden"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Close Button */}
           <button
             onClick={handleClose}
-            className="absolute top-4 right-4 z-10 p-2 text-gray-400 hover:text-gray-600 transition-colors duration-200 hover:bg-gray-100 rounded-full"
+            className="absolute top-4 right-4 z-10 w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-600 transition-colors duration-200 hover:bg-gray-100 rounded-full"
           >
             <X className="w-5 h-5" />
           </button>
 
           {/* Header */}
-          <div className="px-6 pt-6 pb-4">
+          <div className="px-6 pt-6 pb-6">
+            <h2 className="text-2xl font-bold text-gray-900 text-center mb-6">
+              {isLogin ? 'Welcome Back' : 'Create Account'}
+            </h2>
             <div className="flex bg-gray-100 rounded-lg p-1">
               <button
                 type="button"
                 onClick={() => handleTabSwitch(true)}
-                className={`flex-1 py-2 px-4 text-sm font-medium rounded-md transition-all duration-200 ${
+                className={`flex-1 py-3 px-4 text-sm font-semibold rounded-md transition-all duration-300 ${
                   isLogin
-                    ? 'bg-white text-primary-accent shadow-sm'
+                    ? 'bg-white text-primary-accent shadow-sm transform scale-105'
                     : 'text-gray-600 hover:text-gray-800'
                 }`}
               >
@@ -156,9 +188,9 @@ const AuthModal = ({ isOpen, onClose }) => {
               <button
                 type="button"
                 onClick={() => handleTabSwitch(false)}
-                className={`flex-1 py-2 px-4 text-sm font-medium rounded-md transition-all duration-200 ${
+                className={`flex-1 py-3 px-4 text-sm font-semibold rounded-md transition-all duration-300 ${
                   !isLogin
-                    ? 'bg-white text-primary-accent shadow-sm'
+                    ? 'bg-white text-primary-accent shadow-sm transform scale-105'
                     : 'text-gray-600 hover:text-gray-800'
                 }`}
               >
@@ -168,8 +200,8 @@ const AuthModal = ({ isOpen, onClose }) => {
           </div>
 
           {/* Form */}
-          <form onSubmit={handleSubmit} className="px-6 pb-6">
-            <div className="space-y-4">
+          <form onSubmit={handleSubmit} className="px-6 pb-8 min-h-[400px] flex flex-col">
+            <div className="space-y-5 flex-1">
               {/* Name field for signup */}
               {!isLogin && (
                 <div>
@@ -184,8 +216,8 @@ const AuthModal = ({ isOpen, onClose }) => {
                       name="name"
                       value={formData.name}
                       onChange={handleChange}
-                      className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-accent focus:border-transparent transition-all duration-300 ${
-                        errors.name ? 'border-red-500' : 'border-gray-300'
+                      className={`w-full pl-10 pr-4 py-4 border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-accent focus:border-primary-accent transition-all duration-300 bg-gray-50 hover:bg-white ${
+                        errors.name ? 'border-red-500 bg-red-50' : 'border-gray-200 hover:border-gray-300'
                       }`}
                       placeholder="Enter your full name"
                     />
@@ -207,8 +239,8 @@ const AuthModal = ({ isOpen, onClose }) => {
                     name="email"
                     value={formData.email}
                     onChange={handleChange}
-                    className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-accent focus:border-transparent transition-all duration-300 ${
-                      errors.email ? 'border-red-500' : 'border-gray-300'
+                    className={`w-full pl-10 pr-4 py-4 border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-accent focus:border-primary-accent transition-all duration-300 bg-gray-50 hover:bg-white ${
+                      errors.email ? 'border-red-500 bg-red-50' : 'border-gray-200 hover:border-gray-300'
                     }`}
                     placeholder="Enter your email"
                   />
@@ -229,8 +261,8 @@ const AuthModal = ({ isOpen, onClose }) => {
                     name="password"
                     value={formData.password}
                     onChange={handleChange}
-                    className={`w-full pl-10 pr-12 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-accent focus:border-transparent transition-all duration-300 ${
-                      errors.password ? 'border-red-500' : 'border-gray-300'
+                    className={`w-full pl-10 pr-12 py-4 border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-accent focus:border-primary-accent transition-all duration-300 bg-gray-50 hover:bg-white ${
+                      errors.password ? 'border-red-500 bg-red-50' : 'border-gray-200 hover:border-gray-300'
                     }`}
                     placeholder="Enter your password"
                   />
@@ -259,8 +291,8 @@ const AuthModal = ({ isOpen, onClose }) => {
                       name="confirmPassword"
                       value={formData.confirmPassword}
                       onChange={handleChange}
-                      className={`w-full pl-10 pr-12 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-accent focus:border-transparent transition-all duration-300 ${
-                        errors.confirmPassword ? 'border-red-500' : 'border-gray-300'
+                      className={`w-full pl-10 pr-12 py-4 border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-accent focus:border-primary-accent transition-all duration-300 bg-gray-50 hover:bg-white ${
+                        errors.confirmPassword ? 'border-red-500 bg-red-50' : 'border-gray-200 hover:border-gray-300'
                       }`}
                       placeholder="Confirm your password"
                     />
@@ -283,21 +315,55 @@ const AuthModal = ({ isOpen, onClose }) => {
                 </div>
               )}
 
-              {/* Submit Button */}
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="w-full bg-primary-accent text-white py-3 px-4 rounded-lg font-medium hover:bg-secondary-accent focus:outline-none focus:ring-2 focus:ring-primary-accent focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 transform hover:scale-105"
-              >
-                {isLoading ? (
-                  <div className="flex items-center justify-center">
-                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                    {isLogin ? 'Signing In...' : 'Creating Account...'}
-                  </div>
-                ) : (
-                  isLogin ? 'Sign In' : 'Create Account'
-                )}
-              </button>
+              {/* Action Buttons */}
+              {!isLogin && signupStep === 1 ? (
+                <button
+                  type="button"
+                  onClick={handleNextStep}
+                  className="w-full bg-gradient-to-r from-primary-accent to-secondary-accent text-white py-4 px-4 rounded-xl font-semibold hover:from-secondary-accent hover:to-primary-accent focus:outline-none focus:ring-2 focus:ring-primary-accent focus:ring-offset-2 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl mt-6"
+                >
+                  Continue
+                </button>
+              ) : !isLogin && signupStep === 2 ? (
+                <div className="space-y-3 mt-6">
+                  <button
+                    type="submit"
+                    disabled={isLoading}
+                    className="w-full bg-gradient-to-r from-primary-accent to-secondary-accent text-white py-4 px-4 rounded-xl font-semibold hover:from-secondary-accent hover:to-primary-accent focus:outline-none focus:ring-2 focus:ring-primary-accent focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl"
+                  >
+                    {isLoading ? (
+                      <div className="flex items-center justify-center">
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                        Creating Account...
+                      </div>
+                    ) : (
+                      'Create Account'
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handlePrevStep}
+                    className="w-full bg-gray-100 text-gray-700 py-4 px-4 rounded-xl font-semibold hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 transition-all duration-300"
+                  >
+                    Back
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  className="w-full bg-gradient-to-r from-primary-accent to-secondary-accent text-white py-4 px-4 rounded-xl font-semibold hover:from-secondary-accent hover:to-primary-accent focus:outline-none focus:ring-2 focus:ring-primary-accent focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl mt-6"
+                >
+                  {isLoading ? (
+                    <div className="flex items-center justify-center">
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                      Signing In...
+                    </div>
+                  ) : (
+                    'Sign In'
+                  )}
+                </button>
+              )}
             </div>
           </form>
         </motion.div>

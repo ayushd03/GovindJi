@@ -16,49 +16,74 @@ const Home = () => {
   const [error, setError] = useState(null);
   const [isHovered, setIsHovered] = useState(false);
   const [currentPosition, setCurrentPosition] = useState(-320);
+  const [isMounted, setIsMounted] = useState(false);
   const controls = useAnimation();
+
+  // Set mounted state
+  useEffect(() => {
+    setIsMounted(true);
+    return () => setIsMounted(false);
+  }, []);
 
   // Animation function to start from current position
   const startAnimation = async (fromPosition = -320) => {
-    if (featuredProducts.length === 0) return;
+    if (!isMounted || featuredProducts.length === 0) return;
     
     const endPosition = -320 * (featuredProducts.length + 1);
     const distance = Math.abs(endPosition - fromPosition);
     const totalDistance = Math.abs(endPosition - (-320));
     const remainingDuration = (distance / totalDistance) * featuredProducts.length * 6;
     
-    await controls.start({
-      x: endPosition,
-      transition: {
-        duration: remainingDuration,
-        ease: "linear"
+    try {
+      await controls.start({
+        x: endPosition,
+        transition: {
+          duration: remainingDuration,
+          ease: "linear"
+        }
+      });
+      
+      // Restart from beginning after reaching end
+      if (!isHovered && isMounted) {
+        try {
+          controls.set({ x: -320 });
+          setCurrentPosition(-320);
+          startAnimation(-320);
+        } catch (error) {
+          console.log('Animation reset error:', error);
+        }
       }
-    });
-    
-    // Restart from beginning after reaching end
-    if (!isHovered) {
-      controls.set({ x: -320 });
-      setCurrentPosition(-320);
-      startAnimation(-320);
+    } catch (error) {
+      // Handle animation errors gracefully
+      console.log('Animation error:', error);
     }
   };
 
   // Start animation when products are loaded
   useEffect(() => {
-    if (featuredProducts.length > 0 && !isHovered) {
-      startAnimation(currentPosition);
+    if (isMounted && featuredProducts.length > 0 && !isHovered) {
+      // Add a small delay to ensure component is mounted
+      const timer = setTimeout(() => {
+        startAnimation(currentPosition);
+      }, 100);
+      return () => clearTimeout(timer);
     }
-  }, [featuredProducts]);
+  }, [featuredProducts, isMounted]);
 
   // Handle hover state
   useEffect(() => {
+    if (!isMounted) return;
+    
     if (isHovered) {
       controls.stop();
     } else if (featuredProducts.length > 0) {
-      // Continue from current position
-      startAnimation(currentPosition);
+      // Continue from current position with a small delay
+      const timer = setTimeout(() => {
+        startAnimation(currentPosition);
+      }, 100);
+      return () => clearTimeout(timer);
     }
-  }, [isHovered]);
+  }, [isHovered, isMounted]);
 
   useEffect(() => {
     window.scrollTo(0, 0);
