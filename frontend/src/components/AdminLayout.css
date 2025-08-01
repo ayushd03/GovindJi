@@ -1,26 +1,38 @@
 /* Enhanced Admin Layout with Fixed Sidebar and Proper Scrolling */
 
-/* Custom scrollbar styles for sidebar */
+/* Custom scrollbar styles for sidebar - Material Design inspired */
 .scrollbar-thin {
   scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.4) transparent;
 }
 
 .scrollbar-thin::-webkit-scrollbar {
-  width: 6px;
+  width: 4px;
 }
 
 .scrollbar-thin::-webkit-scrollbar-track {
-  background: rgba(71, 85, 105, 0.3);
-  border-radius: 3px;
+  background: transparent;
+  margin: 8px 0;
 }
 
 .scrollbar-thin::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.4);
+  border-radius: 8px;
+  transition: background-color 0.2s ease-in-out, opacity 0.2s ease-in-out;
+  opacity: 0;
+}
+
+.scrollbar-thin:hover::-webkit-scrollbar-thumb {
+  opacity: 1;
   background: rgba(148, 163, 184, 0.6);
-  border-radius: 3px;
 }
 
 .scrollbar-thin::-webkit-scrollbar-thumb:hover {
   background: rgba(148, 163, 184, 0.8);
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:active {
+  background: rgba(148, 163, 184, 0.9);
 }
 
 /* Enhanced mobile responsiveness */
