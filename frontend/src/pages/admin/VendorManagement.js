@@ -298,7 +298,7 @@ const VendorManagement = () => {
               <PermissionGuard permission={ADMIN_PERMISSIONS.MANAGE_VENDORS}>
                 <Button
                   onClick={() => handleOpenModal()}
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 text-sm font-medium"
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 text-sm font-medium min-h-[44px] touch-manipulation"
                 >
                   <PlusIcon className="w-4 h-4 mr-2" />
                   Add Vendor
@@ -315,7 +315,7 @@ const VendorManagement = () => {
                 <input
                   type="text"
                   placeholder="Search vendors..."
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 min-h-[44px] touch-manipulation"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
@@ -330,14 +330,14 @@ const VendorManagement = () => {
                   <input
                     type="text"
                     placeholder="Search vendors..."
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 min-h-[44px] touch-manipulation"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                   />
                 </div>
                 
                 <select
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 min-h-[44px] touch-manipulation"
                   value={selectedCategory}
                   onChange={(e) => setSelectedCategory(e.target.value)}
                 >
@@ -397,29 +397,29 @@ const VendorManagement = () => {
               <>
                 <div className="divide-y divide-gray-200">
                   {vendors.map((vendor) => (
-                <div key={vendor.id} className="p-6 hover:bg-gray-50 transition-colors">
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-4">
-                        <div className="flex-1">
-                          <h3 className="text-lg font-medium text-gray-900">{vendor.name}</h3>
-                          <div className="mt-1 flex items-center space-x-4 text-sm text-gray-500">
+                <div key={vendor.id} className="p-4 sm:p-6 hover:bg-gray-50 transition-colors">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex-1 mb-3 sm:mb-0">
+                      <div className="flex items-start justify-between sm:items-center sm:space-x-4">
+                        <div className="flex-1 min-w-0">
+                          <h3 className="text-base sm:text-lg font-medium text-gray-900 truncate">{vendor.name}</h3>
+                          <div className="mt-1 space-y-1 sm:space-y-0 sm:flex sm:items-center sm:space-x-4 text-sm text-gray-500">
                             {vendor.contact_person && (
                               <div className="flex items-center">
-                                <UserIcon className="w-4 h-4 mr-1" />
-                                {vendor.contact_person}
+                                <UserIcon className="w-4 h-4 mr-1 flex-shrink-0" />
+                                <span className="truncate">{vendor.contact_person}</span>
                               </div>
                             )}
                             {vendor.phone_number && (
                               <div className="flex items-center">
-                                <PhoneIcon className="w-4 h-4 mr-1" />
-                                {vendor.phone_number}
+                                <PhoneIcon className="w-4 h-4 mr-1 flex-shrink-0" />
+                                <span className="truncate">{vendor.phone_number}</span>
                               </div>
                             )}
                             {vendor.email && (
                               <div className="flex items-center">
-                                <EnvelopeIcon className="w-4 h-4 mr-1" />
-                                {vendor.email}
+                                <EnvelopeIcon className="w-4 h-4 mr-1 flex-shrink-0" />
+                                <span className="truncate">{vendor.email}</span>
                               </div>
                             )}
                           </div>
@@ -429,26 +429,51 @@ const VendorManagement = () => {
                             </span>
                           </div>
                         </div>
+                        
+                        {/* Desktop Action Buttons */}
+                        <PermissionGuard permission={ADMIN_PERMISSIONS.MANAGE_VENDORS}>
+                          <div className="hidden sm:flex items-center space-x-2 ml-4">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleOpenModal(vendor)}
+                              className="h-9 w-9 text-gray-400 hover:text-blue-600 min-h-[44px] min-w-[44px] touch-manipulation"
+                            >
+                              <PencilIcon className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setDeleteConfirm(vendor)}
+                              className="h-9 w-9 text-gray-400 hover:text-red-600 min-h-[44px] min-w-[44px] touch-manipulation"
+                            >
+                              <TrashIcon className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </PermissionGuard>
                       </div>
                     </div>
                     
+                    {/* Mobile Action Buttons */}
                     <PermissionGuard permission={ADMIN_PERMISSIONS.MANAGE_VENDORS}>
-                      <div className="flex items-center space-x-1 sm:space-x-2">
+                      <div className="flex sm:hidden space-x-2 mt-3 pt-3 border-t border-gray-200">
                         <Button
-                          variant="ghost"
-                          size="icon"
+                          variant="outline"
+                          size="sm"
                           onClick={() => handleOpenModal(vendor)}
-                          className="h-8 w-8 text-gray-400 hover:text-blue-600"
+                          className="flex-1 min-h-[44px] touch-manipulation"
                         >
-                          <PencilIcon className="w-4 h-4" />
+                          <PencilIcon className="w-4 h-4 mr-2" />
+                          Edit
                         </Button>
                         <Button
-                          variant="ghost"
-                          size="icon"
+                          variant="outline"
+                          size="sm"
                           onClick={() => setDeleteConfirm(vendor)}
-                          className="h-8 w-8 text-gray-400 hover:text-red-600"
+                          className="flex-1 min-h-[44px] touch-manipulation text-red-600 border-red-300 hover:bg-red-50"
                         >
-                          <TrashIcon className="w-4 h-4" />
+                          <TrashIcon className="w-4 h-4 mr-2" />
+                          Delete
                         </Button>
                       </div>
                     </PermissionGuard>
@@ -516,24 +541,24 @@ const VendorManagement = () => {
 
         {/* Add/Edit Modal */}
         {isModalOpen && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-              <div className="p-6 border-b border-gray-200">
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-2 sm:p-4 z-50">
+            <div className="bg-white rounded-xl shadow-xl w-full max-w-sm sm:max-w-2xl max-h-[95vh] sm:max-h-[90vh] overflow-y-auto">
+              <div className="p-4 sm:p-6 border-b border-gray-200">
                 <div className="flex items-center justify-between">
-                  <h2 className="text-xl font-semibold text-gray-900">
+                  <h2 className="text-lg sm:text-xl font-semibold text-gray-900">
                     {editingVendor ? 'Edit Vendor' : 'Add New Vendor'}
                   </h2>
                   <button
                     onClick={handleCloseModal}
-                    className="p-2 text-gray-400 hover:text-gray-600 rounded-lg"
+                    className="p-2 text-gray-400 hover:text-gray-600 rounded-lg min-h-[44px] min-w-[44px] flex items-center justify-center touch-manipulation"
                   >
                     <XMarkIcon className="w-5 h-5" />
                   </button>
                 </div>
               </div>
               
-              <form onSubmit={handleSubmit} className="p-6 space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Vendor Name *
@@ -541,7 +566,7 @@ const VendorManagement = () => {
                     <input
                       type="text"
                       required
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 min-h-[44px] touch-manipulation"
                       value={formData.name}
                       onChange={(e) => setFormData({...formData, name: e.target.value})}
                     />
@@ -553,7 +578,7 @@ const VendorManagement = () => {
                     </label>
                     <select
                       required
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 min-h-[44px] touch-manipulation"
                       value={formData.category}
                       onChange={(e) => setFormData({...formData, category: e.target.value})}
                     >
@@ -565,14 +590,14 @@ const VendorManagement = () => {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Contact Person
                     </label>
                     <input
                       type="text"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 min-h-[44px] touch-manipulation"
                       value={formData.contact_person}
                       onChange={(e) => setFormData({...formData, contact_person: e.target.value})}
                     />
@@ -584,7 +609,7 @@ const VendorManagement = () => {
                     </label>
                     <input
                       type="tel"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 min-h-[44px] touch-manipulation"
                       value={formData.phone_number}
                       onChange={(e) => setFormData({...formData, phone_number: e.target.value})}
                     />
@@ -597,7 +622,7 @@ const VendorManagement = () => {
                   </label>
                   <input
                     type="email"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 min-h-[44px] touch-manipulation"
                     value={formData.email}
                     onChange={(e) => setFormData({...formData, email: e.target.value})}
                   />
@@ -609,7 +634,7 @@ const VendorManagement = () => {
                   </label>
                   <textarea
                     rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 min-h-[44px] touch-manipulation"
                     value={formData.address}
                     onChange={(e) => setFormData({...formData, address: e.target.value})}
                   />
@@ -621,23 +646,23 @@ const VendorManagement = () => {
                   </label>
                   <textarea
                     rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 min-h-[44px] touch-manipulation"
                     value={formData.notes}
                     onChange={(e) => setFormData({...formData, notes: e.target.value})}
                   />
                 </div>
 
-                <div className="flex justify-end space-x-3 pt-4">
+                <div className="flex flex-col sm:flex-row sm:justify-end gap-3 pt-4">
                   <button
                     type="button"
                     onClick={handleCloseModal}
-                    className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                    className="w-full sm:w-auto px-4 py-3 sm:py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 min-h-[44px] touch-manipulation"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                    className="w-full sm:w-auto px-4 py-3 sm:py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 min-h-[44px] touch-manipulation"
                   >
                     {editingVendor ? 'Update Vendor' : 'Add Vendor'}
                   </button>
@@ -650,7 +675,7 @@ const VendorManagement = () => {
         {/* Delete Confirmation Modal */}
         {deleteConfirm && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+            <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-4 sm:p-6">
               <div className="flex items-center justify-center w-12 h-12 bg-red-100 rounded-full mx-auto mb-4">
                 <TrashIcon className="w-6 h-6 text-red-600" />
               </div>
@@ -660,16 +685,16 @@ const VendorManagement = () => {
               <p className="text-gray-500 text-center mb-6">
                 Are you sure you want to delete "{deleteConfirm.name}"? This action cannot be undone.
               </p>
-              <div className="flex justify-center space-x-3">
+              <div className="flex flex-col sm:flex-row sm:justify-center gap-3">
                 <button
                   onClick={() => setDeleteConfirm(null)}
-                  className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
+                  className="w-full sm:w-auto px-4 py-3 sm:py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 min-h-[44px] touch-manipulation"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={() => handleDelete(deleteConfirm.id)}
-                  className="px-4 py-2 border border-transparent rounded-md text-sm font-medium text-white bg-red-600 hover:bg-red-700"
+                  className="w-full sm:w-auto px-4 py-3 sm:py-2 border border-transparent rounded-lg text-sm font-medium text-white bg-red-600 hover:bg-red-700 min-h-[44px] touch-manipulation"
                 >
                   Delete
                 </button>

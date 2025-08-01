@@ -35,11 +35,17 @@ export const ADMIN_TABS = {
     icon: 'ChartBarIcon',
     permissions: [ADMIN_PERMISSIONS.VIEW_DASHBOARD]
   },
-  CATEGORIES: {
-    path: '/admin/categories',
-    label: 'Categories',
-    icon: 'TagIcon',
-    permissions: [ADMIN_PERMISSIONS.VIEW_CATEGORIES]
+  ORDERS: {
+    path: '/admin/orders',
+    label: 'Orders',
+    icon: 'ShoppingCartIcon',
+    permissions: [ADMIN_PERMISSIONS.VIEW_ORDERS]
+  },
+  EXPENSES: {
+    path: '/admin/expenses',
+    label: 'Expenses',
+    icon: 'CurrencyDollarIcon',
+    permissions: [ADMIN_PERMISSIONS.VIEW_EXPENSES]
   },
   PRODUCTS: {
     path: '/admin/products',
@@ -47,11 +53,11 @@ export const ADMIN_TABS = {
     icon: 'CubeIcon',
     permissions: [ADMIN_PERMISSIONS.VIEW_PRODUCTS]
   },
-  ORDERS: {
-    path: '/admin/orders',
-    label: 'Orders',
-    icon: 'ShoppingCartIcon',
-    permissions: [ADMIN_PERMISSIONS.VIEW_ORDERS]
+  CATEGORIES: {
+    path: '/admin/categories',
+    label: 'Categories',
+    icon: 'TagIcon',
+    permissions: [ADMIN_PERMISSIONS.VIEW_CATEGORIES]
   },
   INVENTORY: {
     path: '/admin/inventory',
@@ -82,12 +88,6 @@ export const ADMIN_TABS = {
     label: 'Employees',
     icon: 'UserGroupIcon',
     permissions: [ADMIN_PERMISSIONS.VIEW_EMPLOYEES]
-  },
-  EXPENSES: {
-    path: '/admin/expenses',
-    label: 'Expenses',
-    icon: 'CurrencyDollarIcon',
-    permissions: [ADMIN_PERMISSIONS.VIEW_EXPENSES]
   }
 };
 

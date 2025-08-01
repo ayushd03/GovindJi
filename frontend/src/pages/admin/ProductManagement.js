@@ -207,10 +207,10 @@ const ProductManagement = () => {
               setEditingProduct(null);
               resetForm();
             }}
-            className="inline-flex items-center px-4 py-2 border border-transparent 
+            className="inline-flex items-center justify-center px-4 py-2 border border-transparent 
                      text-sm font-medium rounded-lg text-white bg-blue-600 
                      hover:bg-blue-700 focus:outline-none focus:ring-2 
-                     focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200"
+                     focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200 min-h-[44px] touch-manipulation"
           >
             <PlusIcon className="w-4 h-4 mr-2" />
             Add Product
@@ -231,16 +231,25 @@ const ProductManagement = () => {
         </div>
       </div>
 
-      {/* Products Table */}
+      {/* Products Table - Desktop and Mobile Responsive */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         {loading ? (
           <div className="flex items-center justify-center py-12">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
             <span className="ml-3 text-gray-600">Loading products...</span>
           </div>
+        ) : filteredProducts.length === 0 ? (
+          <div className="px-6 py-12 text-center">
+            <CubeIcon className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+            <p className="text-gray-500 text-lg">No products found</p>
+            <p className="text-gray-400 text-sm">
+              {searchTerm ? 'Try adjusting your search' : 'Add your first product to get started!'}
+            </p>
+          </div>
         ) : (
           <>
-            <div className="overflow-x-auto">
+            {/* Desktop Table View */}
+            <div className="hidden lg:block overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
@@ -271,110 +280,206 @@ const ProductManagement = () => {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {filteredProducts.length === 0 ? (
-                    <tr>
-                      <td colSpan="8" className="px-6 py-12 text-center">
-                        <CubeIcon className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-                        <p className="text-gray-500 text-lg">No products found</p>
-                        <p className="text-gray-400 text-sm">
-                          {searchTerm ? 'Try adjusting your search' : 'Add your first product to get started!'}
-                        </p>
+                  {filteredProducts.map((product) => (
+                    <tr key={product.id} className="hover:bg-gray-50 transition-colors duration-200">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="w-16 h-16 bg-gray-100 rounded-lg overflow-hidden">
+                          <ProductImagePreview 
+                            productId={product.id} 
+                            fallbackImageUrl={product.image_url} 
+                          />
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div>
+                          <div className="text-sm font-medium text-gray-900">{product.name}</div>
+                          <div className="text-sm text-gray-500 max-w-xs truncate">
+                            {product.description}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {product.sku || '-'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                        ₹{product.price}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                            product.stock_quantity <= product.min_stock_level
+                              ? 'bg-red-100 text-red-800'
+                              : 'bg-green-100 text-green-800'
+                          }`}>
+                            {product.stock_quantity || 0} {product.unit || 'kg'}
+                          </span>
+                          {product.stock_quantity <= product.min_stock_level && (
+                            <ExclamationTriangleIcon className="w-4 h-4 text-red-500 ml-2" />
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          product.is_active 
+                            ? 'bg-green-100 text-green-800' 
+                            : 'bg-gray-100 text-gray-800'
+                        }`}>
+                          {product.is_active ? (
+                            <>
+                              <CheckCircleIcon className="w-3 h-3 mr-1" />
+                              Active
+                            </>
+                          ) : (
+                            'Inactive'
+                          )}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <button
+                          onClick={() => handleOpenImageGallery(product)}
+                          className="inline-flex items-center px-3 py-2 border border-gray-300 
+                                   text-sm font-medium rounded-md text-gray-700 bg-white 
+                                   hover:bg-gray-50 focus:outline-none focus:ring-2 
+                                   focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200 min-h-[44px]"
+                        >
+                          <PhotoIcon className="w-4 h-4 mr-1" />
+                          Manage
+                        </button>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
+                        <button
+                          onClick={() => handleEdit(product)}
+                          className="inline-flex items-center px-3 py-2 border border-blue-300 
+                                   text-sm font-medium rounded-md text-blue-700 bg-blue-50 
+                                   hover:bg-blue-100 focus:outline-none focus:ring-2 
+                                   focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200 min-h-[44px]"
+                        >
+                          <PencilIcon className="w-4 h-4 mr-1" />
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleDelete(product.id)}
+                          className="inline-flex items-center px-3 py-2 border border-red-300 
+                                   text-sm font-medium rounded-md text-red-700 bg-red-50 
+                                   hover:bg-red-100 focus:outline-none focus:ring-2 
+                                   focus:ring-offset-2 focus:ring-red-500 transition-colors duration-200 min-h-[44px]"
+                        >
+                          <TrashIcon className="w-4 h-4 mr-1" />
+                          Delete
+                        </button>
                       </td>
                     </tr>
-                  ) : (
-                    filteredProducts.map((product) => (
-                      <tr key={product.id} className="hover:bg-gray-50 transition-colors duration-200">
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="w-16 h-16 bg-gray-100 rounded-lg overflow-hidden">
-                            <ProductImagePreview 
-                              productId={product.id} 
-                              fallbackImageUrl={product.image_url} 
-                            />
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div>
-                            <div className="text-sm font-medium text-gray-900">{product.name}</div>
-                            <div className="text-sm text-gray-500 max-w-xs truncate">
-                              {product.description}
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {product.sku || '-'}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                          ₹{product.price}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center">
-                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                              product.stock_quantity <= product.min_stock_level
-                                ? 'bg-red-100 text-red-800'
-                                : 'bg-green-100 text-green-800'
-                            }`}>
-                              {product.stock_quantity || 0} {product.unit || 'kg'}
-                            </span>
-                            {product.stock_quantity <= product.min_stock_level && (
-                              <ExclamationTriangleIcon className="w-4 h-4 text-red-500 ml-2" />
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            product.is_active 
-                              ? 'bg-green-100 text-green-800' 
-                              : 'bg-gray-100 text-gray-800'
-                          }`}>
-                            {product.is_active ? (
-                              <>
-                                <CheckCircleIcon className="w-3 h-3 mr-1" />
-                                Active
-                              </>
-                            ) : (
-                              'Inactive'
-                            )}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <button
-                            onClick={() => handleOpenImageGallery(product)}
-                            className="inline-flex items-center px-3 py-1 border border-gray-300 
-                                     text-sm font-medium rounded-md text-gray-700 bg-white 
-                                     hover:bg-gray-50 focus:outline-none focus:ring-2 
-                                     focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200"
-                          >
-                            <PhotoIcon className="w-4 h-4 mr-1" />
-                            Manage
-                          </button>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
-                          <button
-                            onClick={() => handleEdit(product)}
-                            className="inline-flex items-center px-3 py-1 border border-blue-300 
-                                     text-sm font-medium rounded-md text-blue-700 bg-blue-50 
-                                     hover:bg-blue-100 focus:outline-none focus:ring-2 
-                                     focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200"
-                          >
-                            <PencilIcon className="w-4 h-4 mr-1" />
-                            Edit
-                          </button>
-                          <button
-                            onClick={() => handleDelete(product.id)}
-                            className="inline-flex items-center px-3 py-1 border border-red-300 
-                                     text-sm font-medium rounded-md text-red-700 bg-red-50 
-                                     hover:bg-red-100 focus:outline-none focus:ring-2 
-                                     focus:ring-offset-2 focus:ring-red-500 transition-colors duration-200"
-                          >
-                            <TrashIcon className="w-4 h-4 mr-1" />
-                            Delete
-                          </button>
-                        </td>
-                      </tr>
-                    ))
-                  )}
+                  ))}
                 </tbody>
               </table>
+            </div>
+
+            {/* Mobile Card View */}
+            <div className="lg:hidden divide-y divide-gray-200">
+              {filteredProducts.map((product) => (
+                <div key={product.id} className="p-4 sm:p-6 hover:bg-gray-50 transition-colors duration-200">
+                  <div className="flex items-start space-x-4">
+                    {/* Product Image */}
+                    <div className="w-20 h-20 sm:w-24 sm:h-24 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
+                      <ProductImagePreview 
+                        productId={product.id} 
+                        fallbackImageUrl={product.image_url} 
+                      />
+                    </div>
+                    
+                    {/* Product Info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <h3 className="text-base sm:text-lg font-medium text-gray-900 leading-tight">
+                            {product.name}
+                          </h3>
+                          {product.description && (
+                            <p className="mt-1 text-sm text-gray-500 line-clamp-2">
+                              {product.description}
+                            </p>
+                          )}
+                        </div>
+                        
+                        {/* Status Badge */}
+                        <span className={`ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          product.is_active 
+                            ? 'bg-green-100 text-green-800' 
+                            : 'bg-gray-100 text-gray-800'
+                        }`}>
+                          {product.is_active ? (
+                            <>
+                              <CheckCircleIcon className="w-3 h-3 mr-1" />
+                              Active
+                            </>
+                          ) : (
+                            'Inactive'
+                          )}
+                        </span>
+                      </div>
+                      
+                      {/* Product Details */}
+                      <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                        <div>
+                          <span className="text-gray-500">SKU:</span>
+                          <span className="ml-1 text-gray-900">{product.sku || '-'}</span>
+                        </div>
+                        <div>
+                          <span className="text-gray-500">Price:</span>
+                          <span className="ml-1 font-medium text-gray-900">₹{product.price}</span>
+                        </div>
+                        <div className="col-span-2">
+                          <span className="text-gray-500">Stock:</span>
+                          <span className={`ml-1 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                            product.stock_quantity <= product.min_stock_level
+                              ? 'bg-red-100 text-red-800'
+                              : 'bg-green-100 text-green-800'
+                          }`}>
+                            {product.stock_quantity || 0} {product.unit || 'kg'}
+                            {product.stock_quantity <= product.min_stock_level && (
+                              <ExclamationTriangleIcon className="w-3 h-3 ml-1" />
+                            )}
+                          </span>
+                        </div>
+                      </div>
+                      
+                      {/* Action Buttons */}
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        <button
+                          onClick={() => handleEdit(product)}
+                          className="inline-flex items-center px-4 py-2 border border-blue-300 
+                                   text-sm font-medium rounded-lg text-blue-700 bg-blue-50 
+                                   hover:bg-blue-100 focus:outline-none focus:ring-2 
+                                   focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200 min-h-[44px] touch-manipulation"
+                        >
+                          <PencilIcon className="w-4 h-4 mr-2" />
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleOpenImageGallery(product)}
+                          className="inline-flex items-center px-4 py-2 border border-gray-300 
+                                   text-sm font-medium rounded-lg text-gray-700 bg-white 
+                                   hover:bg-gray-50 focus:outline-none focus:ring-2 
+                                   focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200 min-h-[44px] touch-manipulation"
+                        >
+                          <PhotoIcon className="w-4 h-4 mr-2" />
+                          Images
+                        </button>
+                        <button
+                          onClick={() => handleDelete(product.id)}
+                          className="inline-flex items-center px-4 py-2 border border-red-300 
+                                   text-sm font-medium rounded-lg text-red-700 bg-red-50 
+                                   hover:bg-red-100 focus:outline-none focus:ring-2 
+                                   focus:ring-offset-2 focus:ring-red-500 transition-colors duration-200 min-h-[44px] touch-manipulation"
+                        >
+                          <TrashIcon className="w-4 h-4 mr-2" />
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           </>
         )}
@@ -404,7 +509,7 @@ const ProductManagement = () => {
           </Transition.Child>
 
           <div className="fixed inset-0 z-10 overflow-y-auto">
-            <div className="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
+            <div className="flex min-h-full items-end justify-center p-2 sm:p-4 text-center sm:items-center">
               <Transition.Child
                 as={React.Fragment}
                 enter="ease-out duration-300"
@@ -414,11 +519,11 @@ const ProductManagement = () => {
                 leaveFrom="opacity-100 translate-y-0 sm:scale-100"
                 leaveTo="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
               >
-                <Dialog.Panel className="relative transform overflow-hidden rounded-lg bg-white px-4 pb-4 pt-5 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-4xl sm:p-6">
-                  <div className="absolute right-0 top-0 pr-4 pt-4">
+                <Dialog.Panel className="relative transform overflow-hidden rounded-lg bg-white px-4 pb-4 pt-5 text-left shadow-xl transition-all w-full max-w-sm sm:max-w-2xl lg:max-w-4xl sm:my-8 sm:p-6">
+                  <div className="absolute right-0 top-0 pr-3 pt-3 sm:pr-4 sm:pt-4">
                     <button
                       type="button"
-                      className="rounded-md bg-white text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                      className="rounded-md bg-white text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 min-h-[44px] min-w-[44px] flex items-center justify-center"
                       onClick={() => {
                         setShowAddForm(false);
                         setEditingProduct(null);
@@ -435,8 +540,8 @@ const ProductManagement = () => {
                         {editingProduct ? 'Edit Product' : 'Add New Product'}
                       </Dialog.Title>
                       
-                      <form onSubmit={handleSubmit} className="space-y-6">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                           <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
                               Product Name *
@@ -592,7 +697,7 @@ const ProductManagement = () => {
                           />
                         </div>
 
-                        <div className="flex justify-end space-x-3 pt-6">
+                        <div className="flex flex-col sm:flex-row sm:justify-end gap-3 pt-4 sm:pt-6">
                           <button
                             type="button"
                             onClick={() => {
@@ -600,19 +705,19 @@ const ProductManagement = () => {
                               setEditingProduct(null);
                               resetForm();
                             }}
-                            className="inline-flex items-center px-4 py-2 border border-gray-300 
-                                     text-sm font-medium rounded-md text-gray-700 bg-white 
+                            className="inline-flex items-center justify-center px-4 py-3 sm:py-2 border border-gray-300 
+                                     text-sm font-medium rounded-lg text-gray-700 bg-white 
                                      hover:bg-gray-50 focus:outline-none focus:ring-2 
-                                     focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200"
+                                     focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200 min-h-[44px] touch-manipulation"
                           >
                             Cancel
                           </button>
                           <button
                             type="submit"
-                            className="inline-flex items-center px-4 py-2 border border-transparent 
-                                     text-sm font-medium rounded-md text-white bg-blue-600 
+                            className="inline-flex items-center justify-center px-4 py-3 sm:py-2 border border-transparent 
+                                     text-sm font-medium rounded-lg text-white bg-blue-600 
                                      hover:bg-blue-700 focus:outline-none focus:ring-2 
-                                     focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200"
+                                     focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200 min-h-[44px] touch-manipulation"
                           >
                             {editingProduct ? 'Update Product' : 'Add Product'}
                           </button>

@@ -132,7 +132,7 @@ const OrderManagement = () => {
               <select 
                 value={selectedStatus} 
                 onChange={(e) => setSelectedStatus(e.target.value)}
-                className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 text-sm"
+                className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 text-sm min-h-[44px] touch-manipulation"
               >
                 <option value="">All Orders</option>
                 <option value="pending">Pending</option>
@@ -146,107 +146,185 @@ const OrderManagement = () => {
         </div>
       </div>
 
-      {/* Orders Table */}
+      {/* Orders Table - Desktop and Mobile Responsive */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Order ID
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Customer
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Date
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Items
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Total
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Status
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {orders.length === 0 ? (
-                <tr>
-                  <td colSpan="7" className="px-6 py-12 text-center">
-                    <CubeIcon className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-                    <p className="text-gray-500 text-lg">No orders found</p>
-                    <p className="text-gray-400 text-sm">
-                      {selectedStatus ? 'No orders with this status' : 'Orders will appear here when customers place them'}
-                    </p>
-                  </td>
-                </tr>
-              ) : (
-                orders.map((order) => {
-                  const StatusIcon = getStatusIcon(order.status);
-                  return (
-                    <tr key={order.id} className="hover:bg-gray-50 transition-colors duration-200">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">
-                          #{order.id.slice(0, 8)}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div>
+        {orders.length === 0 ? (
+          <div className="px-6 py-12 text-center">
+            <CubeIcon className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+            <p className="text-gray-500 text-lg">No orders found</p>
+            <p className="text-gray-400 text-sm">
+              {selectedStatus ? 'No orders with this status' : 'Orders will appear here when customers place them'}
+            </p>
+          </div>
+        ) : (
+          <>
+            {/* Desktop Table View */}
+            <div className="hidden lg:block overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Order ID
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Customer
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Date
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Items
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Total
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Status
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {orders.map((order) => {
+                    const StatusIcon = getStatusIcon(order.status);
+                    return (
+                      <tr key={order.id} className="hover:bg-gray-50 transition-colors duration-200">
+                        <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm font-medium text-gray-900">
-                            {order.users?.name || 'Guest'}
+                            #{order.id.slice(0, 8)}
                           </div>
-                          <div className="text-sm text-gray-500">
-                            {order.users?.email}
+                        </td>
+                        <td className="px-6 py-4">
+                          <div>
+                            <div className="text-sm font-medium text-gray-900">
+                              {order.users?.name || 'Guest'}
+                            </div>
+                            <div className="text-sm text-gray-500">
+                              {order.users?.email}
+                            </div>
                           </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {formatDate(order.created_at)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {order.order_items?.length || 0} items
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                          ₹{order.total_amount}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <select
+                            value={order.status}
+                            onChange={(e) => updateOrderStatus(order.id, e.target.value)}
+                            className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border-0 focus:ring-2 focus:ring-blue-500 min-h-[32px] ${getStatusColor(order.status)}`}
+                          >
+                            <option value="pending">Pending</option>
+                            <option value="processing">Processing</option>
+                            <option value="shipped">Shipped</option>
+                            <option value="delivered">Delivered</option>
+                            <option value="cancelled">Cancelled</option>
+                          </select>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                          <button
+                            onClick={() => setSelectedOrder(order)}
+                            className="inline-flex items-center px-3 py-2 border border-blue-300 
+                                     text-sm font-medium rounded-md text-blue-700 bg-blue-50 
+                                     hover:bg-blue-100 focus:outline-none focus:ring-2 
+                                     focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200 min-h-[44px]"
+                          >
+                            <EyeIcon className="w-4 h-4 mr-1" />
+                            View Details
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile Card View */}
+            <div className="lg:hidden divide-y divide-gray-200">
+              {orders.map((order) => {
+                const StatusIcon = getStatusIcon(order.status);
+                return (
+                  <div key={order.id} className="p-4 sm:p-6 hover:bg-gray-50 transition-colors duration-200">
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center space-x-2 mb-1">
+                          <h3 className="text-base sm:text-lg font-medium text-gray-900">
+                            #{order.id.slice(0, 8)}
+                          </h3>
                         </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {formatDate(order.created_at)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {order.order_items?.length || 0} items
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        ₹{order.total_amount}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <select
-                          value={order.status}
-                          onChange={(e) => updateOrderStatus(order.id, e.target.value)}
-                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border-0 focus:ring-2 focus:ring-blue-500 ${getStatusColor(order.status)}`}
-                        >
-                          <option value="pending">Pending</option>
-                          <option value="processing">Processing</option>
-                          <option value="shipped">Shipped</option>
-                          <option value="delivered">Delivered</option>
-                          <option value="cancelled">Cancelled</option>
-                        </select>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <button
-                          onClick={() => setSelectedOrder(order)}
-                          className="inline-flex items-center px-3 py-1 border border-blue-300 
-                                   text-sm font-medium rounded-md text-blue-700 bg-blue-50 
-                                   hover:bg-blue-100 focus:outline-none focus:ring-2 
-                                   focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200"
-                        >
-                          <EyeIcon className="w-4 h-4 mr-1" />
-                          View Details
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
+                        <p className="text-sm text-gray-500">
+                          {order.users?.name || 'Guest'}
+                        </p>
+                        {order.users?.email && (
+                          <p className="text-xs text-gray-400 truncate">
+                            {order.users.email}
+                          </p>
+                        )}
+                      </div>
+                      
+                      {/* Status Badge */}
+                      <select
+                        value={order.status}
+                        onChange={(e) => updateOrderStatus(order.id, e.target.value)}
+                        className={`ml-2 px-2.5 py-1 rounded-full text-xs font-medium border-0 focus:ring-2 focus:ring-blue-500 min-h-[36px] touch-manipulation ${getStatusColor(order.status)}`}
+                      >
+                        <option value="pending">Pending</option>
+                        <option value="processing">Processing</option>
+                        <option value="shipped">Shipped</option>
+                        <option value="delivered">Delivered</option>
+                        <option value="cancelled">Cancelled</option>
+                      </select>
+                    </div>
+                    
+                    {/* Order Details */}
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm mb-4">
+                      <div>
+                        <span className="text-gray-500">Date:</span>
+                        <span className="ml-1 text-gray-900 font-medium">
+                          {new Date(order.created_at).toLocaleDateString('en-IN', {
+                            month: 'short',
+                            day: 'numeric',
+                            year: 'numeric'
+                          })}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-gray-500">Items:</span>
+                        <span className="ml-1 text-gray-900 font-medium">{order.order_items?.length || 0}</span>
+                      </div>
+                      <div className="col-span-2">
+                        <span className="text-gray-500">Total:</span>
+                        <span className="ml-1 text-lg font-bold text-gray-900">₹{order.total_amount}</span>
+                      </div>
+                    </div>
+                    
+                    {/* Action Button */}
+                    <div className="flex">
+                      <button
+                        onClick={() => setSelectedOrder(order)}
+                        className="w-full inline-flex items-center justify-center px-4 py-3 border border-blue-300 
+                                 text-sm font-medium rounded-lg text-blue-700 bg-blue-50 
+                                 hover:bg-blue-100 focus:outline-none focus:ring-2 
+                                 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200 min-h-[44px] touch-manipulation"
+                      >
+                        <EyeIcon className="w-4 h-4 mr-2" />
+                        View Details
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        )}
       </div>
 
       {/* Order Details Modal */}
@@ -265,7 +343,7 @@ const OrderManagement = () => {
           </Transition.Child>
 
           <div className="fixed inset-0 z-10 overflow-y-auto">
-            <div className="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
+            <div className="flex min-h-full items-end justify-center p-2 sm:p-4 text-center sm:items-center">
               <Transition.Child
                 as={React.Fragment}
                 enter="ease-out duration-300"
@@ -275,11 +353,11 @@ const OrderManagement = () => {
                 leaveFrom="opacity-100 translate-y-0 sm:scale-100"
                 leaveTo="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
               >
-                <Dialog.Panel className="relative transform overflow-hidden rounded-lg bg-white px-4 pb-4 pt-5 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-4xl sm:p-6">
-                  <div className="absolute right-0 top-0 pr-4 pt-4">
+                <Dialog.Panel className="relative transform overflow-hidden rounded-lg bg-white px-4 pb-4 pt-5 text-left shadow-xl transition-all w-full max-w-sm sm:max-w-2xl lg:max-w-4xl sm:my-8 sm:p-6">
+                  <div className="absolute right-0 top-0 pr-3 pt-3 sm:pr-4 sm:pt-4">
                     <button
                       type="button"
-                      className="rounded-md bg-white text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                      className="rounded-md bg-white text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 min-h-[44px] min-w-[44px] flex items-center justify-center"
                       onClick={() => setSelectedOrder(null)}
                     >
                       <XMarkIcon className="h-6 w-6" />
@@ -292,7 +370,7 @@ const OrderManagement = () => {
                         Order Details - #{selectedOrder.id.slice(0, 8)}
                       </Dialog.Title>
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 mb-4 sm:mb-6">
                         {/* Order Information */}
                         <div className="bg-gray-50 rounded-lg p-4">
                           <h4 className="text-md font-medium text-gray-900 mb-3">Order Information</h4>
