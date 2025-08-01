@@ -43,10 +43,12 @@
     transition: transform 0.3s ease-in-out;
   }
   
-  /* Show sidebar when open on mobile */
+  /* Show sidebar when open (full width) on mobile */
   .fixed.inset-y-0.left-0.w-72 {
     transform: translateX(0);
   }
+
+
   
   /* Ensure main content doesn't have left margin on mobile */
   .ml-72, .ml-16 {

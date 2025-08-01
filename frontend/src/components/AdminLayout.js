@@ -81,7 +81,10 @@ const AdminLayout = ({ children }) => {
                         transition-all duration-300 ease-in-out shadow-xl flex flex-col`}>
           
           {/* Sidebar Header - Always visible */}
-          <div className="flex items-center justify-between p-4 border-b border-slate-700 flex-shrink-0">
+          <div
+            className={`flex border-b border-slate-700 flex-shrink-0 
+                        ${sidebarOpen ? 'items-center justify-between p-4' : 'flex-col items-center p-2 space-y-2'}`}
+          >
             <Link to="/admin" className="flex items-center space-x-3">
               <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
                 <CubeIcon className="w-5 h-5 text-white" />
@@ -94,12 +97,12 @@ const AdminLayout = ({ children }) => {
             </Link>
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="p-2 rounded-lg hover:bg-slate-700 transition-colors duration-200"
+              className={`p-2 rounded-lg transition-colors duration-200 ${sidebarOpen ? 'hover:bg-slate-700 mr-2' : 'bg-slate-700'}`}
             >
               {sidebarOpen ? (
-                <ChevronLeftIcon className="w-5 h-5" />
+                <ChevronLeftIcon className="w-5 h-5 text-white" />
               ) : (
-                <ChevronRightIcon className="w-5 h-5" />
+                <ChevronRightIcon className="w-5 h-5 text-white" />
               )}
             </button>
           </div>
@@ -114,7 +117,8 @@ const AdminLayout = ({ children }) => {
                   <Link
                     key={item.path}
                     to={item.path}
-                    className={`flex items-center px-3 py-3 text-sm font-medium rounded-lg transition-all duration-200
+                    className={`flex items-center py-3 text-sm font-medium rounded-lg transition-all duration-200 
+                               ${sidebarOpen ? 'px-3' : 'px-2 justify-center'} 
                                ${isActive 
                                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' 
                                  : 'text-slate-300 hover:bg-slate-700 hover:text-white'
@@ -159,7 +163,7 @@ const AdminLayout = ({ children }) => {
           <main className="flex-1 overflow-y-auto overflow-x-hidden">
             <div className="p-6">
               {/* Mobile Sidebar Toggle and Admin Logo */}
-              <div className="flex items-center justify-between mb-6 lg:justify-end">
+              <div className="flex items-center justify-end mb-6">
                 <div className="flex items-center space-x-3">
                   <RoleIndicator />
                 </div>
@@ -175,6 +179,16 @@ const AdminLayout = ({ children }) => {
             className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
             onClick={() => setSidebarOpen(false)}
           />
+        )}
+
+        {/* Mobile expand button (visible only when sidebar closed) */}
+        {!sidebarOpen && (
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className="fixed top-4 left-3 z-50 p-2 bg-slate-700 rounded-lg shadow lg:hidden"
+          >
+            <ChevronRightIcon className="w-6 h-6 text-white" />
+          </button>
         )}
       </div>
     </AdminPanelGuard>
