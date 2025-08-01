@@ -146,18 +146,29 @@ const Header = () => {
             
             <div className="relative">
               <motion.button
-                whileHover={{ scale: 1.05 }}
+                whileHover={{ 
+                  scale: 1.05,
+                  boxShadow: "0 20px 40px rgba(44, 85, 48, 0.35)"
+                }}
                 whileTap={{ scale: 0.95 }}
                 onClick={openCartPopup}
-                className="btn-primary flex items-center space-x-2"
+                className="premium-cart-btn flex items-center space-x-2 px-4 py-2 rounded-full font-medium text-white shadow-lg transition-all duration-300 relative overflow-hidden group"
+                style={{
+                  background: 'linear-gradient(135deg, #2c5530 0%, #4a7856 100%)',
+                  boxShadow: '0 10px 25px rgba(44, 85, 48, 0.25)'
+                }}
               >
-                <ShoppingCart className="w-5 h-5" data-cart-icon />
-                <span className="font-medium">Cart</span>
+                <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                <ShoppingCart className="w-5 h-5 relative z-10" data-cart-icon />
+                <span className="font-medium relative z-10">Cart</span>
                 {cartItemsCount > 0 && (
                   <motion.span
                     initial={{ scale: 0 }}
                     animate={{ scale: 1 }}
-                    className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground text-xs rounded-full w-6 h-6 flex items-center justify-center font-bold"
+                    className="absolute -top-2 -right-2 bg-gradient-to-br from-red-500 to-red-600 text-white text-xs rounded-full w-7 h-7 flex items-center justify-center font-bold shadow-lg border-2 border-white"
+                    style={{
+                      boxShadow: '0 4px 12px rgba(239, 68, 68, 0.4)'
+                    }}
                   >
                     {cartItemsCount}
                   </motion.span>
@@ -255,10 +266,15 @@ const Header = () => {
                   setIsMenuOpen(false);
                   openCartPopup();
                 }}
-                className="btn-primary flex items-center justify-center space-x-2 w-full"
+                className="premium-cart-btn flex items-center justify-center space-x-2 w-full px-4 py-3 rounded-full font-medium text-white shadow-lg transition-all duration-300 relative overflow-hidden group"
+                style={{
+                  background: 'linear-gradient(135deg, #2c5530 0%, #4a7856 100%)',
+                  boxShadow: '0 10px 25px rgba(44, 85, 48, 0.25)'
+                }}
               >
-                <ShoppingCart className="w-5 h-5" data-cart-icon />
-                <span className="font-medium">Cart ({cartItemsCount})</span>
+                <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                <ShoppingCart className="w-5 h-5 relative z-10" data-cart-icon />
+                <span className="font-medium relative z-10">Cart ({cartItemsCount})</span>
               </button>
             </div>
           </motion.div>
