@@ -56,7 +56,7 @@ const ExpenseManagement = () => {
   const [analytics, setAnalytics] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTab] = useState('overview');
   
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
