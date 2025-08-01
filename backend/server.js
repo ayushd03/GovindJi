@@ -1949,15 +1949,64 @@ app.delete('/api/admin/employees/:id', roleMiddleware.requirePermission(roleMidd
 // Get all expenses with vendor/employee names
 app.get('/api/admin/expenses', roleMiddleware.requirePermission(roleMiddleware.ADMIN_PERMISSIONS.VIEW_EXPENSES), async (req, res) => {
     try {
-        const { data, error } = await supabase
+        const { 
+            page = 1, 
+            limit = 10, 
+            search = '', 
+            category = '', 
+            paymentMode = '', 
+            startDate = '', 
+            endDate = '',
+            vendor_id = '',
+            employee_id = ''
+        } = req.query;
+
+        // Build query for filtering
+        let query = supabase
             .from('expenses')
             .select(`
                 *,
                 vendor:vendor_id(name),
                 employee:employee_id(name)
-            `)
+            `, { count: 'exact' });
+
+        // Apply filters
+        if (search) {
+            query = query.or(`description.ilike.%${search}%,notes.ilike.%${search}%`);
+        }
+        
+        if (category) {
+            query = query.eq('category', category);
+        }
+        
+        if (paymentMode) {
+            query = query.eq('payment_mode', paymentMode);
+        }
+        
+        if (vendor_id) {
+            query = query.eq('vendor_id', vendor_id);
+        }
+        
+        if (employee_id) {
+            query = query.eq('employee_id', employee_id);
+        }
+        
+        if (startDate) {
+            query = query.gte('expense_date', startDate);
+        }
+        
+        if (endDate) {
+            query = query.lte('expense_date', endDate);
+        }
+
+        // Apply pagination and ordering
+        const offset = (parseInt(page) - 1) * parseInt(limit);
+        query = query
             .order('expense_date', { ascending: false })
-            .order('created_at', { ascending: false });
+            .order('created_at', { ascending: false })
+            .range(offset, offset + parseInt(limit) - 1);
+
+        const { data, error, count } = await query;
 
         if (error) throw error;
 
@@ -1968,7 +2017,45 @@ app.get('/api/admin/expenses', roleMiddleware.requirePermission(roleMiddleware.A
             employee_name: expense.employee?.name || null
         }));
 
-        res.json(formattedData);
+        // Calculate total amount for filtered results
+        let totalAmountQuery = supabase
+            .from('expenses')
+            .select('amount');
+
+        // Apply same filters for total calculation
+        if (search) {
+            totalAmountQuery = totalAmountQuery.or(`description.ilike.%${search}%,notes.ilike.%${search}%`);
+        }
+        if (category) {
+            totalAmountQuery = totalAmountQuery.eq('category', category);
+        }
+        if (paymentMode) {
+            totalAmountQuery = totalAmountQuery.eq('payment_mode', paymentMode);
+        }
+        if (vendor_id) {
+            totalAmountQuery = totalAmountQuery.eq('vendor_id', vendor_id);
+        }
+        if (employee_id) {
+            totalAmountQuery = totalAmountQuery.eq('employee_id', employee_id);
+        }
+        if (startDate) {
+            totalAmountQuery = totalAmountQuery.gte('expense_date', startDate);
+        }
+        if (endDate) {
+            totalAmountQuery = totalAmountQuery.lte('expense_date', endDate);
+        }
+
+        const { data: totalData } = await totalAmountQuery;
+        const totalAmount = totalData?.reduce((sum, expense) => sum + parseFloat(expense.amount || 0), 0) || 0;
+
+        res.json({
+            expenses: formattedData,
+            total: count || 0,
+            totalAmount: totalAmount,
+            page: parseInt(page),
+            limit: parseInt(limit),
+            totalPages: Math.ceil((count || 0) / parseInt(limit))
+        });
     } catch (error) {
         console.error('Error fetching expenses:', error);
         res.status(500).json({ error: error.message });

@@ -62,10 +62,14 @@ const ExpenseManagement = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
   const [totalExpenses, setTotalExpenses] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const [totalAmount, setTotalAmount] = useState(0);
   
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
+  const [selectedVendor, setSelectedVendor] = useState('');
+  const [selectedEmployee, setSelectedEmployee] = useState('');
   const [selectedPaymentMode, setSelectedPaymentMode] = useState('');
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
   const [showFilters, setShowFilters] = useState(false);
@@ -133,6 +137,8 @@ const ExpenseManagement = () => {
         limit: limit.toString(),
         ...(searchTerm && { search: searchTerm }),
         ...(selectedCategory && { category: selectedCategory }),
+        ...(selectedVendor && { vendor_id: selectedVendor }),
+        ...(selectedEmployee && { employee_id: selectedEmployee }),
         ...(selectedPaymentMode && { paymentMode: selectedPaymentMode }),
         ...(dateRange.start && { startDate: dateRange.start }),
         ...(dateRange.end && { endDate: dateRange.end }),
@@ -152,6 +158,8 @@ const ExpenseManagement = () => {
       const data = await response.json();
       setExpenses(data.expenses || data);
       setTotalExpenses(data.total || data.length || 0);
+      setTotalPages(data.totalPages || Math.ceil((data.total || 0) / limit));
+      setTotalAmount(data.totalAmount || 0);
     } catch (err) {
       setError(err.message);
       showError('Failed to load expenses');
@@ -400,15 +408,15 @@ const ExpenseManagement = () => {
     }, 500);
 
     return () => clearTimeout(timer);
-  }, [searchTerm, selectedCategory, selectedPaymentMode, dateRange]);
+  }, [searchTerm, selectedCategory, selectedVendor, selectedEmployee, selectedPaymentMode, dateRange]);
 
   // Pagination calculations
-  const totalPages = Math.ceil(totalExpenses / itemsPerPage);
+  const calculatedTotalPages = totalPages > 0 ? totalPages : Math.ceil(totalExpenses / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = Math.min(startIndex + itemsPerPage, totalExpenses);
 
   const handlePageChange = (page) => {
-    if (page >= 1 && page <= totalPages) {
+    if (page >= 1 && page <= calculatedTotalPages) {
       setCurrentPage(page);
       fetchExpenses(page);
     }
@@ -418,7 +426,7 @@ const ExpenseManagement = () => {
     const pages = [];
     const maxVisible = 5;
     let start = Math.max(1, currentPage - Math.floor(maxVisible / 2));
-    let end = Math.min(totalPages, start + maxVisible - 1);
+    let end = Math.min(calculatedTotalPages, start + maxVisible - 1);
     
     if (end - start + 1 < maxVisible) {
       start = Math.max(1, end - maxVisible + 1);
@@ -441,12 +449,12 @@ const ExpenseManagement = () => {
   }
 
   const CategoryQuickButtons = () => (
-    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2 mb-6">
+    <div className="grid grid-cols-2 gap-2 mb-3">
       {EXPENSE_CATEGORIES.map((category) => (
         <button
           key={category}
           onClick={() => setFormData(prev => ({ ...prev, category }))}
-          className={`p-3 rounded-lg border-2 text-sm font-medium transition-all ${
+          className={`p-2 rounded-lg border text-xs font-medium transition-all min-h-[36px] touch-manipulation ${
             formData.category === category
               ? 'border-purple-500 bg-purple-50 text-purple-700'
               : 'border-gray-200 hover:border-purple-300 hover:bg-purple-50'
@@ -459,7 +467,7 @@ const ExpenseManagement = () => {
   );
 
   const PaymentModeButtons = () => (
-    <div className="grid grid-cols-5 gap-2 mb-4">
+    <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 mb-3">
       {PAYMENT_MODES.map((mode) => {
         const IconComponent = getPaymentModeIcon(mode);
         return (
@@ -467,14 +475,14 @@ const ExpenseManagement = () => {
             key={mode}
             type="button"
             onClick={() => setFormData(prev => ({ ...prev, payment_mode: mode }))}
-            className={`p-3 rounded-lg border-2 text-sm font-medium transition-all flex flex-col items-center space-y-1 ${
+            className={`p-2 rounded-lg border text-xs font-medium transition-all flex flex-col items-center space-y-1 min-h-[44px] touch-manipulation ${
               formData.payment_mode === mode
                 ? 'border-purple-500 bg-purple-50 text-purple-700'
                 : 'border-gray-200 hover:border-purple-300 hover:bg-purple-50'
             }`}
           >
-            <IconComponent className="w-5 h-5" />
-            <span>{mode}</span>
+            <IconComponent className="w-4 h-4" />
+            <span className="leading-tight">{mode}</span>
           </button>
         );
       })}
@@ -681,13 +689,45 @@ const ExpenseManagement = () => {
                   <select
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-purple-500 focus:border-purple-500 min-h-[44px] touch-manipulation"
                     value={selectedCategory}
-                    onChange={(e) => setSelectedCategory(e.target.value)}
+                    onChange={(e) => {
+                      setSelectedCategory(e.target.value);
+                      // Clear vendor/employee selection when category changes
+                      setSelectedVendor('');
+                      setSelectedEmployee('');
+                    }}
                   >
                     <option value="">All Categories</option>
                     {EXPENSE_CATEGORIES.map(category => (
                       <option key={category} value={category}>{category}</option>
                     ))}
                   </select>
+                  
+                  {/* Conditional Vendor/Employee Dropdown */}
+                  {selectedCategory === 'Vendor Payment' && vendors.length > 0 && (
+                    <select
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-purple-500 focus:border-purple-500 min-h-[44px] touch-manipulation"
+                      value={selectedVendor}
+                      onChange={(e) => setSelectedVendor(e.target.value)}
+                    >
+                      <option value="">All Vendors</option>
+                      {vendors.map(vendor => (
+                        <option key={vendor.id} value={vendor.id}>{vendor.name}</option>
+                      ))}
+                    </select>
+                  )}
+                  
+                  {selectedCategory === 'Employee Payout' && employees.length > 0 && (
+                    <select
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-purple-500 focus:border-purple-500 min-h-[44px] touch-manipulation"
+                      value={selectedEmployee}
+                      onChange={(e) => setSelectedEmployee(e.target.value)}
+                    >
+                      <option value="">All Employees</option>
+                      {employees.map(employee => (
+                        <option key={employee.id} value={employee.id}>{employee.name}</option>
+                      ))}
+                    </select>
+                  )}
                   
                   <select
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-purple-500 focus:border-purple-500 min-h-[44px] touch-manipulation"
@@ -728,9 +768,16 @@ const ExpenseManagement = () => {
               {/* Expenses List */}
               <div className="bg-white border border-gray-200 rounded-xl">
                 <div className="p-6 border-b border-gray-200">
-                  <h3 className="text-lg font-semibold text-gray-900">
-                    Expenses ({totalExpenses})
-                  </h3>
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                    <div className="flex items-center gap-4">
+                      <h3 className="text-lg font-semibold text-gray-900">
+                        Expenses {totalAmount > 0 && `(${formatCurrency(totalAmount)})`}
+                      </h3>
+                    </div>
+                    <div className="text-sm text-gray-500">
+                      {totalExpenses} {totalExpenses === 1 ? 'expense' : 'expenses'}
+                    </div>
+                  </div>
                 </div>
                 
                 {expenses.length === 0 ? (
@@ -738,70 +785,119 @@ const ExpenseManagement = () => {
                     <CurrencyDollarIcon className="w-16 h-16 text-gray-400 mx-auto mb-4" />
                     <h3 className="text-lg font-medium text-gray-900 mb-2">No expenses found</h3>
                     <p className="text-gray-500">
-                      {searchTerm || selectedCategory || selectedPaymentMode || dateRange.start || dateRange.end
+                      {searchTerm || selectedCategory || selectedVendor || selectedEmployee || selectedPaymentMode || dateRange.start || dateRange.end
                         ? "Try adjusting your search criteria" 
                         : "Get started by adding your first expense"}
                     </p>
                   </div>
                 ) : (
-                  <div className="divide-y divide-gray-200">
-                    {expenses.map((expense) => {
-                      const PaymentIcon = getPaymentModeIcon(expense.payment_mode);
-                      return (
-                        <div key={expense.id} className="p-4 sm:p-6 hover:bg-gray-50 transition-colors">
-                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-                            <div className="flex-1 mb-4 sm:mb-0">
-                              <div className="flex items-start sm:items-center space-x-3 sm:space-x-4">
-                                <div className="p-2 bg-gray-100 rounded-lg flex-shrink-0">
-                                  <PaymentIcon className="w-5 h-5 text-gray-600" />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <h3 className="text-base sm:text-lg font-medium text-gray-900 truncate">{expense.description}</h3>
-                                  <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-gray-500">
-                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                                      {expense.category}
-                                    </span>
-                                    <span className="whitespace-nowrap">{formatDate(expense.expense_date)}</span>
-                                    <span className="whitespace-nowrap">{expense.payment_mode}</span>
-                                    {(expense.vendor_name || expense.employee_name) && (
-                                      <span className="truncate">• {expense.vendor_name || expense.employee_name}</span>
-                                    )}
+                  <div>
+                    <div className="divide-y divide-gray-200">
+                      {expenses.map((expense) => {
+                        const PaymentIcon = getPaymentModeIcon(expense.payment_mode);
+                        return (
+                          <div key={expense.id} className="p-4 sm:p-6 hover:bg-gray-50 transition-colors">
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+                              <div className="flex-1 mb-4 sm:mb-0">
+                                <div className="flex items-start sm:items-center space-x-3 sm:space-x-4">
+                                  <div className="p-2 bg-gray-100 rounded-lg flex-shrink-0">
+                                    <PaymentIcon className="w-5 h-5 text-gray-600" />
                                   </div>
-                                  {/* Mobile Amount Display */}
-                                  <div className="mt-2 sm:hidden">
-                                    <p className="text-xl font-bold text-gray-900">{formatCurrency(expense.amount)}</p>
+                                  <div className="flex-1 min-w-0">
+                                    <h3 className="text-base sm:text-lg font-medium text-gray-900 truncate">{expense.description}</h3>
+                                    <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-gray-500">
+                                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                                        {expense.category}
+                                      </span>
+                                      <span className="whitespace-nowrap">{formatDate(expense.expense_date)}</span>
+                                      <span className="whitespace-nowrap">{expense.payment_mode}</span>
+                                      {(expense.vendor_name || expense.employee_name) && (
+                                        <span className="truncate">• {expense.vendor_name || expense.employee_name}</span>
+                                      )}
+                                    </div>
+                                    {/* Mobile Amount Display */}
+                                    <div className="mt-2 sm:hidden">
+                                      <p className="text-xl font-bold text-gray-900">{formatCurrency(expense.amount)}</p>
+                                    </div>
                                   </div>
                                 </div>
-                              </div>
-                            </div>
-                            
-                            <div className="flex items-center justify-between sm:justify-end sm:space-x-4">
-                              {/* Desktop Amount Display */}
-                              <div className="hidden sm:block text-right">
-                                <p className="text-xl font-bold text-gray-900">{formatCurrency(expense.amount)}</p>
                               </div>
                               
-                              <PermissionGuard permission={ADMIN_PERMISSIONS.MANAGE_EXPENSES}>
-                                <div className="flex items-center space-x-2">
-                                  <button
-                                    onClick={() => handleOpenModal(expense)}
-                                    className="p-2 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors min-h-[44px] min-w-[44px] touch-manipulation"
-                                  >
-                                    <PencilIcon className="w-4 h-4" />
-                                  </button>
-                                  <button
-                                    onClick={() => setDeleteConfirm(expense)}
-                                    className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors min-h-[44px] min-w-[44px] touch-manipulation"
-                                  >
-                                    <TrashIcon className="w-4 h-4" />
-                                  </button>
+                              <div className="flex items-center justify-between sm:justify-end sm:space-x-4">
+                                {/* Desktop Amount Display */}
+                                <div className="hidden sm:block text-right">
+                                  <p className="text-xl font-bold text-gray-900">{formatCurrency(expense.amount)}</p>
                                 </div>
-                              </PermissionGuard>
+                                
+                                <PermissionGuard permission={ADMIN_PERMISSIONS.MANAGE_EXPENSES}>
+                                  <div className="flex items-center space-x-2">
+                                    <button
+                                      onClick={() => handleOpenModal(expense)}
+                                      className="p-2 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors min-h-[44px] min-w-[44px] touch-manipulation"
+                                    >
+                                      <PencilIcon className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                      onClick={() => setDeleteConfirm(expense)}
+                                      className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors min-h-[44px] min-w-[44px] touch-manipulation"
+                                    >
+                                      <TrashIcon className="w-4 h-4" />
+                                    </button>
+                                  </div>
+                                </PermissionGuard>
+                              </div>
                             </div>
                           </div>
+                        );
+                      })}
+                    </div>
+                    
+                    {/* Pagination */}
+                    {calculatedTotalPages > 1 && (
+                      <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                          <div className="text-sm text-gray-700">
+                            Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, totalExpenses)} of {totalExpenses} results
+                          </div>
+                          
+                          <div className="flex items-center space-x-2">
+                            <button
+                              onClick={() => handlePageChange(currentPage - 1)}
+                              disabled={currentPage === 1}
+                              className="inline-flex items-center px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed min-h-[40px] touch-manipulation"
+                            >
+                              <ChevronLeftIcon className="w-4 h-4 mr-1" />
+                              Previous
+                            </button>
+                            
+                            <div className="flex items-center space-x-1">
+                              {getPaginationPages().map((page) => (
+                                <button
+                                  key={page}
+                                  onClick={() => handlePageChange(page)}
+                                  className={`inline-flex items-center px-3 py-2 border text-sm font-medium rounded-lg min-h-[40px] min-w-[40px] touch-manipulation ${
+                                    currentPage === page
+                                      ? 'border-purple-500 bg-purple-50 text-purple-600'
+                                      : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+                                  }`}
+                                >
+                                  {page}
+                                </button>
+                              ))}
+                            </div>
+                            
+                            <button
+                              onClick={() => handlePageChange(currentPage + 1)}
+                              disabled={currentPage === calculatedTotalPages}
+                              className="inline-flex items-center px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed min-h-[40px] touch-manipulation"
+                            >
+                              Next
+                              <ChevronRightIcon className="w-4 h-4 ml-1" />
+                            </button>
+                          </div>
                         </div>
-                      );
-                    })}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -811,74 +907,85 @@ const ExpenseManagement = () => {
 
         {/* Add/Edit Modal */}
         {isModalOpen && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-2 sm:p-4 z-50">
-            <div className="bg-white rounded-xl shadow-xl w-full max-w-sm sm:max-w-2xl lg:max-w-4xl max-h-[95vh] overflow-y-auto">
-              <div className="p-4 sm:p-6 border-b border-gray-200">
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center p-2 sm:p-4 z-50 pt-4 sm:pt-8">
+            <div className="bg-white rounded-xl shadow-xl w-full max-w-sm sm:max-w-lg max-h-[calc(100vh-2rem)] overflow-y-auto">
+              <div className="sticky top-0 bg-white p-3 sm:p-4 border-b border-gray-200 rounded-t-xl">
                 <div className="flex items-center justify-between">
-                  <h2 className="text-lg sm:text-xl font-semibold text-gray-900">
-                    {editingExpense ? 'Edit Expense' : 'Add New Expense'}
+                  <h2 className="text-base sm:text-lg font-semibold text-gray-900">
+                    {editingExpense ? 'Edit Expense' : 'Add Expense'}
                   </h2>
-                  <button
-                    onClick={handleCloseModal}
-                    className="p-2 text-gray-400 hover:text-gray-600 rounded-lg min-h-[44px] min-w-[44px] flex items-center justify-center touch-manipulation"
-                  >
-                    <XMarkIcon className="w-5 h-5" />
-                  </button>
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={handleCloseModal}
+                      className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 min-h-[40px] touch-manipulation"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      form="expense-form"
+                      className="px-4 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 min-h-[40px] touch-manipulation"
+                    >
+                      {editingExpense ? 'Update' : 'Add'}
+                    </button>
+                  </div>
                 </div>
               </div>
               
-              <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 sm:space-y-6">
-                {/* Amount - Most Prominent */}
-                <div>
-                  <label className="block text-lg font-semibold text-gray-900 mb-2">
-                    Amount (₹) *
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    required
-                    className="w-full px-4 py-3 text-lg sm:text-xl border-2 border-gray-300 rounded-lg focus:ring-purple-500 focus:border-purple-500 min-h-[44px] touch-manipulation"
-                    value={formData.amount}
-                    onChange={(e) => setFormData({...formData, amount: e.target.value})}
-                    placeholder="0.00"
-                  />
+              <form id="expense-form" onSubmit={handleSubmit} className="p-3 sm:p-4 space-y-3 sm:space-y-4">
+                {/* Amount & Description Row */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-900 mb-1">
+                      Amount (₹) *
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      required
+                      className="w-full px-3 py-2 text-lg border-2 border-gray-300 rounded-lg focus:ring-purple-500 focus:border-purple-500 min-h-[44px] touch-manipulation"
+                      value={formData.amount}
+                      onChange={(e) => setFormData({...formData, amount: e.target.value})}
+                      placeholder="0.00"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Description *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-purple-500 focus:border-purple-500 min-h-[44px] touch-manipulation"
+                      value={formData.description}
+                      onChange={(e) => setFormData({...formData, description: e.target.value})}
+                      placeholder="What was this expense for?"
+                    />
+                  </div>
                 </div>
 
-                {/* Description */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Description *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-purple-500 focus:border-purple-500 min-h-[44px] touch-manipulation"
-                    value={formData.description}
-                    onChange={(e) => setFormData({...formData, description: e.target.value})}
-                    placeholder="What was this expense for?"
-                  />
-                </div>
 
                 {/* Smart Categories */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-3">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
                     Category *
                   </label>
                   <CategoryQuickButtons />
                 </div>
 
-                {/* Context-Aware Linking */}
+                {/* Context-Aware Linking - Only show when relevant */}
                 {formData.category === 'Vendor Payment' && vendors.length > 0 && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Select Vendor
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Vendor
                     </label>
                     <select
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-purple-500 focus:border-purple-500 min-h-[44px] touch-manipulation"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-purple-500 focus:border-purple-500 min-h-[40px] touch-manipulation text-sm"
                       value={formData.vendor_id}
                       onChange={(e) => setFormData({...formData, vendor_id: e.target.value})}
                     >
-                      <option value="">Select Vendor (Optional)</option>
+                      <option value="">Select Vendor</option>
                       {vendors.map(vendor => (
                         <option key={vendor.id} value={vendor.id}>{vendor.name}</option>
                       ))}
@@ -888,11 +995,11 @@ const ExpenseManagement = () => {
 
                 {formData.category === 'Employee Payout' && employees.length > 0 && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Select Employee
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Employee
                     </label>
                     <select
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-purple-500 focus:border-purple-500 min-h-[44px] touch-manipulation"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-purple-500 focus:border-purple-500 min-h-[40px] touch-manipulation text-sm"
                       value={formData.employee_id}
                       onChange={(e) => setFormData({...formData, employee_id: e.target.value})}
                     >
@@ -906,55 +1013,40 @@ const ExpenseManagement = () => {
 
                 {/* Payment Mode */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-3">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
                     Payment Mode *
                   </label>
                   <PaymentModeButtons />
                 </div>
 
-                {/* Date */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Date *
-                  </label>
-                  <input
-                    type="date"
-                    required
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-purple-500 focus:border-purple-500 min-h-[44px] touch-manipulation"
-                    value={formData.expense_date}
-                    onChange={(e) => setFormData({...formData, expense_date: e.target.value})}
-                  />
+                {/* Date & Notes Row */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Date *
+                    </label>
+                    <input
+                      type="date"
+                      required
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-purple-500 focus:border-purple-500 min-h-[40px] touch-manipulation"
+                      value={formData.expense_date}
+                      onChange={(e) => setFormData({...formData, expense_date: e.target.value})}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Notes
+                    </label>
+                    <input
+                      type="text"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-purple-500 focus:border-purple-500 min-h-[40px] touch-manipulation"
+                      value={formData.notes}
+                      onChange={(e) => setFormData({...formData, notes: e.target.value})}
+                      placeholder="Quick notes..."
+                    />
+                  </div>
                 </div>
 
-                {/* Notes */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Notes
-                  </label>
-                  <textarea
-                    rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-purple-500 focus:border-purple-500 min-h-[44px] touch-manipulation"
-                    value={formData.notes}
-                    onChange={(e) => setFormData({...formData, notes: e.target.value})}
-                    placeholder="Any additional notes..."
-                  />
-                </div>
-
-                <div className="flex flex-col sm:flex-row sm:justify-end gap-3 pt-4 border-t border-gray-200">
-                  <button
-                    type="button"
-                    onClick={handleCloseModal}
-                    className="w-full sm:w-auto px-6 py-3 sm:py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 min-h-[44px] touch-manipulation"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="w-full sm:w-auto px-6 py-3 sm:py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 min-h-[44px] touch-manipulation"
-                  >
-                    {editingExpense ? 'Update Expense' : 'Add Expense'}
-                  </button>
-                </div>
               </form>
             </div>
           </div>
