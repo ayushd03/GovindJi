@@ -12,8 +12,18 @@ import {
   CalendarIcon,
   CurrencyRupeeIcon,
   XMarkIcon,
-  UserIcon
+  UserIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  AdjustmentsHorizontalIcon,
+  ExclamationTriangleIcon,
+  DocumentArrowDownIcon
 } from '@heroicons/react/24/outline';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../components/ui/dialog';
+import { Button } from '../../components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
+import { useToast } from '../../hooks/use-toast';
+import { Toaster } from '../../components/ui/toaster';
 
 const EMPLOYEE_ROLES = [
   'Store Manager',
@@ -28,11 +38,22 @@ const EMPLOYEE_ROLES = [
 ];
 
 const EmployeeManagement = () => {
+  const { toast } = useToast();
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(10);
+  const [totalEmployees, setTotalEmployees] = useState(0);
+  
+  // Filters
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRole, setSelectedRole] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
+  
+  // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
@@ -52,14 +73,40 @@ const EmployeeManagement = () => {
 
   const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
+  // Toast notification functions
+  const showSuccess = (message) => {
+    toast({
+      title: "Success",
+      description: message,
+      variant: "success",
+      duration: 3000,
+    });
+  };
+
+  const showError = (message) => {
+    toast({
+      title: "Error",
+      description: message,
+      variant: "destructive",
+      duration: 5000,
+    });
+  };
+
   useEffect(() => {
-    fetchEmployees();
+    fetchEmployees(1);
   }, []);
 
-  const fetchEmployees = async () => {
+  const fetchEmployees = async (page = 1, limit = itemsPerPage) => {
     try {
       const token = localStorage.getItem('authToken');
-      const response = await fetch(`${API_BASE_URL}/api/admin/employees`, {
+      const queryParams = new URLSearchParams({
+        page: page.toString(),
+        limit: limit.toString(),
+        ...(searchTerm && { search: searchTerm }),
+        ...(selectedRole && { role: selectedRole }),
+      });
+
+      const response = await fetch(`${API_BASE_URL}/api/admin/employees?${queryParams}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -71,12 +118,56 @@ const EmployeeManagement = () => {
       }
 
       const data = await response.json();
-      setEmployees(data);
+      setEmployees(data.employees || data);
+      setTotalEmployees(data.total || data.length || 0);
     } catch (err) {
       setError(err.message);
+      showError('Failed to load employees');
     } finally {
       setLoading(false);
     }
+  };
+
+  // Debounced search effect
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (currentPage === 1) {
+        fetchEmployees(1);
+      } else {
+        setCurrentPage(1);
+      }
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [searchTerm, selectedRole]);
+
+  // Pagination calculations
+  const totalPages = Math.ceil(totalEmployees / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = Math.min(startIndex + itemsPerPage, totalEmployees);
+
+  const handlePageChange = (page) => {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page);
+      fetchEmployees(page);
+    }
+  };
+
+  const getPaginationPages = () => {
+    const pages = [];
+    const maxVisible = 5;
+    let start = Math.max(1, currentPage - Math.floor(maxVisible / 2));
+    let end = Math.min(totalPages, start + maxVisible - 1);
+    
+    if (end - start + 1 < maxVisible) {
+      start = Math.max(1, end - maxVisible + 1);
+    }
+    
+    for (let i = start; i <= end; i++) {
+      pages.push(i);
+    }
+    
+    return pages;
   };
 
   const handleSubmit = async (e) => {
@@ -106,10 +197,12 @@ const EmployeeManagement = () => {
         throw new Error(`Failed to ${editingEmployee ? 'update' : 'create'} employee`);
       }
 
-      await fetchEmployees();
+      await fetchEmployees(currentPage);
       handleCloseModal();
+      showSuccess(editingEmployee ? 'Employee updated successfully' : 'Employee added successfully');
     } catch (err) {
       setError(err.message);
+      showError(editingEmployee ? 'Failed to update employee' : 'Failed to add employee');
     }
   };
 
@@ -127,10 +220,12 @@ const EmployeeManagement = () => {
         throw new Error('Failed to delete employee');
       }
 
-      await fetchEmployees();
+      await fetchEmployees(currentPage);
       setDeleteConfirm(null);
+      showSuccess('Employee deleted successfully');
     } catch (err) {
       setError(err.message);
+      showError('Failed to delete employee');
     }
   };
 
@@ -198,12 +293,6 @@ const EmployeeManagement = () => {
     }).format(amount);
   };
 
-  const filteredEmployees = employees.filter(employee => {
-    const matchesSearch = employee.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         (employee.role || '').toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesRole = !selectedRole || employee.role === selectedRole;
-    return matchesSearch && matchesRole;
-  });
 
   if (loading) {
     return (
@@ -217,55 +306,93 @@ const EmployeeManagement = () => {
   return (
     <PermissionGuard permission={ADMIN_PERMISSIONS.VIEW_EMPLOYEES}>
       <div className="space-y-6">
-        {/* Header */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center space-x-3">
-              <div className="p-2 bg-green-100 rounded-lg">
-                <UserGroupIcon className="w-6 h-6 text-green-600" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">Employee Management</h1>
-                <p className="text-gray-500">Manage your staff and team members</p>
-              </div>
-            </div>
-            <PermissionGuard permission={ADMIN_PERMISSIONS.MANAGE_EMPLOYEES}>
-              <button
-                onClick={() => handleOpenModal()}
-                className="mt-4 sm:mt-0 inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-              >
-                <PlusIcon className="w-4 h-4 mr-2" />
-                Add New Employee
-              </button>
-            </PermissionGuard>
-          </div>
+        {/* Header with Add Button */}
+        <div className="flex flex-col sm:flex-row gap-4">
+          <PermissionGuard permission={ADMIN_PERMISSIONS.MANAGE_EMPLOYEES}>
+            <Button
+              onClick={() => handleOpenModal()}
+              className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 text-sm font-medium"
+              size="lg"
+            >
+              <PlusIcon className="w-5 h-5 mr-2" />
+              Add New Employee
+            </Button>
+          </PermissionGuard>
         </div>
 
-        {/* Filters and Search */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="relative">
-              <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search employees by name or role..."
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
+        {/* Filters and Controls */}
+        <Card>
+          <CardHeader className="pb-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <CardTitle className="text-lg">Employee List</CardTitle>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowFilters(!showFilters)}
+                  className="md:hidden"
+                >
+                  <AdjustmentsHorizontalIcon className="w-4 h-4 mr-2" />
+                  Filters
+                </Button>
+              </div>
             </div>
-            <select
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"
-              value={selectedRole}
-              onChange={(e) => setSelectedRole(e.target.value)}
-            >
-              <option value="">All Roles</option>
-              {EMPLOYEE_ROLES.map(role => (
-                <option key={role} value={role}>{role}</option>
-              ))}
-            </select>
-          </div>
-        </div>
+          </CardHeader>
+          
+          <CardContent className="pt-0">
+            {/* Mobile Search */}
+            <div className="mb-4 md:hidden">
+              <div className="relative">
+                <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search employees..."
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+            </div>
+
+            {/* Desktop Filters */}
+            <div className={`${showFilters ? 'block' : 'hidden'} md:block`}>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                <div className="relative hidden md:block">
+                  <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <input
+                    type="text"
+                    placeholder="Search employees..."
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+                </div>
+                
+                <select
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"
+                  value={selectedRole}
+                  onChange={(e) => setSelectedRole(e.target.value)}
+                >
+                  <option value="">All Roles</option>
+                  {EMPLOYEE_ROLES.map(role => (
+                    <option key={role} value={role}>{role}</option>
+                  ))}
+                </select>
+                
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setSearchTerm('');
+                    setSelectedRole('');
+                  }}
+                  className="w-full"
+                >
+                  Clear Filters
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Error Display */}
         {error && (
@@ -275,26 +402,33 @@ const EmployeeManagement = () => {
         )}
 
         {/* Employees List */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-          <div className="p-6 border-b border-gray-200">
-            <h2 className="text-lg font-semibold text-gray-900">
-              Employees ({filteredEmployees.length})
-            </h2>
-          </div>
-          
-          {filteredEmployees.length === 0 ? (
-            <div className="p-12 text-center">
-              <UserGroupIcon className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No employees found</h3>
-              <p className="text-gray-500">
-                {searchTerm || selectedRole 
-                  ? "Try adjusting your search criteria" 
-                  : "Get started by adding your first employee"}
-              </p>
+        <Card>
+          <CardHeader className="pb-4">
+            <div className="flex items-center justify-between">
+              <CardTitle>
+                Employees ({totalEmployees})
+              </CardTitle>
+              <div className="text-sm text-gray-500">
+                Showing {startIndex + 1}-{endIndex} of {totalEmployees}
+              </div>
             </div>
-          ) : (
-            <div className="divide-y divide-gray-200">
-              {filteredEmployees.map((employee) => (
+          </CardHeader>
+          
+          <CardContent className="p-0">
+            {employees.length === 0 ? (
+              <div className="p-12 text-center">
+                <UserGroupIcon className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">No employees found</h3>
+                <p className="text-gray-500">
+                  {searchTerm || selectedRole 
+                    ? "Try adjusting your search criteria" 
+                    : "Get started by adding your first employee"}
+                </p>
+              </div>
+            ) : (
+              <>
+                <div className="divide-y divide-gray-200">
+                  {employees.map((employee) => (
                 <div key={employee.id} className="p-6 hover:bg-gray-50 transition-colors">
                   <div className="flex items-center justify-between">
                     <div className="flex-1">
@@ -341,27 +475,86 @@ const EmployeeManagement = () => {
                     </div>
                     
                     <PermissionGuard permission={ADMIN_PERMISSIONS.MANAGE_EMPLOYEES}>
-                      <div className="flex items-center space-x-2 ml-4">
-                        <button
+                      <div className="flex items-center space-x-1 sm:space-x-2">
+                        <Button
+                          variant="ghost"
+                          size="icon"
                           onClick={() => handleOpenModal(employee)}
-                          className="p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                          className="h-8 w-8 text-gray-400 hover:text-green-600"
                         >
                           <PencilIcon className="w-4 h-4" />
-                        </button>
-                        <button
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
                           onClick={() => setDeleteConfirm(employee)}
-                          className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          className="h-8 w-8 text-gray-400 hover:text-red-600"
                         >
                           <TrashIcon className="w-4 h-4" />
-                        </button>
+                        </Button>
                       </div>
                     </PermissionGuard>
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
+                  ))}
+                </div>
+
+                {/* Pagination */}
+                {totalPages > 1 && (
+                  <div className="p-4 sm:p-6 border-t border-gray-200">
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                      <div className="text-sm text-gray-700">
+                        Showing <span className="font-medium">{startIndex + 1}</span> to{' '}
+                        <span className="font-medium">{endIndex}</span> of{' '}
+                        <span className="font-medium">{totalEmployees}</span> results
+                      </div>
+                      
+                      <div className="flex items-center space-x-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handlePageChange(currentPage - 1)}
+                          disabled={currentPage === 1}
+                          className="h-8 w-8 p-0"
+                        >
+                          <ChevronLeftIcon className="w-4 h-4" />
+                        </Button>
+                        
+                        <div className="hidden sm:flex items-center space-x-1">
+                          {getPaginationPages().map((page) => (
+                            <Button
+                              key={page}
+                              variant={currentPage === page ? "default" : "outline"}
+                              size="sm"
+                              onClick={() => handlePageChange(page)}
+                              className="h-8 w-8 p-0"
+                            >
+                              {page}
+                            </Button>
+                          ))}
+                        </div>
+                        
+                        <div className="sm:hidden text-sm text-gray-700">
+                          Page {currentPage} of {totalPages}
+                        </div>
+                        
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handlePageChange(currentPage + 1)}
+                          disabled={currentPage === totalPages}
+                          className="h-8 w-8 p-0"
+                        >
+                          <ChevronRightIcon className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Add/Edit Modal */}
         {isModalOpen && (
@@ -586,6 +779,8 @@ const EmployeeManagement = () => {
             </div>
           </div>
         )}
+        
+        <Toaster />
       </div>
     </PermissionGuard>
   );

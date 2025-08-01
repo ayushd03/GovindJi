@@ -15,9 +15,19 @@ import {
   CreditCardIcon,
   DevicePhoneMobileIcon,
   ClockIcon,
-  FunnelIcon
+  FunnelIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  AdjustmentsHorizontalIcon,
+  CheckCircleIcon,
+  ExclamationTriangleIcon
 } from '@heroicons/react/24/outline';
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from '../../components/ui/dialog';
+import { Button } from '../../components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
+import { useToast } from '../../hooks/use-toast';
+import { Toaster } from '../../components/ui/toaster';
 
 const EXPENSE_CATEGORIES = [
   'Vendor Payment',
@@ -39,6 +49,7 @@ const PAYMENT_MODES = [
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D'];
 
 const ExpenseManagement = () => {
+  const { toast } = useToast();
   const [expenses, setExpenses] = useState([]);
   const [vendors, setVendors] = useState([]);
   const [employees, setEmployees] = useState([]);
@@ -47,11 +58,17 @@ const ExpenseManagement = () => {
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('dashboard');
   
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(10);
+  const [totalExpenses, setTotalExpenses] = useState(0);
+  
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedPaymentMode, setSelectedPaymentMode] = useState('');
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
+  const [showFilters, setShowFilters] = useState(false);
   
   // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -71,17 +88,57 @@ const ExpenseManagement = () => {
 
   const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
+  // Show success toast notification
+  const showSuccess = (message) => {
+    toast({
+      title: "Success",
+      description: message,
+      variant: "success",
+      duration: 3000,
+    });
+  };
+
+  // Show error toast notification
+  const showError = (message) => {
+    toast({
+      title: "Error",
+      description: message,
+      variant: "destructive",
+      duration: 5000,
+    });
+  };
+
+  // Show warning toast notification
+  const showWarning = (message) => {
+    toast({
+      title: "Warning",
+      description: message,
+      variant: "warning",
+      duration: 4000,
+    });
+  };
+
   useEffect(() => {
-    fetchExpenses();
+    fetchExpenses(1);
     fetchVendors();
     fetchEmployees();
     fetchAnalytics();
   }, []);
 
-  const fetchExpenses = async () => {
+  const fetchExpenses = async (page = 1, limit = itemsPerPage) => {
     try {
       const token = localStorage.getItem('authToken');
-      const response = await fetch(`${API_BASE_URL}/api/admin/expenses`, {
+      const queryParams = new URLSearchParams({
+        page: page.toString(),
+        limit: limit.toString(),
+        ...(searchTerm && { search: searchTerm }),
+        ...(selectedCategory && { category: selectedCategory }),
+        ...(selectedPaymentMode && { paymentMode: selectedPaymentMode }),
+        ...(dateRange.start && { startDate: dateRange.start }),
+        ...(dateRange.end && { endDate: dateRange.end }),
+      });
+
+      const response = await fetch(`${API_BASE_URL}/api/admin/expenses?${queryParams}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -93,9 +150,11 @@ const ExpenseManagement = () => {
       }
 
       const data = await response.json();
-      setExpenses(data);
+      setExpenses(data.expenses || data);
+      setTotalExpenses(data.total || data.length || 0);
     } catch (err) {
       setError(err.message);
+      showError('Failed to load expenses');
     } finally {
       setLoading(false);
     }
@@ -189,11 +248,13 @@ const ExpenseManagement = () => {
         throw new Error(`Failed to ${editingExpense ? 'update' : 'create'} expense`);
       }
 
-      await fetchExpenses();
+      await fetchExpenses(currentPage);
       await fetchAnalytics();
       handleCloseModal();
+      showSuccess(editingExpense ? 'Expense updated successfully' : 'Expense added successfully');
     } catch (err) {
       setError(err.message);
+      showError(editingExpense ? 'Failed to update expense' : 'Failed to add expense');
     }
   };
 
@@ -211,11 +272,13 @@ const ExpenseManagement = () => {
         throw new Error('Failed to delete expense');
       }
 
-      await fetchExpenses();
+      await fetchExpenses(currentPage);
       await fetchAnalytics();
       setDeleteConfirm(null);
+      showSuccess('Expense deleted successfully');
     } catch (err) {
       setError(err.message);
+      showError('Failed to delete expense');
     }
   };
 
@@ -276,7 +339,7 @@ const ExpenseManagement = () => {
     const headers = ['Date', 'Amount', 'Description', 'Category', 'Payment Mode', 'Vendor/Employee', 'Notes'];
     const csvData = [
       headers.join(','),
-      ...filteredExpenses.map(expense => [
+      ...expenses.map(expense => [
         expense.expense_date,
         expense.amount,
         `"${expense.description.replace(/"/g, '""')}"`,
@@ -294,6 +357,7 @@ const ExpenseManagement = () => {
     link.download = `expenses_${new Date().toISOString().split('T')[0]}.csv`;
     link.click();
     window.URL.revokeObjectURL(url);
+    showSuccess('Expenses exported successfully');
   };
 
   const formatCurrency = (amount) => {
@@ -319,17 +383,53 @@ const ExpenseManagement = () => {
     }
   };
 
-  const filteredExpenses = expenses.filter(expense => {
-    const matchesSearch = expense.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         (expense.vendor_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         (expense.employee_name || '').toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = !selectedCategory || expense.category === selectedCategory;
-    const matchesPaymentMode = !selectedPaymentMode || expense.payment_mode === selectedPaymentMode;
-    const matchesDateRange = (!dateRange.start || expense.expense_date >= dateRange.start) &&
-                            (!dateRange.end || expense.expense_date <= dateRange.end);
+  // Handle filter changes
+  const handleFilterChange = () => {
+    setCurrentPage(1);
+    fetchExpenses(1);
+  };
+
+  // Debounced search effect
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (currentPage === 1) {
+        fetchExpenses(1);
+      } else {
+        setCurrentPage(1);
+      }
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [searchTerm, selectedCategory, selectedPaymentMode, dateRange]);
+
+  // Pagination calculations
+  const totalPages = Math.ceil(totalExpenses / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = Math.min(startIndex + itemsPerPage, totalExpenses);
+
+  const handlePageChange = (page) => {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page);
+      fetchExpenses(page);
+    }
+  };
+
+  const getPaginationPages = () => {
+    const pages = [];
+    const maxVisible = 5;
+    let start = Math.max(1, currentPage - Math.floor(maxVisible / 2));
+    let end = Math.min(totalPages, start + maxVisible - 1);
     
-    return matchesSearch && matchesCategory && matchesPaymentMode && matchesDateRange;
-  });
+    if (end - start + 1 < maxVisible) {
+      start = Math.max(1, end - maxVisible + 1);
+    }
+    
+    for (let i = start; i <= end; i++) {
+      pages.push(i);
+    }
+    
+    return pages;
+  };
 
   if (loading) {
     return (
@@ -384,28 +484,18 @@ const ExpenseManagement = () => {
   return (
     <PermissionGuard permission={ADMIN_PERMISSIONS.VIEW_EXPENSES}>
       <div className="space-y-6">
-        {/* Header */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center space-x-3">
-              <div className="p-2 bg-purple-100 rounded-lg">
-                <CurrencyDollarIcon className="w-6 h-6 text-purple-600" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">Expense Management</h1>
-                <p className="text-gray-500">Track and analyze your business expenses</p>
-              </div>
-            </div>
-            <PermissionGuard permission={ADMIN_PERMISSIONS.MANAGE_EXPENSES}>
-              <button
-                onClick={() => handleOpenModal()}
-                className="mt-4 sm:mt-0 inline-flex items-center px-6 py-3 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 transition-colors"
-              >
-                <PlusIcon className="w-5 h-5 mr-2" />
-                Add New Expense
-              </button>
-            </PermissionGuard>
-          </div>
+        {/* Header with Add Button */}
+        <div className="flex flex-col sm:flex-row gap-4">
+          <PermissionGuard permission={ADMIN_PERMISSIONS.MANAGE_EXPENSES}>
+            <Button
+              onClick={() => handleOpenModal()}
+              className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 text-sm font-medium"
+              size="lg"
+            >
+              <PlusIcon className="w-5 h-5 mr-2" />
+              Add New Expense
+            </Button>
+          </PermissionGuard>
         </div>
 
         {/* Tabs */}
@@ -441,7 +531,7 @@ const ExpenseManagement = () => {
           {activeTab === 'dashboard' && analytics && (
             <div className="p-6 space-y-6">
               {/* Key Metrics */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl p-6 text-white">
                   <div className="flex items-center justify-between">
                     <div>
@@ -469,16 +559,6 @@ const ExpenseManagement = () => {
                       <p className="text-2xl font-bold">{formatCurrency(analytics.monthTotal || 0)}</p>
                     </div>
                     <ChartPieIcon className="w-8 h-8 text-purple-200" />
-                  </div>
-                </div>
-                
-                <div className="bg-gradient-to-r from-orange-500 to-orange-600 rounded-xl p-6 text-white">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-orange-100 text-sm font-medium">Average Daily</p>
-                      <p className="text-2xl font-bold">{formatCurrency(analytics.dailyAverage || 0)}</p>
-                    </div>
-                    <CurrencyDollarIcon className="w-8 h-8 text-orange-200" />
                   </div>
                 </div>
               </div>
@@ -646,11 +726,11 @@ const ExpenseManagement = () => {
               <div className="bg-white border border-gray-200 rounded-xl">
                 <div className="p-6 border-b border-gray-200">
                   <h3 className="text-lg font-semibold text-gray-900">
-                    Expenses ({filteredExpenses.length})
+                    Expenses ({totalExpenses})
                   </h3>
                 </div>
                 
-                {filteredExpenses.length === 0 ? (
+                {expenses.length === 0 ? (
                   <div className="p-12 text-center">
                     <CurrencyDollarIcon className="w-16 h-16 text-gray-400 mx-auto mb-4" />
                     <h3 className="text-lg font-medium text-gray-900 mb-2">No expenses found</h3>
@@ -662,7 +742,7 @@ const ExpenseManagement = () => {
                   </div>
                 ) : (
                   <div className="divide-y divide-gray-200">
-                    {filteredExpenses.map((expense) => {
+                    {expenses.map((expense) => {
                       const PaymentIcon = getPaymentModeIcon(expense.payment_mode);
                       return (
                         <div key={expense.id} className="p-6 hover:bg-gray-50 transition-colors">
@@ -902,6 +982,8 @@ const ExpenseManagement = () => {
             </div>
           </div>
         )}
+        
+        <Toaster />
       </div>
     </PermissionGuard>
   );
