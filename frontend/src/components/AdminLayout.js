@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { usePermissions } from '../context/PermissionContext';
+import { AdminPanelGuard } from './PermissionGuard';
+import RoleIndicator from './RoleIndicator';
 import { Disclosure } from '@headlessui/react';
 import {
   HomeIcon,
@@ -20,6 +23,7 @@ import {
 
 const AdminLayout = ({ children }) => {
   const { user, logout } = useAuth();
+  const { getAccessibleTabs } = usePermissions();
   const location = useLocation();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -29,18 +33,27 @@ const AdminLayout = ({ children }) => {
     navigate('/');
   };
 
-  const menuItems = [
-    { path: '/admin', label: 'Dashboard', icon: ChartBarIcon },
-    { path: '/admin/categories', label: 'Categories', icon: TagIcon },
-    { path: '/admin/products', label: 'Products', icon: CubeIcon },
-    { path: '/admin/orders', label: 'Orders', icon: ShoppingCartIcon },
-    { path: '/admin/inventory', label: 'Inventory', icon: ClipboardDocumentListIcon },
-    { path: '/admin/customers', label: 'Customers', icon: UsersIcon },
-    { path: '/admin/analytics', label: 'Analytics', icon: ChartPieIcon }
-  ];
+  // Get icon components mapping
+  const iconComponents = {
+    'ChartBarIcon': ChartBarIcon,
+    'TagIcon': TagIcon,
+    'CubeIcon': CubeIcon,
+    'ShoppingCartIcon': ShoppingCartIcon,
+    'ClipboardDocumentListIcon': ClipboardDocumentListIcon,
+    'UsersIcon': UsersIcon,
+    'ChartPieIcon': ChartPieIcon
+  };
+
+  // Get accessible menu items based on user role
+  const menuItems = getAccessibleTabs().map(tab => ({
+    path: tab.path,
+    label: tab.label,
+    icon: iconComponents[tab.icon] || ChartBarIcon
+  }));
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
+    <AdminPanelGuard>
+      <div className="min-h-screen bg-gray-50 flex">
       {/* Sidebar */}
       <div className={`fixed inset-y-0 left-0 z-50 ${sidebarOpen ? 'w-72' : 'w-16'} 
                       bg-gradient-to-br from-slate-800 to-slate-900 text-white 
@@ -122,6 +135,14 @@ const AdminLayout = ({ children }) => {
       <div className={`flex-1 ${sidebarOpen ? 'lg:ml-0' : 'lg:ml-0'} transition-all duration-300`}>
         {/* Header */}
         <header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-40">
+          <div className="px-6 py-4 flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <h2 className="text-lg font-semibold text-gray-900">Admin Panel</h2>
+            </div>
+            <div className="flex items-center space-x-4">
+              <RoleIndicator />
+            </div>
+          </div>
         </header>
 
         {/* Page Content */}
@@ -137,7 +158,8 @@ const AdminLayout = ({ children }) => {
           onClick={() => setSidebarOpen(false)}
         />
       )}
-    </div>
+      </div>
+    </AdminPanelGuard>
   );
 };
 

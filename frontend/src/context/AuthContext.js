@@ -69,9 +69,21 @@ export const AuthProvider = ({ children }) => {
           // Token appears valid, try to use it
           console.log('Token appears valid, attempting validation...');
           try {
+            // First validate token, then get fresh profile data
             await authAPI.validateToken();
-            setUser(JSON.parse(userData));
-            console.log('Token validation successful');
+            const profileResponse = await authAPI.getProfile();
+            const { profile } = profileResponse.data;
+            
+            // Update user data with fresh profile information including role
+            const updatedUser = {
+              ...JSON.parse(userData),
+              ...profile
+            };
+            
+            // Update stored user data with latest profile
+            localStorage.setItem('userData', JSON.stringify(updatedUser));
+            setUser(updatedUser);
+            console.log('Token validation and profile update successful');
           } catch (validationError) {
             console.log('Token validation failed, attempting refresh...');
             
@@ -196,7 +208,25 @@ export const AuthProvider = ({ children }) => {
       // Store all token information for production-ready auth
       storeAuthData(session, user);
       
-      setUser(user);
+      // Get fresh profile data including role after successful login
+      try {
+        const profileResponse = await authAPI.getProfile();
+        const { profile } = profileResponse.data;
+        
+        // Update user data with profile information including role
+        const updatedUser = {
+          ...user,
+          ...profile
+        };
+        
+        // Update stored user data with latest profile
+        localStorage.setItem('userData', JSON.stringify(updatedUser));
+        setUser(updatedUser);
+      } catch (profileError) {
+        console.warn('Failed to fetch profile after login:', profileError);
+        // Still set the basic user data if profile fetch fails
+        setUser(user);
+      }
       
       return { success: true };
     } catch (error) {

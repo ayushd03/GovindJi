@@ -7,6 +7,7 @@ const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
 const { createClient } = require('@supabase/supabase-js');
 const storageService = require('./services/StorageService');
+const roleMiddleware = require('./middleware/roleMiddleware');
 
 const app = express();
 const port = process.env.PORT || 3001;
@@ -1484,6 +1485,67 @@ app.get('/api/auth/validate', authenticateToken, async (req, res) => {
         });
     } catch (error) {
         console.error('Token validation error:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// Get user profile with role information
+app.get('/api/auth/profile', roleMiddleware.authenticateToken, async (req, res) => {
+    try {
+        // Get user role from database
+        const { data: userData, error: userError } = await supabase
+            .from('users')
+            .select('id, name, email, role, is_admin, created_at')
+            .eq('id', req.user.id)
+            .single();
+
+        if (userError || !userData) {
+            // If user doesn't exist in users table, create a default customer entry
+            const defaultUser = {
+                id: req.user.id,
+                name: req.user.user_metadata?.name || req.user.email.split('@')[0],
+                email: req.user.email,
+                role: 'customer',
+                is_admin: false
+            };
+
+            const { data: newUser, error: createError } = await supabase
+                .from('users')
+                .insert([{
+                    id: req.user.id,
+                    name: defaultUser.name,
+                    email: defaultUser.email,
+                    password: 'managed_by_supabase_auth',
+                    role: defaultUser.role,
+                    is_admin: defaultUser.is_admin
+                }])
+                .select()
+                .single();
+
+            if (createError) {
+                console.error('Error creating user:', createError);
+                return res.status(500).json({ error: 'Failed to create user profile' });
+            }
+
+            return res.json({
+                user: req.user,
+                profile: {
+                    id: newUser.id,
+                    name: newUser.name,
+                    email: newUser.email,
+                    role: newUser.role,
+                    is_admin: newUser.is_admin,
+                    created_at: newUser.created_at
+                }
+            });
+        }
+
+        res.json({
+            user: req.user,
+            profile: userData
+        });
+    } catch (error) {
+        console.error('Profile fetch error:', error);
         res.status(500).json({ error: 'Internal server error' });
     }
 });

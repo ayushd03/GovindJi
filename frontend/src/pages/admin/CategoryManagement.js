@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { PermissionGuard } from '../../components/PermissionGuard';
+import { ADMIN_PERMISSIONS } from '../../enums/roles';
 import ImageUploadManager from '../../components/ImageUploadManager';
 import {
   PlusIcon,
@@ -271,7 +273,8 @@ const CategoryManagement = () => {
   );
 
   return (
-    <div className="space-y-6">
+    <PermissionGuard permission={ADMIN_PERMISSIONS.VIEW_CATEGORIES}>
+      <div className="space-y-6">
       {/* Header */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
@@ -588,7 +591,8 @@ const CategoryManagement = () => {
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </PermissionGuard>
   );
 };
 

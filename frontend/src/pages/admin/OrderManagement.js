@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { PermissionGuard } from '../../components/PermissionGuard';
+import { ADMIN_PERMISSIONS } from '../../enums/roles';
 import { Dialog, Transition } from '@headlessui/react';
 import {
   MagnifyingGlassIcon,
@@ -115,7 +117,8 @@ const OrderManagement = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <PermissionGuard permission={ADMIN_PERMISSIONS.VIEW_ORDERS}>
+      <div className="space-y-6">
       {/* Header */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
@@ -393,7 +396,8 @@ const OrderManagement = () => {
           </div>
         </Dialog>
       </Transition>
-    </div>
+      </div>
+    </PermissionGuard>
   );
 };
 

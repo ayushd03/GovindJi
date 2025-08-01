@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { PermissionGuard } from '../../components/PermissionGuard';
+import { ADMIN_PERMISSIONS } from '../../enums/roles';
 import {
   CubeIcon,
   ShoppingCartIcon,
@@ -125,7 +127,8 @@ const AdminDashboard = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <PermissionGuard permission={ADMIN_PERMISSIONS.VIEW_DASHBOARD}>
+      <div className="space-y-6">
       {/* Header */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
@@ -263,7 +266,8 @@ const AdminDashboard = () => {
           </div>
         </div>
       </div>
-    </div>
+      </div>
+    </PermissionGuard>
   );
 };
 

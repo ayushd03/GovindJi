@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { PermissionProvider } from './context/PermissionContext';
 import { CartProvider, useCart } from './context/CartContext';
 import Header from './components/Header';
 import Footer from './components/Footer';
@@ -19,6 +20,9 @@ import AdminDashboard from './pages/admin/AdminDashboard';
 import ProductManagement from './pages/admin/ProductManagement';
 import OrderManagement from './pages/admin/OrderManagement';
 import CategoryManagement from './pages/admin/CategoryManagement';
+import InventoryManagement from './pages/admin/InventoryManagement';
+import CustomerManagement from './pages/admin/CustomerManagement';
+import AnalyticsManagement from './pages/admin/AnalyticsManagement';
 import './App.css';
 
 const ProtectedRoute = ({ children }) => {
@@ -32,23 +36,17 @@ const ProtectedRoute = ({ children }) => {
 };
 
 const AdminRoute = ({ children }) => {
-  const { isAuthenticated, user, loading } = useAuth();
+  const { isAuthenticated, loading } = useAuth();
   
   if (loading) {
     return <div>Loading...</div>;
   }
   
-  // For now, we'll check if user email contains 'admin' - in production you'd check a proper admin role
-  const isAdmin = isAuthenticated && (user?.email?.includes('admin') || user?.user_metadata?.role === 'admin');
-  
   if (!isAuthenticated) {
     return <Navigate to="/login" />;
   }
   
-  if (!isAdmin) {
-    return <Navigate to="/" />;
-  }
-  
+  // The actual permission check is now handled by AdminPanelGuard in AdminLayout
   return children;
 };
 
@@ -69,6 +67,9 @@ const AppContent = () => {
                 <Route path="/products" element={<ProductManagement />} />
                 <Route path="/orders" element={<OrderManagement />} />
                 <Route path="/categories" element={<CategoryManagement />} />
+                <Route path="/inventory" element={<InventoryManagement />} />
+                <Route path="/customers" element={<CustomerManagement />} />
+                <Route path="/analytics" element={<AnalyticsManagement />} />
               </Routes>
             </AdminLayout>
           </AdminRoute>
@@ -115,11 +116,13 @@ const AppContent = () => {
 function App() {
   return (
     <AuthProvider>
-      <CartProvider>
-        <Router>
-          <AppContent />
-        </Router>
-      </CartProvider>
+      <PermissionProvider>
+        <CartProvider>
+          <Router>
+            <AppContent />
+          </Router>
+        </CartProvider>
+      </PermissionProvider>
     </AuthProvider>
   );
 }

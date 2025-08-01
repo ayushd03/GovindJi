@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { PermissionGuard } from '../../components/PermissionGuard';
+import { ADMIN_PERMISSIONS } from '../../enums/roles';
 import EnhancedImageGalleryManager from '../../components/EnhancedImageGalleryManager';
 import ProductImagePreview from '../../components/ProductImagePreview';
 import { Dialog, Transition } from '@headlessui/react';
@@ -192,7 +194,8 @@ const ProductManagement = () => {
   );
 
   return (
-    <div className="space-y-6">
+    <PermissionGuard permission={ADMIN_PERMISSIONS.VIEW_PRODUCTS}>
+      <div className="space-y-6">
       {/* Header */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
@@ -639,7 +642,8 @@ const ProductManagement = () => {
         onClose={handleCloseImageGallery}
         onImagesUpdate={handleImagesUpdate}
       />
-    </div>
+      </div>
+    </PermissionGuard>
   );
 };
 
