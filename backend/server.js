@@ -1734,6 +1734,429 @@ app.get('/api/admin/storage/config', authenticateAdmin, async (req, res) => {
     }
 });
 
+// ======================================
+// VENDOR MANAGEMENT ROUTES
+// ======================================
+
+// Get all vendors
+app.get('/api/admin/vendors', roleMiddleware.requirePermission(roleMiddleware.ADMIN_PERMISSIONS.VIEW_VENDORS), async (req, res) => {
+    try {
+        const { data, error } = await supabase
+            .from('vendors')
+            .select('*')
+            .eq('is_active', true)
+            .order('name');
+
+        if (error) throw error;
+        res.json(data);
+    } catch (error) {
+        console.error('Error fetching vendors:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Create new vendor
+app.post('/api/admin/vendors', roleMiddleware.requirePermission(roleMiddleware.ADMIN_PERMISSIONS.MANAGE_VENDORS), async (req, res) => {
+    try {
+        const { name, contact_person, phone_number, email, address, category, notes } = req.body;
+
+        const { data, error } = await supabase
+            .from('vendors')
+            .insert([{
+                name,
+                contact_person,
+                phone_number,
+                email,
+                address,
+                category,
+                notes
+            }])
+            .select()
+            .single();
+
+        if (error) throw error;
+        res.status(201).json(data);
+    } catch (error) {
+        console.error('Error creating vendor:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Update vendor
+app.put('/api/admin/vendors/:id', roleMiddleware.requirePermission(roleMiddleware.ADMIN_PERMISSIONS.MANAGE_VENDORS), async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { name, contact_person, phone_number, email, address, category, notes } = req.body;
+
+        const { data, error } = await supabase
+            .from('vendors')
+            .update({
+                name,
+                contact_person,
+                phone_number,
+                email,
+                address,
+                category,
+                notes,
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', id)
+            .select()
+            .single();
+
+        if (error) throw error;
+        res.json(data);
+    } catch (error) {
+        console.error('Error updating vendor:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Delete vendor (soft delete)
+app.delete('/api/admin/vendors/:id', roleMiddleware.requirePermission(roleMiddleware.ADMIN_PERMISSIONS.MANAGE_VENDORS), async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const { data, error } = await supabase
+            .from('vendors')
+            .update({
+                is_active: false,
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', id)
+            .select()
+            .single();
+
+        if (error) throw error;
+        res.json({ message: 'Vendor deleted successfully' });
+    } catch (error) {
+        console.error('Error deleting vendor:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ======================================
+// EMPLOYEE MANAGEMENT ROUTES
+// ======================================
+
+// Get all employees
+app.get('/api/admin/employees', roleMiddleware.requirePermission(roleMiddleware.ADMIN_PERMISSIONS.VIEW_EMPLOYEES), async (req, res) => {
+    try {
+        const { data, error } = await supabase
+            .from('employees')
+            .select('*')
+            .eq('is_active', true)
+            .order('name');
+
+        if (error) throw error;
+        res.json(data);
+    } catch (error) {
+        console.error('Error fetching employees:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Create new employee
+app.post('/api/admin/employees', roleMiddleware.requirePermission(roleMiddleware.ADMIN_PERMISSIONS.MANAGE_EMPLOYEES), async (req, res) => {
+    try {
+        const { name, role, contact_number, email, start_date, salary, address, emergency_contact, emergency_phone, notes } = req.body;
+
+        const { data, error } = await supabase
+            .from('employees')
+            .insert([{
+                name,
+                role,
+                contact_number,
+                email,
+                start_date,
+                salary,
+                address,
+                emergency_contact,
+                emergency_phone,
+                notes
+            }])
+            .select()
+            .single();
+
+        if (error) throw error;
+        res.status(201).json(data);
+    } catch (error) {
+        console.error('Error creating employee:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Update employee
+app.put('/api/admin/employees/:id', roleMiddleware.requirePermission(roleMiddleware.ADMIN_PERMISSIONS.MANAGE_EMPLOYEES), async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { name, role, contact_number, email, start_date, salary, address, emergency_contact, emergency_phone, notes } = req.body;
+
+        const { data, error } = await supabase
+            .from('employees')
+            .update({
+                name,
+                role,
+                contact_number,
+                email,
+                start_date,
+                salary,
+                address,
+                emergency_contact,
+                emergency_phone,
+                notes,
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', id)
+            .select()
+            .single();
+
+        if (error) throw error;
+        res.json(data);
+    } catch (error) {
+        console.error('Error updating employee:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Delete employee (soft delete)
+app.delete('/api/admin/employees/:id', roleMiddleware.requirePermission(roleMiddleware.ADMIN_PERMISSIONS.MANAGE_EMPLOYEES), async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const { data, error } = await supabase
+            .from('employees')
+            .update({
+                is_active: false,
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', id)
+            .select()
+            .single();
+
+        if (error) throw error;
+        res.json({ message: 'Employee deleted successfully' });
+    } catch (error) {
+        console.error('Error deleting employee:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ======================================
+// EXPENSE MANAGEMENT ROUTES
+// ======================================
+
+// Get all expenses with vendor/employee names
+app.get('/api/admin/expenses', roleMiddleware.requirePermission(roleMiddleware.ADMIN_PERMISSIONS.VIEW_EXPENSES), async (req, res) => {
+    try {
+        const { data, error } = await supabase
+            .from('expenses')
+            .select(`
+                *,
+                vendor:vendor_id(name),
+                employee:employee_id(name)
+            `)
+            .order('expense_date', { ascending: false })
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        // Format the response to include vendor/employee names
+        const formattedData = data.map(expense => ({
+            ...expense,
+            vendor_name: expense.vendor?.name || null,
+            employee_name: expense.employee?.name || null
+        }));
+
+        res.json(formattedData);
+    } catch (error) {
+        console.error('Error fetching expenses:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get expense analytics
+app.get('/api/admin/expenses/analytics', roleMiddleware.requirePermission(roleMiddleware.ADMIN_PERMISSIONS.VIEW_EXPENSES), async (req, res) => {
+    try {
+        const today = new Date().toISOString().split('T')[0];
+        const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+        const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+
+        // Today's total
+        const { data: todayData } = await supabase
+            .from('expenses')
+            .select('amount')
+            .eq('expense_date', today);
+
+        // Week total
+        const { data: weekData } = await supabase
+            .from('expenses')
+            .select('amount')
+            .gte('expense_date', weekAgo);
+
+        // Month total
+        const { data: monthData } = await supabase
+            .from('expenses')
+            .select('amount')
+            .gte('expense_date', monthStart);
+
+        // Category breakdown for current month
+        const { data: categoryData } = await supabase
+            .from('expenses')
+            .select('category, amount')
+            .gte('expense_date', monthStart);
+
+        // Daily trend for last 7 days
+        const { data: dailyData } = await supabase
+            .from('expenses')
+            .select('expense_date, amount')
+            .gte('expense_date', weekAgo)
+            .order('expense_date');
+
+        const todayTotal = todayData?.reduce((sum, exp) => sum + parseFloat(exp.amount), 0) || 0;
+        const weekTotal = weekData?.reduce((sum, exp) => sum + parseFloat(exp.amount), 0) || 0;
+        const monthTotal = monthData?.reduce((sum, exp) => sum + parseFloat(exp.amount), 0) || 0;
+
+        // Process category breakdown
+        const categoryBreakdown = {};
+        categoryData?.forEach(expense => {
+            const category = expense.category;
+            categoryBreakdown[category] = (categoryBreakdown[category] || 0) + parseFloat(expense.amount);
+        });
+
+        const categoryBreakdownArray = Object.entries(categoryBreakdown).map(([name, amount]) => ({
+            name,
+            amount
+        }));
+
+        // Process daily trend
+        const dailyBreakdown = {};
+        dailyData?.forEach(expense => {
+            const date = expense.expense_date;
+            dailyBreakdown[date] = (dailyBreakdown[date] || 0) + parseFloat(expense.amount);
+        });
+
+        const dailyTrend = Object.entries(dailyBreakdown).map(([date, amount]) => ({
+            date: new Date(date).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' }),
+            amount
+        }));
+
+        res.json({
+            todayTotal,
+            weekTotal,
+            monthTotal,
+            dailyAverage: monthTotal / new Date().getDate(),
+            categoryBreakdown: categoryBreakdownArray,
+            dailyTrend
+        });
+    } catch (error) {
+        console.error('Error fetching expense analytics:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Create new expense
+app.post('/api/admin/expenses', roleMiddleware.requirePermission(roleMiddleware.ADMIN_PERMISSIONS.MANAGE_EXPENSES), async (req, res) => {
+    try {
+        const { amount, description, category, vendor_id, employee_id, payment_mode, expense_date, notes } = req.body;
+
+        const { data, error } = await supabase
+            .from('expenses')
+            .insert([{
+                amount,
+                description,
+                category,
+                vendor_id: vendor_id || null,
+                employee_id: employee_id || null,
+                payment_mode,
+                expense_date,
+                notes,
+                created_by: req.user.id
+            }])
+            .select(`
+                *,
+                vendor:vendor_id(name),
+                employee:employee_id(name)
+            `)
+            .single();
+
+        if (error) throw error;
+
+        const formattedData = {
+            ...data,
+            vendor_name: data.vendor?.name || null,
+            employee_name: data.employee?.name || null
+        };
+
+        res.status(201).json(formattedData);
+    } catch (error) {
+        console.error('Error creating expense:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Update expense
+app.put('/api/admin/expenses/:id', roleMiddleware.requirePermission(roleMiddleware.ADMIN_PERMISSIONS.MANAGE_EXPENSES), async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { amount, description, category, vendor_id, employee_id, payment_mode, expense_date, notes } = req.body;
+
+        const { data, error } = await supabase
+            .from('expenses')
+            .update({
+                amount,
+                description,
+                category,
+                vendor_id: vendor_id || null,
+                employee_id: employee_id || null,
+                payment_mode,
+                expense_date,
+                notes,
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', id)
+            .select(`
+                *,
+                vendor:vendor_id(name),
+                employee:employee_id(name)
+            `)
+            .single();
+
+        if (error) throw error;
+
+        const formattedData = {
+            ...data,
+            vendor_name: data.vendor?.name || null,
+            employee_name: data.employee?.name || null
+        };
+
+        res.json(formattedData);
+    } catch (error) {
+        console.error('Error updating expense:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Delete expense
+app.delete('/api/admin/expenses/:id', roleMiddleware.requirePermission(roleMiddleware.ADMIN_PERMISSIONS.MANAGE_EXPENSES), async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const { data, error } = await supabase
+            .from('expenses')
+            .delete()
+            .eq('id', id)
+            .select()
+            .single();
+
+        if (error) throw error;
+        res.json({ message: 'Expense deleted successfully' });
+    } catch (error) {
+        console.error('Error deleting expense:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 app.listen(port, () => {
     console.log(`Backend server listening at http://localhost:${port}`);
 }); 

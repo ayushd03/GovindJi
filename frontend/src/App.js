@@ -23,6 +23,9 @@ import CategoryManagement from './pages/admin/CategoryManagement';
 import InventoryManagement from './pages/admin/InventoryManagement';
 import CustomerManagement from './pages/admin/CustomerManagement';
 import AnalyticsManagement from './pages/admin/AnalyticsManagement';
+import VendorManagement from './pages/admin/VendorManagement';
+import EmployeeManagement from './pages/admin/EmployeeManagement';
+import ExpenseManagement from './pages/admin/ExpenseManagement';
 import './App.css';
 
 const ProtectedRoute = ({ children }) => {
@@ -70,6 +73,9 @@ const AppContent = () => {
                 <Route path="/inventory" element={<InventoryManagement />} />
                 <Route path="/customers" element={<CustomerManagement />} />
                 <Route path="/analytics" element={<AnalyticsManagement />} />
+                <Route path="/vendors" element={<VendorManagement />} />
+                <Route path="/employees" element={<EmployeeManagement />} />
+                <Route path="/expenses" element={<ExpenseManagement />} />
               </Routes>
             </AdminLayout>
           </AdminRoute>

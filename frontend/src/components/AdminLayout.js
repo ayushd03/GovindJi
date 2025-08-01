@@ -18,7 +18,10 @@ import {
   ArrowRightOnRectangleIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
-  TagIcon
+  TagIcon,
+  BuildingOfficeIcon,
+  UserGroupIcon,
+  CurrencyDollarIcon
 } from '@heroicons/react/24/outline';
 
 const AdminLayout = ({ children }) => {
@@ -41,7 +44,10 @@ const AdminLayout = ({ children }) => {
     'ShoppingCartIcon': ShoppingCartIcon,
     'ClipboardDocumentListIcon': ClipboardDocumentListIcon,
     'UsersIcon': UsersIcon,
-    'ChartPieIcon': ChartPieIcon
+    'ChartPieIcon': ChartPieIcon,
+    'BuildingOfficeIcon': BuildingOfficeIcon,
+    'UserGroupIcon': UserGroupIcon,
+    'CurrencyDollarIcon': CurrencyDollarIcon
   };
 
   // Get accessible menu items based on user role

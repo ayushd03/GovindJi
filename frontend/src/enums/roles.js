@@ -18,7 +18,13 @@ export const ADMIN_PERMISSIONS = {
   MANAGE_INVENTORY: 'manage_inventory',
   VIEW_CUSTOMERS: 'view_customers',
   MANAGE_CUSTOMERS: 'manage_customers',
-  VIEW_ANALYTICS: 'view_analytics'
+  VIEW_ANALYTICS: 'view_analytics',
+  VIEW_VENDORS: 'view_vendors',
+  MANAGE_VENDORS: 'manage_vendors',
+  VIEW_EMPLOYEES: 'view_employees',
+  MANAGE_EMPLOYEES: 'manage_employees',
+  VIEW_EXPENSES: 'view_expenses',
+  MANAGE_EXPENSES: 'manage_expenses'
 };
 
 // Admin tabs configuration with their required permissions
@@ -64,6 +70,24 @@ export const ADMIN_TABS = {
     label: 'Analytics',
     icon: 'ChartPieIcon',
     permissions: [ADMIN_PERMISSIONS.VIEW_ANALYTICS]
+  },
+  VENDORS: {
+    path: '/admin/vendors',
+    label: 'Vendors',
+    icon: 'BuildingOfficeIcon',
+    permissions: [ADMIN_PERMISSIONS.VIEW_VENDORS]
+  },
+  EMPLOYEES: {
+    path: '/admin/employees',
+    label: 'Employees',
+    icon: 'UserGroupIcon',
+    permissions: [ADMIN_PERMISSIONS.VIEW_EMPLOYEES]
+  },
+  EXPENSES: {
+    path: '/admin/expenses',
+    label: 'Expenses',
+    icon: 'CurrencyDollarIcon',
+    permissions: [ADMIN_PERMISSIONS.VIEW_EXPENSES]
   }
 };
 
@@ -81,7 +105,13 @@ export const ROLE_PERMISSIONS = {
     ADMIN_PERMISSIONS.MANAGE_INVENTORY,
     ADMIN_PERMISSIONS.VIEW_CUSTOMERS,
     ADMIN_PERMISSIONS.MANAGE_CUSTOMERS,
-    ADMIN_PERMISSIONS.VIEW_ANALYTICS
+    ADMIN_PERMISSIONS.VIEW_ANALYTICS,
+    ADMIN_PERMISSIONS.VIEW_VENDORS,
+    ADMIN_PERMISSIONS.MANAGE_VENDORS,
+    ADMIN_PERMISSIONS.VIEW_EMPLOYEES,
+    ADMIN_PERMISSIONS.MANAGE_EMPLOYEES,
+    ADMIN_PERMISSIONS.VIEW_EXPENSES,
+    ADMIN_PERMISSIONS.MANAGE_EXPENSES
   ],
   [USER_ROLES.MANAGER]: [
     ADMIN_PERMISSIONS.VIEW_DASHBOARD,
