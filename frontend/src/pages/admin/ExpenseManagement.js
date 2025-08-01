@@ -650,7 +650,7 @@ const ExpenseManagement = () => {
             <div className="p-3 sm:p-6 space-y-4 sm:space-y-6 w-full max-w-full overflow-hidden">
 
               {/* Enhanced Key Metrics with Trends */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 w-full max-w-full">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6 w-full max-w-full">
                 <div className="bg-white border border-gray-200 rounded-xl p-3 sm:p-6 shadow-sm hover:shadow-md transition-shadow w-full max-w-full overflow-hidden">
                   <div className="flex items-center justify-between">
                     <div>
@@ -735,24 +735,6 @@ const ExpenseManagement = () => {
                   </div>
                 </div>
 
-                <div className="bg-white border border-gray-200 rounded-xl p-3 sm:p-6 shadow-sm hover:shadow-md transition-shadow w-full max-w-full overflow-hidden">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-gray-500 text-sm font-medium">Avg Daily</p>
-                      <p className="text-xl sm:text-2xl font-bold text-gray-900">
-                        {formatCurrency((analytics.monthTotal || 0) / new Date().getDate())}
-                      </p>
-                      <div className="flex items-center mt-1">
-                        <span className="text-xs font-medium text-gray-500">
-                          Based on {new Date().getDate()} days
-                        </span>
-                      </div>
-                    </div>
-                    <div className="p-3 bg-yellow-100 rounded-lg">
-                      <BanknotesIcon className="w-6 h-6 text-yellow-600" />
-                    </div>
-                  </div>
-                </div>
               </div>
 
               {/* Interactive Charts Grid */}
