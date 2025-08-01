@@ -80,8 +80,8 @@ class StorageInterface {
   validateFile(fileBuffer, mimeType, options = {}) {
     const errors = [];
     
-    // Check file size (default 5MB)
-    const maxSize = options.maxSize || 5 * 1024 * 1024;
+    // Check file size (default 50MB)
+    const maxSize = options.maxSize || 50 * 1024 * 1024;
     if (fileBuffer.length > maxSize) {
       errors.push(`File size exceeds ${maxSize} bytes`);
     }
