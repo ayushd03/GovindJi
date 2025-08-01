@@ -196,34 +196,26 @@ const ProductManagement = () => {
   return (
     <PermissionGuard permission={ADMIN_PERMISSIONS.VIEW_PRODUCTS}>
       <div className="space-y-6">
-      {/* Header */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Product Management</h1>
-            <p className="mt-1 text-gray-500">Manage your inventory and product catalog</p>
-          </div>
-          <div className="mt-4 sm:mt-0">
-            <button
-              onClick={() => {
-                setShowAddForm(true);
-                setEditingProduct(null);
-                resetForm();
-              }}
-              className="inline-flex items-center px-4 py-2 border border-transparent 
-                       text-sm font-medium rounded-lg text-white bg-blue-600 
-                       hover:bg-blue-700 focus:outline-none focus:ring-2 
-                       focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200"
-            >
-              <PlusIcon className="w-4 h-4 mr-2" />
-              Add New Product
-            </button>
-          </div>
-        </div>
-      </div>
 
       {/* Search Bar */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+          <h1 className="text-lg font-semibold text-gray-900">Product Management</h1>
+          <button
+            onClick={() => {
+              setShowAddForm(true);
+              setEditingProduct(null);
+              resetForm();
+            }}
+            className="inline-flex items-center px-4 py-2 border border-transparent 
+                     text-sm font-medium rounded-lg text-white bg-blue-600 
+                     hover:bg-blue-700 focus:outline-none focus:ring-2 
+                     focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200"
+          >
+            <PlusIcon className="w-4 h-4 mr-2" />
+            Add Product
+          </button>
+        </div>
         <div className="relative">
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
             <MagnifyingGlassIcon className="h-5 w-5 text-gray-400" />

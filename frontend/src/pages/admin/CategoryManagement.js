@@ -275,14 +275,10 @@ const CategoryManagement = () => {
   return (
     <PermissionGuard permission={ADMIN_PERMISSIONS.VIEW_CATEGORIES}>
       <div className="space-y-6">
-      {/* Header */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Category Management</h1>
-            <p className="mt-1 text-gray-500">Manage product categories with images and ordering</p>
-          </div>
-          <div className="mt-4 sm:mt-0">
+        {/* Header with Categories Grid */}
+        <div className="space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+            <h1 className="text-lg font-semibold text-gray-900">Category Management</h1>
             <button
               onClick={() => openModal('create')}
               className="inline-flex items-center px-4 py-2 border border-transparent 
@@ -294,27 +290,25 @@ const CategoryManagement = () => {
               Add Category
             </button>
           </div>
-        </div>
-      </div>
 
-      {/* Error Message */}
-      {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-          <div className="flex items-center">
-            <XMarkIcon className="w-5 h-5 text-red-500 mr-3" />
-            <span className="text-red-700">{error}</span>
-            <button
-              onClick={() => setError(null)}
-              className="ml-auto text-red-500 hover:text-red-700"
-            >
-              <XMarkIcon className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-      )}
+          {/* Error Message */}
+          {error && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+              <div className="flex items-center">
+                <XMarkIcon className="w-5 h-5 text-red-500 mr-3" />
+                <span className="text-red-700">{error}</span>
+                <button
+                  onClick={() => setError(null)}
+                  className="ml-auto text-red-500 hover:text-red-700"
+                >
+                  <XMarkIcon className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          )}
 
-      {/* Categories Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {/* Categories Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {categories.map((category) => (
           <div key={category.id} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
             {/* Category Header with Gradient */}
@@ -591,6 +585,8 @@ const CategoryManagement = () => {
           </div>
         </div>
       )}
+          </div>
+        </div>
       </div>
     </PermissionGuard>
   );

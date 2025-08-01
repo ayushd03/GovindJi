@@ -484,47 +484,47 @@ const ExpenseManagement = () => {
   return (
     <PermissionGuard permission={ADMIN_PERMISSIONS.VIEW_EXPENSES}>
       <div className="space-y-6">
-        {/* Header with Add Button */}
-        <div className="flex flex-col sm:flex-row gap-4">
-          <PermissionGuard permission={ADMIN_PERMISSIONS.MANAGE_EXPENSES}>
-            <Button
-              onClick={() => handleOpenModal()}
-              className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 text-sm font-medium"
-              size="lg"
-            >
-              <PlusIcon className="w-5 h-5 mr-2" />
-              Add New Expense
-            </Button>
-          </PermissionGuard>
-        </div>
-
         {/* Tabs */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200">
           <div className="border-b border-gray-200">
-            <nav className="flex space-x-8 px-6" aria-label="Tabs">
-              <button
-                onClick={() => setActiveTab('dashboard')}
-                className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                  activeTab === 'dashboard'
-                    ? 'border-purple-500 text-purple-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                <ChartPieIcon className="w-5 h-5 inline mr-2" />
-                Dashboard
-              </button>
-              <button
-                onClick={() => setActiveTab('expenses')}
-                className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                  activeTab === 'expenses'
-                    ? 'border-purple-500 text-purple-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                <CurrencyDollarIcon className="w-5 h-5 inline mr-2" />
-                All Expenses
-              </button>
-            </nav>
+            <div className="flex items-center justify-between px-6">
+              <div className="flex items-center space-x-8">
+                <h2 className="text-lg font-semibold text-gray-900 py-4">Expense Management</h2>
+                <nav className="flex space-x-8" aria-label="Tabs">
+                  <button
+                    onClick={() => setActiveTab('dashboard')}
+                    className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                      activeTab === 'dashboard'
+                        ? 'border-purple-500 text-purple-600'
+                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    }`}
+                  >
+                    <ChartPieIcon className="w-5 h-5 inline mr-2" />
+                    Dashboard
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('expenses')}
+                    className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                      activeTab === 'expenses'
+                        ? 'border-purple-500 text-purple-600'
+                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    }`}
+                  >
+                    <CurrencyDollarIcon className="w-5 h-5 inline mr-2" />
+                    All Expenses
+                  </button>
+                </nav>
+              </div>
+              <PermissionGuard permission={ADMIN_PERMISSIONS.MANAGE_EXPENSES}>
+                <Button
+                  onClick={() => handleOpenModal()}
+                  className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 text-sm font-medium"
+                >
+                  <PlusIcon className="w-4 h-4 mr-2" />
+                  Add Expense
+                </Button>
+              </PermissionGuard>
+            </div>
           </div>
 
           {/* Dashboard Tab */}

@@ -279,26 +279,12 @@ const VendorManagement = () => {
   return (
     <PermissionGuard permission={ADMIN_PERMISSIONS.VIEW_VENDORS}>
       <div className="space-y-6">
-        {/* Header with Add Button */}
-        <div className="flex flex-col sm:flex-row gap-4">
-          <PermissionGuard permission={ADMIN_PERMISSIONS.MANAGE_VENDORS}>
-            <Button
-              onClick={() => handleOpenModal()}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 text-sm font-medium"
-              size="lg"
-            >
-              <PlusIcon className="w-5 h-5 mr-2" />
-              Add New Vendor
-            </Button>
-          </PermissionGuard>
-        </div>
-
         {/* Filters and Controls */}
         <Card>
           <CardHeader className="pb-4">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div className="flex items-center gap-4">
-                <CardTitle className="text-lg">Vendor List</CardTitle>
+                <CardTitle className="text-lg">Vendor Management</CardTitle>
                 <Button
                   variant="outline"
                   size="sm"
@@ -309,6 +295,15 @@ const VendorManagement = () => {
                   Filters
                 </Button>
               </div>
+              <PermissionGuard permission={ADMIN_PERMISSIONS.MANAGE_VENDORS}>
+                <Button
+                  onClick={() => handleOpenModal()}
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 text-sm font-medium"
+                >
+                  <PlusIcon className="w-4 h-4 mr-2" />
+                  Add Vendor
+                </Button>
+              </PermissionGuard>
             </div>
           </CardHeader>
           
