@@ -389,6 +389,7 @@ const CategoryManagement = () => {
           </div>
         ))}
       </div>
+      </div>
 
       {/* Modal */}
       {showModal && (
@@ -585,8 +586,6 @@ const CategoryManagement = () => {
           </div>
         </div>
       )}
-          </div>
-        </div>
       </div>
     </PermissionGuard>
   );
