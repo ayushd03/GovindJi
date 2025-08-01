@@ -598,7 +598,7 @@ const ExpenseManagement = () => {
 
   return (
     <PermissionGuard permission={ADMIN_PERMISSIONS.VIEW_EXPENSES}>
-      <div className="space-y-6">
+      <div className="space-y-6 max-w-full overflow-hidden">
         {/* Tabs */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200">
           <div className="border-b border-gray-200">
