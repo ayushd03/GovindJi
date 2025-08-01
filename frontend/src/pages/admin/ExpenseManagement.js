@@ -973,20 +973,20 @@ const ExpenseManagement = () => {
                   </button>
                 </div>
                 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-                  <div className="relative lg:col-span-1">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 w-full">
+                  <div className="relative lg:col-span-1 w-full">
                     <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
                     <input
                       type="text"
                       placeholder="Search expenses..."
-                      className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-purple-500 focus:border-purple-500 min-h-[44px] touch-manipulation"
+                      className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-purple-500 focus:border-purple-500 min-h-[44px] touch-manipulation max-w-full"
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                     />
                   </div>
                   
                   <select
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-purple-500 focus:border-purple-500 min-h-[44px] touch-manipulation"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-purple-500 focus:border-purple-500 min-h-[44px] touch-manipulation max-w-full"
                     value={selectedCategory}
                     onChange={(e) => {
                       setSelectedCategory(e.target.value);
@@ -1004,7 +1004,7 @@ const ExpenseManagement = () => {
                   {/* Conditional Vendor/Employee Dropdown */}
                   {selectedCategory === 'Vendor Payment' && vendors.length > 0 && (
                     <select
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-purple-500 focus:border-purple-500 min-h-[44px] touch-manipulation"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-purple-500 focus:border-purple-500 min-h-[44px] touch-manipulation max-w-full"
                       value={selectedVendor}
                       onChange={(e) => setSelectedVendor(e.target.value)}
                     >
@@ -1017,7 +1017,7 @@ const ExpenseManagement = () => {
                   
                   {selectedCategory === 'Employee Payout' && employees.length > 0 && (
                     <select
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-purple-500 focus:border-purple-500 min-h-[44px] touch-manipulation"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-purple-500 focus:border-purple-500 min-h-[44px] touch-manipulation max-w-full"
                       value={selectedEmployee}
                       onChange={(e) => setSelectedEmployee(e.target.value)}
                     >
