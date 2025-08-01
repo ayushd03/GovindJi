@@ -756,15 +756,15 @@ const ExpenseManagement = () => {
               </div>
 
               {/* Interactive Charts Grid */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 w-full max-w-full overflow-hidden">
                 {/* Enhanced Interactive Category Breakdown */}
-                <div className="bg-white border border-gray-200 rounded-xl p-4 sm:p-6 shadow-sm hover:shadow-md transition-shadow">
+                <div className="bg-white border border-gray-200 rounded-xl p-4 sm:p-6 shadow-sm hover:shadow-md transition-shadow w-full max-w-full overflow-hidden">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-base sm:text-lg font-semibold text-gray-900">Expenses by Category</h3>
                   </div>
                   
                   {analytics.categoryBreakdown && analytics.categoryBreakdown.length > 0 ? (
-                    <div className="relative">
+                    <div className="relative w-full max-w-full overflow-hidden">
                       <ResponsiveContainer width="100%" height={280}>
                         <PieChart>
                           <Pie
@@ -792,29 +792,29 @@ const ExpenseManagement = () => {
                       </ResponsiveContainer>
                       
                       {/* Interactive Category Legend */}
-                      <div className="mt-4 grid grid-cols-1 gap-2">
+                      <div className="mt-4 grid grid-cols-1 gap-2 w-full max-w-full">
                         {analytics.categoryBreakdown.map((entry, index) => (
                           <div 
                             key={entry.name}
-                            className="flex items-center justify-between p-3 rounded-lg cursor-pointer transition-all hover:bg-purple-50 hover:border-purple-200 border border-transparent group"
+                            className="flex items-center justify-between p-3 rounded-lg cursor-pointer transition-all hover:bg-purple-50 hover:border-purple-200 border border-transparent group w-full max-w-full overflow-hidden"
                             onClick={() => handleCategoryClick(entry)}
                             title={`Click to view all ${entry.name} expenses`}
                           >
-                            <div className="flex items-center space-x-3">
+                            <div className="flex items-center space-x-3 min-w-0 flex-1">
                               <div 
-                                className="w-4 h-4 rounded-full shadow-sm"
+                                className="w-4 h-4 rounded-full shadow-sm flex-shrink-0"
                                 style={{ backgroundColor: COLORS[index % COLORS.length] }}
                               />
-                              <span className="text-sm font-medium text-gray-700 group-hover:text-purple-700 transition-colors">
+                              <span className="text-sm font-medium text-gray-700 group-hover:text-purple-700 transition-colors truncate">
                                 {entry.name}
                               </span>
                             </div>
-                            <div className="flex items-center space-x-2">
-                              <span className="text-sm font-semibold text-gray-900">
+                            <div className="flex items-center space-x-2 flex-shrink-0">
+                              <span className="text-sm font-semibold text-gray-900 whitespace-nowrap">
                                 {formatCurrency(entry.amount)}
                               </span>
                               <svg 
-                                className="w-4 h-4 text-gray-400 group-hover:text-purple-600 transition-colors opacity-0 group-hover:opacity-100" 
+                                className="w-4 h-4 text-gray-400 group-hover:text-purple-600 transition-colors opacity-0 group-hover:opacity-100 flex-shrink-0" 
                                 fill="none" 
                                 stroke="currentColor" 
                                 viewBox="0 0 24 24"
@@ -837,7 +837,7 @@ const ExpenseManagement = () => {
                 </div>
 
                 {/* Enhanced Daily Trend Chart */}
-                <div className="bg-white border border-gray-200 rounded-xl p-4 sm:p-6 shadow-sm hover:shadow-md transition-shadow">
+                <div className="bg-white border border-gray-200 rounded-xl p-4 sm:p-6 shadow-sm hover:shadow-md transition-shadow w-full max-w-full overflow-hidden">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-base sm:text-lg font-semibold text-gray-900">Daily Expense Trend</h3>
                     <div className="flex items-center space-x-2">
@@ -851,8 +851,9 @@ const ExpenseManagement = () => {
                   </div>
                   
                   {analytics.dailyTrend && analytics.dailyTrend.length > 0 ? (
-                    <ResponsiveContainer width="100%" height={280}>
-                      <ComposedChart data={analytics.dailyTrend} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                    <div className="w-full max-w-full overflow-hidden">
+                      <ResponsiveContainer width="100%" height={280}>
+                      <ComposedChart data={analytics.dailyTrend} margin={{ top: 10, right: 10, left: 10, bottom: 5 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
                         <XAxis 
                           dataKey="date" 
@@ -888,7 +889,8 @@ const ExpenseManagement = () => {
                           activeDot={{ r: 6, fill: CHART_COLORS.secondary }}
                         />
                       </ComposedChart>
-                    </ResponsiveContainer>
+                      </ResponsiveContainer>
+                    </div>
                   ) : (
                     <div className="flex items-center justify-center h-64 text-gray-500">
                       <div className="text-center">
@@ -1029,7 +1031,7 @@ const ExpenseManagement = () => {
                   )}
                   
                   <select
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-purple-500 focus:border-purple-500 min-h-[44px] touch-manipulation"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-purple-500 focus:border-purple-500 min-h-[44px] touch-manipulation max-w-full"
                     value={selectedPaymentMode}
                     onChange={(e) => setSelectedPaymentMode(e.target.value)}
                   >
@@ -1041,7 +1043,7 @@ const ExpenseManagement = () => {
                   
                   <input
                     type="date"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-purple-500 focus:border-purple-500 min-h-[44px] touch-manipulation"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-purple-500 focus:border-purple-500 min-h-[44px] touch-manipulation max-w-full"
                     value={dateRange.start}
                     onChange={(e) => setDateRange(prev => ({ ...prev, start: e.target.value }))}
                     placeholder="From Date"
@@ -1049,7 +1051,7 @@ const ExpenseManagement = () => {
                   
                   <input
                     type="date"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-purple-500 focus:border-purple-500 min-h-[44px] touch-manipulation"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-purple-500 focus:border-purple-500 min-h-[44px] touch-manipulation max-w-full"
                     value={dateRange.end}
                     onChange={(e) => setDateRange(prev => ({ ...prev, end: e.target.value }))}
                     placeholder="To Date"
@@ -1095,16 +1097,16 @@ const ExpenseManagement = () => {
                       {expenses.map((expense) => {
                         const PaymentIcon = getPaymentModeIcon(expense.payment_mode);
                         return (
-                          <div key={expense.id} className="p-4 sm:p-6 hover:bg-gray-50 transition-colors">
-                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-                              <div className="flex-1 mb-4 sm:mb-0">
-                                <div className="flex items-start sm:items-center space-x-3 sm:space-x-4">
+                          <div key={expense.id} className="p-4 sm:p-6 hover:bg-gray-50 transition-colors w-full max-w-full overflow-hidden">
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between w-full">
+                              <div className="flex-1 mb-4 sm:mb-0 min-w-0">
+                                <div className="flex items-start sm:items-center space-x-3 sm:space-x-4 w-full">
                                   <div className="p-2 bg-gray-100 rounded-lg flex-shrink-0">
                                     <PaymentIcon className="w-5 h-5 text-gray-600" />
                                   </div>
                                   <div className="flex-1 min-w-0">
                                     <h3 className="text-base sm:text-lg font-medium text-gray-900 truncate">{expense.description}</h3>
-                                    <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-gray-500">
+                                    <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-gray-500 max-w-full">
                                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
                                         {expense.category}
                                       </span>
@@ -1159,22 +1161,23 @@ const ExpenseManagement = () => {
                             Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, totalExpenses)} of {totalExpenses} results
                           </div>
                           
-                          <div className="flex items-center space-x-2">
+                          <div className="flex items-center space-x-1 sm:space-x-2 overflow-x-auto">
                             <button
                               onClick={() => handlePageChange(currentPage - 1)}
                               disabled={currentPage === 1}
-                              className="inline-flex items-center px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed min-h-[40px] touch-manipulation"
+                              className="inline-flex items-center px-2 sm:px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed min-h-[40px] touch-manipulation whitespace-nowrap"
                             >
                               <ChevronLeftIcon className="w-4 h-4 mr-1" />
-                              Previous
+                              <span className="hidden sm:inline">Previous</span>
+                              <span className="sm:hidden">Prev</span>
                             </button>
                             
-                            <div className="flex items-center space-x-1">
+                            <div className="flex items-center space-x-1 overflow-x-auto">
                               {getPaginationPages().map((page) => (
                                 <button
                                   key={page}
                                   onClick={() => handlePageChange(page)}
-                                  className={`inline-flex items-center px-3 py-2 border text-sm font-medium rounded-lg min-h-[40px] min-w-[40px] touch-manipulation ${
+                                  className={`inline-flex items-center px-3 py-2 border text-sm font-medium rounded-lg min-h-[40px] min-w-[40px] touch-manipulation flex-shrink-0 ${
                                     currentPage === page
                                       ? 'border-purple-500 bg-purple-50 text-purple-600'
                                       : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
@@ -1188,9 +1191,10 @@ const ExpenseManagement = () => {
                             <button
                               onClick={() => handlePageChange(currentPage + 1)}
                               disabled={currentPage === calculatedTotalPages}
-                              className="inline-flex items-center px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed min-h-[40px] touch-manipulation"
+                              className="inline-flex items-center px-2 sm:px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed min-h-[40px] touch-manipulation whitespace-nowrap"
                             >
-                              Next
+                              <span className="hidden sm:inline">Next</span>
+                              <span className="sm:hidden">Next</span>
                               <ChevronRightIcon className="w-4 h-4 ml-1" />
                             </button>
                           </div>
@@ -1207,7 +1211,7 @@ const ExpenseManagement = () => {
         {/* Add/Edit Modal */}
         {isModalOpen && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center p-2 sm:p-4 z-50 pt-4 sm:pt-8">
-            <div className="bg-white rounded-xl shadow-xl w-full max-w-sm sm:max-w-lg max-h-[calc(100vh-2rem)] overflow-y-auto">
+            <div className="bg-white rounded-xl shadow-xl w-full max-w-[95vw] sm:max-w-lg max-h-[calc(100vh-2rem)] overflow-y-auto">
               <div className="sticky top-0 bg-white p-3 sm:p-4 border-b border-gray-200 rounded-t-xl">
                 <div className="flex items-center justify-between">
                   <h2 className="text-base sm:text-lg font-semibold text-gray-900">
