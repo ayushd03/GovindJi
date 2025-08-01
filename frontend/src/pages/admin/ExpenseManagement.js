@@ -918,32 +918,27 @@ const ExpenseManagement = () => {
                   {expenses.slice(0, 5).map((expense) => {
                     const PaymentIcon = getPaymentModeIcon(expense.payment_mode);
                     return (
-                      <div key={expense.id} className="flex flex-wrap items-start justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors w-full max-w-full">
-                        <div className="flex items-center space-x-3">
+                      <div key={expense.id} className="flex items-start justify-between space-x-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors w-full overflow-hidden">
+                        <div className="flex items-start space-x-3 min-w-0 flex-1">
                           <div className="p-2 bg-white rounded-lg shadow-sm">
                             <PaymentIcon className="w-5 h-5 text-gray-600" />
                           </div>
                           <div className="min-w-0 flex-1">
-                            <p className="font-medium text-gray-900 truncate">{expense.description}</p>
-                            <div className="flex items-center space-x-2 text-sm text-gray-500 mt-1">
+                            <div className="flex items-baseline justify-between gap-2">
+                              <p className="font-medium text-gray-900 truncate">{expense.description}</p>
+                              <p className="font-bold text-gray-900 flex-shrink-0">{formatCurrency(expense.amount)}</p>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-x-2 text-sm text-gray-500 mt-1">
                               <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
                                 {expense.category}
                               </span>
                               <span>•</span>
                               <span>{formatDate(expense.expense_date)}</span>
-                              <span>•</span>
-                              <span>{expense.payment_mode}</span>
                             </div>
+                            <p className="text-sm text-gray-500 mt-1">{expense.payment_mode}</p>
                           </div>
                         </div>
-                        <div className="text-right flex-shrink-0">
-                          <p className="font-bold text-gray-900">{formatCurrency(expense.amount)}</p>
-                          {(expense.vendor_name || expense.employee_name) && (
-                            <p className="text-sm text-gray-500 truncate max-w-24">
-                              {expense.vendor_name || expense.employee_name}
-                            </p>
-                          )}
-                        </div>
+
                       </div>
                     );
                   })}
@@ -1067,8 +1062,8 @@ const ExpenseManagement = () => {
               )}
 
               {/* Expenses List */}
-              <div className="bg-white border border-gray-200 rounded-xl">
-                <div className="p-6 border-b border-gray-200">
+              <div className="bg-white border border-gray-200 sm:rounded-xl -mx-6 sm:mx-0">
+                <div className="px-4 py-4 sm:p-6 border-b border-gray-200">
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                     <div className="flex items-center gap-4">
                       <h3 className="text-lg font-semibold text-gray-900">
@@ -1097,16 +1092,16 @@ const ExpenseManagement = () => {
                       {expenses.map((expense) => {
                         const PaymentIcon = getPaymentModeIcon(expense.payment_mode);
                         return (
-                          <div key={expense.id} className="p-4 sm:p-6 hover:bg-gray-50 transition-colors w-full max-w-full overflow-hidden">
-                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between w-full">
-                              <div className="flex-1 mb-4 sm:mb-0 min-w-0">
-                                <div className="flex items-start sm:items-center space-x-3 sm:space-x-4 w-full">
+                          <div key={expense.id} className="px-4 py-3 sm:px-6 sm:py-4 hover:bg-gray-50 transition-colors w-full">
+                            <div className="flex items-start justify-between w-full space-x-3">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-start sm:items-center space-x-3 sm:space-x-4 w-full min-w-0">
                                   <div className="p-2 bg-gray-100 rounded-lg flex-shrink-0">
                                     <PaymentIcon className="w-5 h-5 text-gray-600" />
                                   </div>
                                   <div className="flex-1 min-w-0">
                                     <h3 className="text-base sm:text-lg font-medium text-gray-900 truncate">{expense.description}</h3>
-                                    <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-gray-500 max-w-full">
+                                    <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-gray-500 max-w-full">
                                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
                                         {expense.category}
                                       </span>
@@ -1116,17 +1111,14 @@ const ExpenseManagement = () => {
                                         <span className="truncate">• {expense.vendor_name || expense.employee_name}</span>
                                       )}
                                     </div>
-                                    {/* Mobile Amount Display */}
-                                    <div className="mt-2 sm:hidden">
-                                      <p className="text-xl font-bold text-gray-900">{formatCurrency(expense.amount)}</p>
-                                    </div>
+
                                   </div>
                                 </div>
                               </div>
                               
-                              <div className="flex items-center justify-between sm:justify-end sm:space-x-4">
+                              <div className="flex items-center space-x-2 sm:space-x-4 ml-2 flex-shrink-0">
                                 {/* Desktop Amount Display */}
-                                <div className="hidden sm:block text-right">
+                                <div className="text-right min-w-[80px]">
                                   <p className="text-xl font-bold text-gray-900">{formatCurrency(expense.amount)}</p>
                                 </div>
                                 
@@ -1155,7 +1147,7 @@ const ExpenseManagement = () => {
                     
                     {/* Pagination */}
                     {calculatedTotalPages > 1 && (
-                      <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
+                      <div className="px-4 py-4 sm:px-6 border-t border-gray-200 bg-gray-50">
                         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                           <div className="text-sm text-gray-700">
                             Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, totalExpenses)} of {totalExpenses} results
