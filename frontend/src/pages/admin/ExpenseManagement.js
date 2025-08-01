@@ -384,14 +384,42 @@ const ExpenseManagement = () => {
                         <CardHeader><CardTitle>Expenses by Category</CardTitle></CardHeader>
                         <CardContent>
                             {analytics.categoryBreakdown?.length > 0 ? (
-                                <ResponsiveContainer width="100%" height={240}>
-                        <PieChart>
-                                        <Pie data={analytics.categoryBreakdown} cx="50%" cy="50%" labelLine={false} outerRadius={80} fill="#8884d8" dataKey="amount" onClick={handleCategoryClick} className="cursor-pointer">
-                                            {analytics.categoryBreakdown.map((entry, index) => <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} className="hover:opacity-80 transition-opacity" />)}
-                          </Pie>
-                          <Tooltip content={<CustomTooltip />} />
-                        </PieChart>
-                      </ResponsiveContainer>
+                                <>
+                                    <ResponsiveContainer width="100%" height={240}>
+                                        <PieChart>
+                                            <Pie data={analytics.categoryBreakdown} cx="50%" cy="50%" labelLine={false} outerRadius={80} fill="#8884d8" dataKey="amount" onClick={handleCategoryClick} className="cursor-pointer">
+                                                {analytics.categoryBreakdown.map((entry, index) => <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} className="hover:opacity-80 transition-opacity" />)}
+                                            </Pie>
+                                            <Tooltip content={<CustomTooltip />} />
+                                        </PieChart>
+                                    </ResponsiveContainer>
+                                    <div className="mt-6">
+                                        <div className="mb-3">
+                                            <h4 className="text-sm font-medium text-muted-foreground">Category Breakdown</h4>
+                                        </div>
+                                        <div className="bg-card border rounded-lg overflow-hidden">
+                                            <div className="divide-y divide-border">
+                                                {analytics.categoryBreakdown.map((category, index) => (
+                                                    <div key={category.name} className="flex items-center justify-between px-4 py-3 hover:bg-muted/50 transition-colors cursor-pointer group" onClick={() => handleCategoryClick(category)}>
+                                                        <div className="flex items-center space-x-3">
+                                                            <div className="w-4 h-4 rounded-full border-2 border-white shadow-sm" style={{ backgroundColor: CHART_COLORS[index % CHART_COLORS.length] }}></div>
+                                                            <span className="text-sm font-medium text-foreground group-hover:text-primary transition-colors">{category.name}</span>
+                                                        </div>
+                                                        <div className="text-right">
+                                                            <div className="text-sm font-semibold text-foreground">{formatCurrency(category.amount)}</div>
+                                                            <div className="text-xs text-muted-foreground">
+                                                                {((category.amount / analytics.categoryBreakdown.reduce((sum, cat) => sum + cat.amount, 0)) * 100).toFixed(1)}%
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                        <div className="mt-2 text-xs text-muted-foreground text-center">
+                                            Click on any category to view detailed expenses
+                                        </div>
+                                    </div>
+                                </>
                             ) : <div className="h-60 flex items-center justify-center text-muted-foreground">No data</div>}
                         </CardContent>
                     </Card>
