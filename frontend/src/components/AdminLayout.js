@@ -158,24 +158,6 @@ const AdminLayout = ({ children }) => {
           {/* Page Content - Scrollable */}
           <main className="flex-1 overflow-y-auto">
             <div className="p-6">
-              {/* Mobile Sidebar Toggle and Admin Logo */}
-              <div className="flex items-center justify-between mb-6 lg:justify-end">
-                <button
-                  onClick={() => setSidebarOpen(!sidebarOpen)}
-                  className="lg:hidden p-2 rounded-lg hover:bg-gray-100 transition-colors duration-200"
-                >
-                  <Bars3Icon className="w-5 h-5 text-gray-600" />
-                </button>
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-                    <CubeIcon className="w-5 h-5 text-white" />
-                  </div>
-                  <span className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                    Admin
-                  </span>
-                  <RoleIndicator />
-                </div>
-              </div>
               {children}
             </div>
           </main>
