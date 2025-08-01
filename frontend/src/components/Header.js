@@ -256,7 +256,7 @@ const Header = () => {
                       setIsMenuOpen(false);
                       setIsAuthModalOpen(true);
                     }}
-                    className="flex items-center justify-center space-x-2 text-primary-text hover:text-primary-accent transition-all duration-300 py-3 rounded-lg hover:bg-gray-100/50 w-full"
+                    className="flex items-center space-x-2 text-primary-text hover:text-primary-accent transition-all duration-300 py-3 rounded-lg hover:bg-gray-100/50 w-full"
                   >
                     <User className="w-5 h-5" />
                     <span className="font-medium">Sign In</span>
@@ -269,7 +269,7 @@ const Header = () => {
                   setIsMenuOpen(false);
                   openCartPopup();
                 }}
-                className="flex items-center justify-center space-x-2 bg-primary-accent text-white py-3 rounded-full hover:bg-secondary-accent transition-all duration-300 shadow-md w-full"
+                className="flex items-center space-x-2 bg-primary-accent text-white py-3 px-4 rounded-full hover:bg-secondary-accent transition-all duration-300 shadow-md w-full mb-4"
               >
                 <ShoppingCart className="w-5 h-5" data-cart-icon />
                 <span className="font-medium">Cart ({cartItemsCount})</span>

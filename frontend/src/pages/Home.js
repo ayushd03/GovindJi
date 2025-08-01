@@ -17,6 +17,9 @@ const Home = () => {
   const [isHovered, setIsHovered] = useState(false);
   const [currentPosition, setCurrentPosition] = useState(-320);
   const [isMounted, setIsMounted] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStartX, setDragStartX] = useState(0);
+  const [dragStartPosition, setDragStartPosition] = useState(0);
   const controls = useAnimation();
 
   // Set mounted state
@@ -25,9 +28,67 @@ const Home = () => {
     return () => setIsMounted(false);
   }, []);
 
+  // Touch/drag handlers
+  const handleDragStart = (event, info) => {
+    if (isDragging) return;
+    setIsDragging(true);
+    setIsHovered(true);
+    controls.stop();
+    setDragStartX(info.point.x);
+    setDragStartPosition(currentPosition);
+  };
+
+  const handleDrag = (event, info) => {
+    if (!isDragging) return;
+    const deltaX = info.point.x - dragStartX;
+    const newPosition = dragStartPosition + deltaX;
+    controls.set({ x: newPosition });
+    setCurrentPosition(newPosition);
+  };
+
+  const handleDragEnd = (event, info) => {
+    if (!isDragging) return;
+    setIsDragging(false);
+    
+    const deltaX = info.point.x - dragStartX;
+    const velocity = info.velocity.x;
+    const cardWidth = 320;
+    
+    // Determine if swipe was significant enough
+    const threshold = cardWidth / 3;
+    let snapPosition = dragStartPosition;
+    
+    if (Math.abs(deltaX) > threshold || Math.abs(velocity) > 500) {
+      if (deltaX > 0 || velocity > 500) {
+        // Swiped right - go to previous
+        snapPosition = Math.min(dragStartPosition + cardWidth, -320);
+      } else {
+        // Swiped left - go to next
+        const maxPosition = -320 * (featuredProducts.length + 1);
+        snapPosition = Math.max(dragStartPosition - cardWidth, maxPosition);
+      }
+    }
+    
+    // Animate to snap position
+    controls.start({
+      x: snapPosition,
+      transition: {
+        type: "spring",
+        stiffness: 300,
+        damping: 30
+      }
+    });
+    setCurrentPosition(snapPosition);
+    
+    // Resume auto-animation after a delay
+    setTimeout(() => {
+      setIsHovered(false);
+    }, 2000);
+  };
+
   // Animation function to start from current position
   const startAnimation = async (fromPosition = -320) => {
-    if (!isMounted || featuredProducts.length === 0) return;
+    if (!isMounted || featuredProducts.length === 0 || isDragging) return;
     
     const endPosition = -320 * (featuredProducts.length + 1);
     const distance = Math.abs(endPosition - fromPosition);
@@ -44,7 +105,7 @@ const Home = () => {
       });
       
       // Restart from beginning after reaching end
-      if (!isHovered && isMounted) {
+      if (!isHovered && !isDragging && isMounted) {
         try {
           controls.set({ x: -320 });
           setCurrentPosition(-320);
@@ -74,7 +135,7 @@ const Home = () => {
   useEffect(() => {
     if (!isMounted) return;
     
-    if (isHovered) {
+    if (isHovered || isDragging) {
       controls.stop();
     } else if (featuredProducts.length > 0) {
       // Continue from current position with a small delay
@@ -83,7 +144,7 @@ const Home = () => {
       }, 100);
       return () => clearTimeout(timer);
     }
-  }, [isHovered, isMounted]);
+  }, [isHovered, isDragging, isMounted]);
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -372,10 +433,16 @@ const Home = () => {
                 onMouseLeave={() => setIsHovered(false)}
               >
                 <motion.div 
-                  className="flex gap-8 will-change-transform"
+                  className="flex gap-8 will-change-transform cursor-grab active:cursor-grabbing"
                   animate={controls}
+                  drag="x"
+                  dragConstraints={{ left: -320 * (featuredProducts.length + 1), right: -320 }}
+                  dragElastic={0.1}
+                  onDragStart={handleDragStart}
+                  onDrag={handleDrag}  
+                  onDragEnd={handleDragEnd}
                   onUpdate={(latest) => {
-                    if (isHovered && latest.x !== undefined) {
+                    if ((isHovered || isDragging) && latest.x !== undefined) {
                       setCurrentPosition(latest.x);
                     }
                   }}
