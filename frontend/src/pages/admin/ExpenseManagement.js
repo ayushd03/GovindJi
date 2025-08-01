@@ -22,7 +22,10 @@ import {
   CheckCircleIcon,
   ExclamationTriangleIcon
 } from '@heroicons/react/24/outline';
-import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
+import { 
+  PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
+  LineChart, Line, Area, AreaChart, ComposedChart
+} from 'recharts';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from '../../components/ui/dialog';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
@@ -46,7 +49,16 @@ const PAYMENT_MODES = [
   'Credit'
 ];
 
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D'];
+const COLORS = ['#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#84cc16', '#f97316', '#ec4899'];
+
+const CHART_COLORS = {
+  primary: '#8b5cf6',
+  secondary: '#06b6d4', 
+  success: '#10b981',
+  warning: '#f59e0b',
+  danger: '#ef4444',
+  info: '#84cc16'
+};
 
 const ExpenseManagement = () => {
   const { toast } = useToast();
@@ -73,6 +85,11 @@ const ExpenseManagement = () => {
   const [selectedPaymentMode, setSelectedPaymentMode] = useState('');
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
   const [showFilters, setShowFilters] = useState(false);
+  
+  // Dashboard drill-down states
+  const [selectedCategoryDrill, setSelectedCategoryDrill] = useState(null);
+  const [drillDownData, setDrillDownData] = useState(null);
+  const [chartView, setChartView] = useState('overview'); // overview, category, trend
   
   // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -439,6 +456,96 @@ const ExpenseManagement = () => {
     return pages;
   };
 
+  // Enhanced chart interactions - navigate to expenses tab with category filter
+  const handleCategoryClick = async (data) => {
+    if (!data || !data.name) return;
+    
+    // Clear other filters to show only this category
+    setSelectedVendor('');
+    setSelectedEmployee('');
+    setSelectedPaymentMode('');
+    setDateRange({ start: '', end: '' });
+    setSearchTerm('');
+    
+    // Set the category filter and switch to expenses tab
+    setSelectedCategory(data.name);
+    setActiveTab('expenses');
+    
+    // Reset pagination to first page
+    setCurrentPage(1);
+    
+    // Fetch filtered expenses immediately
+    try {
+      const token = localStorage.getItem('authToken');
+      const queryParams = new URLSearchParams({
+        page: '1',
+        limit: itemsPerPage.toString(),
+        category: data.name
+      });
+
+      const response = await fetch(`${API_BASE_URL}/api/admin/expenses?${queryParams}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        const responseData = await response.json();
+        setExpenses(responseData.expenses || responseData);
+        setTotalExpenses(responseData.total || responseData.length || 0);
+        setTotalPages(responseData.totalPages || Math.ceil((responseData.total || 0) / itemsPerPage));
+        setTotalAmount(responseData.totalAmount || 0);
+      }
+    } catch (err) {
+      console.error('Failed to fetch filtered expenses:', err);
+    }
+    
+    // Show success message
+    showSuccess(`Viewing all ${data.name} expenses`);
+  };
+
+  const handleChartReset = () => {
+    setSelectedCategoryDrill(null);
+    setDrillDownData(null);
+    setChartView('overview');
+  };
+
+  // Calculate trend indicators
+  const calculateTrendIndicator = (current, previous) => {
+    if (!previous || previous === 0) return { change: 0, percentage: 0, trend: 'neutral' };
+    
+    const change = current - previous;
+    const percentage = (change / previous) * 100;
+    const trend = change > 0 ? 'up' : change < 0 ? 'down' : 'neutral';
+    
+    return { change, percentage: Math.abs(percentage), trend };
+  };
+
+  // Minimal Mixpanel-style tooltip component
+  const CustomTooltip = ({ active, payload, label }) => {
+    if (active && payload && payload.length) {
+      const data = payload[0].payload;
+      return (
+        <div 
+          className="bg-white px-3 py-2 border border-gray-200 rounded-md shadow-md cursor-pointer hover:shadow-lg transition-shadow group min-w-max"
+          onClick={() => handleCategoryClick(data)}
+        >
+          <div className="text-xs font-medium text-gray-600 mb-1">
+            {data.name}
+          </div>
+          <div className="text-sm font-semibold text-gray-900 mb-2">
+            {formatCurrency(data.amount)}
+          </div>
+          <button className="text-xs text-blue-600 hover:text-blue-800 font-medium transition-colors">
+            View expenses
+          </button>
+        </div>
+      );
+    }
+    return null;
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-96">
@@ -538,122 +645,314 @@ const ExpenseManagement = () => {
             </div>
           </div>
 
-          {/* Dashboard Tab */}
+          {/* Enhanced Dashboard Tab */}
           {activeTab === 'dashboard' && analytics && (
             <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
-              {/* Key Metrics */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-                <div className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl p-4 sm:p-6 text-white">
+
+              {/* Enhanced Key Metrics with Trends */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+                <div className="bg-white border border-gray-200 rounded-xl p-4 sm:p-6 shadow-sm hover:shadow-md transition-shadow">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-blue-100 text-sm font-medium">Today's Expenses</p>
-                      <p className="text-xl sm:text-2xl font-bold">{formatCurrency(analytics.todayTotal || 0)}</p>
-                    </div>
-                    <ClockIcon className="w-6 h-6 sm:w-8 sm:h-8 text-blue-200 flex-shrink-0" />
-                  </div>
-                </div>
-                
-                <div className="bg-gradient-to-r from-green-500 to-green-600 rounded-xl p-4 sm:p-6 text-white">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-green-100 text-sm font-medium">This Week</p>
-                      <p className="text-xl sm:text-2xl font-bold">{formatCurrency(analytics.weekTotal || 0)}</p>
-                    </div>
-                    <CalendarIcon className="w-6 h-6 sm:w-8 sm:h-8 text-green-200 flex-shrink-0" />
-                  </div>
-                </div>
-                
-                <div className="bg-gradient-to-r from-purple-500 to-purple-600 rounded-xl p-4 sm:p-6 text-white">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-purple-100 text-sm font-medium">This Month</p>
-                      <p className="text-xl sm:text-2xl font-bold">{formatCurrency(analytics.monthTotal || 0)}</p>
-                    </div>
-                    <ChartPieIcon className="w-6 h-6 sm:w-8 sm:h-8 text-purple-200 flex-shrink-0" />
-                  </div>
-                </div>
-              </div>
-
-              {/* Charts */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-                {/* Category Breakdown Pie Chart */}
-                <div className="bg-gray-50 rounded-xl p-4 sm:p-6">
-                  <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-4">This Month's Expenses by Category</h3>
-                  {analytics.categoryBreakdown && analytics.categoryBreakdown.length > 0 ? (
-                    <ResponsiveContainer width="100%" height={250}>
-                      <PieChart>
-                        <Pie
-                          data={analytics.categoryBreakdown}
-                          cx="50%"
-                          cy="50%"
-                          labelLine={false}
-                          label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                          outerRadius={80}
-                          fill="#8884d8"
-                          dataKey="amount"
-                        >
-                          {analytics.categoryBreakdown.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                          ))}
-                        </Pie>
-                        <Tooltip formatter={(value) => formatCurrency(value)} />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  ) : (
-                    <div className="flex items-center justify-center h-64 text-gray-500">
-                      No expense data available for this month
-                    </div>
-                  )}
-                </div>
-
-                {/* Daily Trend Chart */}
-                <div className="bg-gray-50 rounded-xl p-4 sm:p-6">
-                  <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-4">Daily Expense Trend (Last 7 Days)</h3>
-                  {analytics.dailyTrend && analytics.dailyTrend.length > 0 ? (
-                    <ResponsiveContainer width="100%" height={250}>
-                      <BarChart data={analytics.dailyTrend}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="date" />
-                        <YAxis />
-                        <Tooltip formatter={(value) => formatCurrency(value)} />
-                        <Bar dataKey="amount" fill="#8b5cf6" />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  ) : (
-                    <div className="flex items-center justify-center h-64 text-gray-500">
-                      No daily trend data available
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Recent Transactions */}
-              <div className="bg-gray-50 rounded-xl p-4 sm:p-6">
-                <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-4">Recent Transactions</h3>
-                {expenses.slice(0, 5).map((expense) => {
-                  const PaymentIcon = getPaymentModeIcon(expense.payment_mode);
-                  return (
-                    <div key={expense.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between py-3 border-b border-gray-200 last:border-b-0 gap-3 sm:gap-0">
-                      <div className="flex items-center space-x-3">
-                        <div className="p-2 bg-white rounded-lg flex-shrink-0">
-                          <PaymentIcon className="w-5 h-5 text-gray-600" />
+                      <p className="text-gray-500 text-sm font-medium">Today's Expenses</p>
+                      <p className="text-xl sm:text-2xl font-bold text-gray-900">{formatCurrency(analytics.todayTotal || 0)}</p>
+                      {analytics.yesterdayTotal !== undefined && (
+                        <div className="flex items-center mt-1">
+                          {(() => {
+                            const trend = calculateTrendIndicator(analytics.todayTotal || 0, analytics.yesterdayTotal || 0);
+                            return (
+                              <span className={`text-xs font-medium flex items-center ${
+                                trend.trend === 'up' ? 'text-red-600' : 
+                                trend.trend === 'down' ? 'text-green-600' : 'text-gray-500'
+                              }`}>
+                                {trend.trend === 'up' ? '↗' : trend.trend === 'down' ? '↘' : '→'} 
+                                {trend.percentage.toFixed(1)}% vs yesterday
+                              </span>
+                            );
+                          })()}
                         </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="font-medium text-gray-900 truncate">{expense.description}</p>
-                          <div className="flex flex-wrap items-center gap-2 text-sm text-gray-500 mt-1">
-                            <span>{expense.category}</span>
-                            <span className="hidden sm:inline">•</span>
-                            <span>{formatDate(expense.expense_date)}</span>
+                      )}
+                    </div>
+                    <div className="p-3 bg-blue-100 rounded-lg">
+                      <ClockIcon className="w-6 h-6 text-blue-600" />
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="bg-white border border-gray-200 rounded-xl p-4 sm:p-6 shadow-sm hover:shadow-md transition-shadow">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-gray-500 text-sm font-medium">This Week</p>
+                      <p className="text-xl sm:text-2xl font-bold text-gray-900">{formatCurrency(analytics.weekTotal || 0)}</p>
+                      {analytics.lastWeekTotal !== undefined && (
+                        <div className="flex items-center mt-1">
+                          {(() => {
+                            const trend = calculateTrendIndicator(analytics.weekTotal || 0, analytics.lastWeekTotal || 0);
+                            return (
+                              <span className={`text-xs font-medium flex items-center ${
+                                trend.trend === 'up' ? 'text-red-600' : 
+                                trend.trend === 'down' ? 'text-green-600' : 'text-gray-500'
+                              }`}>
+                                {trend.trend === 'up' ? '↗' : trend.trend === 'down' ? '↘' : '→'} 
+                                {trend.percentage.toFixed(1)}% vs last week
+                              </span>
+                            );
+                          })()}
+                        </div>
+                      )}
+                    </div>
+                    <div className="p-3 bg-green-100 rounded-lg">
+                      <CalendarIcon className="w-6 h-6 text-green-600" />
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="bg-white border border-gray-200 rounded-xl p-4 sm:p-6 shadow-sm hover:shadow-md transition-shadow">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-gray-500 text-sm font-medium">This Month</p>
+                      <p className="text-xl sm:text-2xl font-bold text-gray-900">{formatCurrency(analytics.monthTotal || 0)}</p>
+                      {analytics.lastMonthTotal !== undefined && (
+                        <div className="flex items-center mt-1">
+                          {(() => {
+                            const trend = calculateTrendIndicator(analytics.monthTotal || 0, analytics.lastMonthTotal || 0);
+                            return (
+                              <span className={`text-xs font-medium flex items-center ${
+                                trend.trend === 'up' ? 'text-red-600' : 
+                                trend.trend === 'down' ? 'text-green-600' : 'text-gray-500'
+                              }`}>
+                                {trend.trend === 'up' ? '↗' : trend.trend === 'down' ? '↘' : '→'} 
+                                {trend.percentage.toFixed(1)}% vs last month
+                              </span>
+                            );
+                          })()}
+                        </div>
+                      )}
+                    </div>
+                    <div className="p-3 bg-purple-100 rounded-lg">
+                      <ChartPieIcon className="w-6 h-6 text-purple-600" />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-white border border-gray-200 rounded-xl p-4 sm:p-6 shadow-sm hover:shadow-md transition-shadow">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-gray-500 text-sm font-medium">Avg Daily</p>
+                      <p className="text-xl sm:text-2xl font-bold text-gray-900">
+                        {formatCurrency((analytics.monthTotal || 0) / new Date().getDate())}
+                      </p>
+                      <div className="flex items-center mt-1">
+                        <span className="text-xs font-medium text-gray-500">
+                          Based on {new Date().getDate()} days
+                        </span>
+                      </div>
+                    </div>
+                    <div className="p-3 bg-yellow-100 rounded-lg">
+                      <BanknotesIcon className="w-6 h-6 text-yellow-600" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Interactive Charts Grid */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+                {/* Enhanced Interactive Category Breakdown */}
+                <div className="bg-white border border-gray-200 rounded-xl p-4 sm:p-6 shadow-sm hover:shadow-md transition-shadow">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-base sm:text-lg font-semibold text-gray-900">Expenses by Category</h3>
+                  </div>
+                  
+                  {analytics.categoryBreakdown && analytics.categoryBreakdown.length > 0 ? (
+                    <div className="relative">
+                      <ResponsiveContainer width="100%" height={280}>
+                        <PieChart>
+                          <Pie
+                            data={analytics.categoryBreakdown}
+                            cx="50%"
+                            cy="50%"
+                            labelLine={false}
+                            label={false}
+                            outerRadius={90}
+                            fill="#8884d8"
+                            dataKey="amount"
+                            onClick={handleCategoryClick}
+                            className="cursor-pointer"
+                          >
+                            {analytics.categoryBreakdown.map((entry, index) => (
+                              <Cell 
+                                key={`cell-${index}`} 
+                                fill={COLORS[index % COLORS.length]}
+                                className="hover:opacity-80 transition-opacity"
+                              />
+                            ))}
+                          </Pie>
+                          <Tooltip content={<CustomTooltip />} />
+                        </PieChart>
+                      </ResponsiveContainer>
+                      
+                      {/* Interactive Category Legend */}
+                      <div className="mt-4 grid grid-cols-1 gap-2">
+                        {analytics.categoryBreakdown.map((entry, index) => (
+                          <div 
+                            key={entry.name}
+                            className="flex items-center justify-between p-3 rounded-lg cursor-pointer transition-all hover:bg-purple-50 hover:border-purple-200 border border-transparent group"
+                            onClick={() => handleCategoryClick(entry)}
+                            title={`Click to view all ${entry.name} expenses`}
+                          >
+                            <div className="flex items-center space-x-3">
+                              <div 
+                                className="w-4 h-4 rounded-full shadow-sm"
+                                style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                              />
+                              <span className="text-sm font-medium text-gray-700 group-hover:text-purple-700 transition-colors">
+                                {entry.name}
+                              </span>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <span className="text-sm font-semibold text-gray-900">
+                                {formatCurrency(entry.amount)}
+                              </span>
+                              <svg 
+                                className="w-4 h-4 text-gray-400 group-hover:text-purple-600 transition-colors opacity-0 group-hover:opacity-100" 
+                                fill="none" 
+                                stroke="currentColor" 
+                                viewBox="0 0 24 24"
+                              >
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                              </svg>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-center h-64 text-gray-500">
+                      <div className="text-center">
+                        <ChartPieIcon className="w-12 h-12 text-gray-300 mx-auto mb-2" />
+                        <p>No expense data available for this month</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Enhanced Daily Trend Chart */}
+                <div className="bg-white border border-gray-200 rounded-xl p-4 sm:p-6 shadow-sm hover:shadow-md transition-shadow">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-base sm:text-lg font-semibold text-gray-900">Daily Expense Trend</h3>
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={() => setChartView(chartView === 'trend' ? 'overview' : 'trend')}
+                        className="text-sm text-purple-600 hover:text-purple-800 font-medium"
+                      >
+                        {chartView === 'trend' ? '7 Days' : '30 Days'}
+                      </button>
+                    </div>
+                  </div>
+                  
+                  {analytics.dailyTrend && analytics.dailyTrend.length > 0 ? (
+                    <ResponsiveContainer width="100%" height={280}>
+                      <ComposedChart data={analytics.dailyTrend} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+                        <XAxis 
+                          dataKey="date" 
+                          stroke="#6b7280"
+                          fontSize={12}
+                          tickFormatter={(value) => new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                        />
+                        <YAxis 
+                          stroke="#6b7280"
+                          fontSize={12}
+                          tickFormatter={(value) => `₹${(value / 1000).toFixed(0)}k`}
+                        />
+                        <Tooltip content={<CustomTooltip />} />
+                        <Area
+                          type="monotone"
+                          dataKey="amount"
+                          fill={CHART_COLORS.primary}
+                          fillOpacity={0.1}
+                          stroke="none"
+                        />
+                        <Bar
+                          dataKey="amount"
+                          fill={CHART_COLORS.primary}
+                          radius={[4, 4, 0, 0]}
+                          opacity={0.8}
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="amount"
+                          stroke={CHART_COLORS.secondary}
+                          strokeWidth={2}
+                          dot={{ fill: CHART_COLORS.secondary, strokeWidth: 2, r: 4 }}
+                          activeDot={{ r: 6, fill: CHART_COLORS.secondary }}
+                        />
+                      </ComposedChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="flex items-center justify-center h-64 text-gray-500">
+                      <div className="text-center">
+                        <CalendarIcon className="w-12 h-12 text-gray-300 mx-auto mb-2" />
+                        <p>No daily trend data available</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Enhanced Recent Transactions with Quick Actions */}
+              <div className="bg-white border border-gray-200 rounded-xl p-4 sm:p-6 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-base sm:text-lg font-semibold text-gray-900">Recent Transactions</h3>
+                  <button
+                    onClick={() => setActiveTab('expenses')}
+                    className="text-sm text-purple-600 hover:text-purple-800 font-medium"
+                  >
+                    View All →
+                  </button>
+                </div>
+                
+                <div className="space-y-3">
+                  {expenses.slice(0, 5).map((expense) => {
+                    const PaymentIcon = getPaymentModeIcon(expense.payment_mode);
+                    return (
+                      <div key={expense.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                        <div className="flex items-center space-x-3">
+                          <div className="p-2 bg-white rounded-lg shadow-sm">
+                            <PaymentIcon className="w-5 h-5 text-gray-600" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="font-medium text-gray-900 truncate">{expense.description}</p>
+                            <div className="flex items-center space-x-2 text-sm text-gray-500 mt-1">
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                                {expense.category}
+                              </span>
+                              <span>•</span>
+                              <span>{formatDate(expense.expense_date)}</span>
+                              <span>•</span>
+                              <span>{expense.payment_mode}</span>
+                            </div>
                           </div>
                         </div>
+                        <div className="text-right">
+                          <p className="font-bold text-gray-900">{formatCurrency(expense.amount)}</p>
+                          {(expense.vendor_name || expense.employee_name) && (
+                            <p className="text-sm text-gray-500 truncate max-w-24">
+                              {expense.vendor_name || expense.employee_name}
+                            </p>
+                          )}
+                        </div>
                       </div>
-                      <div className="text-right sm:text-right">
-                        <p className="font-semibold text-gray-900 text-lg sm:text-base">{formatCurrency(expense.amount)}</p>
-                        <p className="text-sm text-gray-500">{expense.payment_mode}</p>
-                      </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
+                
+                {expenses.length === 0 && (
+                  <div className="text-center py-8">
+                    <CurrencyDollarIcon className="w-12 h-12 text-gray-300 mx-auto mb-2" />
+                    <p className="text-gray-500">No recent transactions</p>
+                  </div>
+                )}
               </div>
             </div>
           )}
