@@ -598,16 +598,16 @@ const ExpenseManagement = () => {
 
   return (
     <PermissionGuard permission={ADMIN_PERMISSIONS.VIEW_EXPENSES}>
-      <div className="space-y-6 max-w-full overflow-hidden">
+      <div className="space-y-4 sm:space-y-6 max-w-full overflow-x-hidden px-0">
         {/* Tabs */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 w-full max-w-full overflow-hidden">
           <div className="border-b border-gray-200">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between px-4 sm:px-6">
               <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-8">
-                <nav className="flex space-x-4 sm:space-x-8 pb-4 sm:pb-0" aria-label="Tabs">
+                <nav className="flex space-x-2 sm:space-x-8 pb-4 sm:pb-0 overflow-x-auto w-full max-w-full" aria-label="Tabs">
                   <button
                     onClick={() => setActiveTab('dashboard')}
-                    className={`py-2 sm:py-4 px-1 border-b-2 font-medium text-sm min-h-[44px] flex items-center touch-manipulation ${
+                    className={`py-2 sm:py-4 px-1 sm:px-2 border-b-2 font-medium text-sm min-h-[44px] flex items-center touch-manipulation whitespace-nowrap flex-shrink-0 ${
                       activeTab === 'dashboard'
                         ? 'border-purple-500 text-purple-600'
                         : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
@@ -619,7 +619,7 @@ const ExpenseManagement = () => {
                   </button>
                   <button
                     onClick={() => setActiveTab('expenses')}
-                    className={`py-2 sm:py-4 px-1 border-b-2 font-medium text-sm min-h-[44px] flex items-center touch-manipulation ${
+                    className={`py-2 sm:py-4 px-1 sm:px-2 border-b-2 font-medium text-sm min-h-[44px] flex items-center touch-manipulation whitespace-nowrap flex-shrink-0 ${
                       activeTab === 'expenses'
                         ? 'border-purple-500 text-purple-600'
                         : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
@@ -647,11 +647,11 @@ const ExpenseManagement = () => {
 
           {/* Enhanced Dashboard Tab */}
           {activeTab === 'dashboard' && analytics && (
-            <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
+            <div className="p-3 sm:p-6 space-y-4 sm:space-y-6 w-full max-w-full overflow-hidden">
 
               {/* Enhanced Key Metrics with Trends */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-                <div className="bg-white border border-gray-200 rounded-xl p-4 sm:p-6 shadow-sm hover:shadow-md transition-shadow">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 w-full max-w-full">
+                <div className="bg-white border border-gray-200 rounded-xl p-3 sm:p-6 shadow-sm hover:shadow-md transition-shadow w-full max-w-full overflow-hidden">
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-gray-500 text-sm font-medium">Today's Expenses</p>
@@ -679,7 +679,7 @@ const ExpenseManagement = () => {
                   </div>
                 </div>
                 
-                <div className="bg-white border border-gray-200 rounded-xl p-4 sm:p-6 shadow-sm hover:shadow-md transition-shadow">
+                <div className="bg-white border border-gray-200 rounded-xl p-3 sm:p-6 shadow-sm hover:shadow-md transition-shadow w-full max-w-full overflow-hidden">
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-gray-500 text-sm font-medium">This Week</p>
@@ -707,7 +707,7 @@ const ExpenseManagement = () => {
                   </div>
                 </div>
                 
-                <div className="bg-white border border-gray-200 rounded-xl p-4 sm:p-6 shadow-sm hover:shadow-md transition-shadow">
+                <div className="bg-white border border-gray-200 rounded-xl p-3 sm:p-6 shadow-sm hover:shadow-md transition-shadow w-full max-w-full overflow-hidden">
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-gray-500 text-sm font-medium">This Month</p>
@@ -735,7 +735,7 @@ const ExpenseManagement = () => {
                   </div>
                 </div>
 
-                <div className="bg-white border border-gray-200 rounded-xl p-4 sm:p-6 shadow-sm hover:shadow-md transition-shadow">
+                <div className="bg-white border border-gray-200 rounded-xl p-3 sm:p-6 shadow-sm hover:shadow-md transition-shadow w-full max-w-full overflow-hidden">
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-gray-500 text-sm font-medium">Avg Daily</p>
@@ -765,7 +765,7 @@ const ExpenseManagement = () => {
                   
                   {analytics.categoryBreakdown && analytics.categoryBreakdown.length > 0 ? (
                     <div className="relative w-full max-w-full overflow-hidden">
-                      <ResponsiveContainer width="100%" height={280}>
+                      <ResponsiveContainer width="100%" height={240} className="overflow-visible">
                         <PieChart>
                           <Pie
                             data={analytics.categoryBreakdown}
@@ -773,7 +773,7 @@ const ExpenseManagement = () => {
                             cy="50%"
                             labelLine={false}
                             label={false}
-                            outerRadius={90}
+                            outerRadius={70}
                             fill="#8884d8"
                             dataKey="amount"
                             onClick={handleCategoryClick}
@@ -852,8 +852,8 @@ const ExpenseManagement = () => {
                   
                   {analytics.dailyTrend && analytics.dailyTrend.length > 0 ? (
                     <div className="w-full max-w-full overflow-hidden">
-                      <ResponsiveContainer width="100%" height={280}>
-                      <ComposedChart data={analytics.dailyTrend} margin={{ top: 10, right: 10, left: 10, bottom: 5 }}>
+                      <ResponsiveContainer width="100%" height={240} className="overflow-visible">
+                      <ComposedChart data={analytics.dailyTrend} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
                         <XAxis 
                           dataKey="date" 
@@ -903,7 +903,7 @@ const ExpenseManagement = () => {
               </div>
 
               {/* Enhanced Recent Transactions with Quick Actions */}
-              <div className="bg-white border border-gray-200 rounded-xl p-4 sm:p-6 shadow-sm">
+              <div className="bg-white border border-gray-200 rounded-xl p-3 sm:p-6 shadow-sm w-full max-w-full overflow-hidden">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-base sm:text-lg font-semibold text-gray-900">Recent Transactions</h3>
                   <button
@@ -918,7 +918,7 @@ const ExpenseManagement = () => {
                   {expenses.slice(0, 5).map((expense) => {
                     const PaymentIcon = getPaymentModeIcon(expense.payment_mode);
                     return (
-                      <div key={expense.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                      <div key={expense.id} className="flex flex-wrap items-start justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors w-full max-w-full">
                         <div className="flex items-center space-x-3">
                           <div className="p-2 bg-white rounded-lg shadow-sm">
                             <PaymentIcon className="w-5 h-5 text-gray-600" />
@@ -936,7 +936,7 @@ const ExpenseManagement = () => {
                             </div>
                           </div>
                         </div>
-                        <div className="text-right">
+                        <div className="text-right flex-shrink-0">
                           <p className="font-bold text-gray-900">{formatCurrency(expense.amount)}</p>
                           {(expense.vendor_name || expense.employee_name) && (
                             <p className="text-sm text-gray-500 truncate max-w-24">
@@ -961,9 +961,9 @@ const ExpenseManagement = () => {
 
           {/* All Expenses Tab */}
           {activeTab === 'expenses' && (
-            <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
+            <div className="p-3 sm:p-6 space-y-4 sm:space-y-6 w-full max-w-full overflow-hidden">
               {/* Filters */}
-              <div className="bg-gray-50 rounded-xl p-4 sm:p-6">
+              <div className="bg-gray-50 rounded-xl p-3 sm:p-6 w-full max-w-full overflow-hidden">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
                   <h3 className="text-base sm:text-lg font-semibold text-gray-900">Filters</h3>
                   <button
@@ -975,7 +975,7 @@ const ExpenseManagement = () => {
                   </button>
                 </div>
                 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 w-full">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4 w-full max-w-full">
                   <div className="relative lg:col-span-1 w-full">
                     <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
                     <input
@@ -1161,7 +1161,7 @@ const ExpenseManagement = () => {
                             Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, totalExpenses)} of {totalExpenses} results
                           </div>
                           
-                          <div className="flex items-center space-x-1 sm:space-x-2 overflow-x-auto">
+                          <div className="flex items-center space-x-1 sm:space-x-2 overflow-x-auto w-full max-w-full">
                             <button
                               onClick={() => handlePageChange(currentPage - 1)}
                               disabled={currentPage === 1}
@@ -1172,7 +1172,7 @@ const ExpenseManagement = () => {
                               <span className="sm:hidden">Prev</span>
                             </button>
                             
-                            <div className="flex items-center space-x-1 overflow-x-auto">
+                            <div className="flex items-center space-x-1 overflow-x-auto w-full max-w-full">
                               {getPaginationPages().map((page) => (
                                 <button
                                   key={page}
@@ -1210,9 +1210,9 @@ const ExpenseManagement = () => {
 
         {/* Add/Edit Modal */}
         {isModalOpen && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center p-2 sm:p-4 z-50 pt-4 sm:pt-8">
-            <div className="bg-white rounded-xl shadow-xl w-full max-w-[95vw] sm:max-w-lg max-h-[calc(100vh-2rem)] overflow-y-auto">
-              <div className="sticky top-0 bg-white p-3 sm:p-4 border-b border-gray-200 rounded-t-xl">
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center p-0 sm:p-4 z-50 pt-2 sm:pt-8">
+            <div className="bg-white rounded-none sm:rounded-xl shadow-xl w-full max-w-full sm:max-w-lg max-h-[100vh] sm:max-h-[calc(100vh-2rem)] overflow-y-auto">
+              <div className="sticky top-0 bg-white p-3 sm:p-4 border-b border-gray-200 rounded-none sm:rounded-t-xl">
                 <div className="flex items-center justify-between">
                   <h2 className="text-base sm:text-lg font-semibold text-gray-900">
                     {editingExpense ? 'Edit Expense' : 'Add Expense'}

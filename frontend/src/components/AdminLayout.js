@@ -154,9 +154,9 @@ const AdminLayout = ({ children }) => {
         </div>
 
         {/* Main Content */}
-        <div className={`flex-1 ${sidebarOpen ? 'ml-72' : 'ml-16'} transition-all duration-300 flex flex-col min-h-screen`}>
+        <div className={`flex-1 ml-0 ${sidebarOpen ? 'lg:ml-72' : 'lg:ml-16'} transition-all duration-300 flex flex-col min-h-screen`}>
           {/* Page Content - Scrollable */}
-          <main className="flex-1 overflow-y-auto">
+          <main className="flex-1 overflow-y-auto overflow-x-hidden">
             <div className="p-6">
               {/* Mobile Sidebar Toggle and Admin Logo */}
               <div className="flex items-center justify-between mb-6 lg:justify-end">

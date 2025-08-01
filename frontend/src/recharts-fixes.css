@@ -1,0 +1,5 @@
+/* Restrict Recharts surfaces from expanding beyond the viewport */
+.recharts-wrapper,
+.recharts-wrapper svg {
+  max-width: 100% !important;
+}

@@ -107,6 +107,8 @@
   }
 }
 
+@import './recharts-fixes.css';
+
 /* Custom Component Classes using Tailwind's @layer directive */
 @layer components {
   .container {
