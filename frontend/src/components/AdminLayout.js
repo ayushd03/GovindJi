@@ -4,8 +4,6 @@ import { useAuth } from '../context/AuthContext';
 import { usePermissions } from '../context/PermissionContext';
 import { AdminPanelGuard } from './PermissionGuard';
 import RoleIndicator from './RoleIndicator';
-import { Disclosure } from '@headlessui/react';
-import './AdminLayout.css';
 import {
   HomeIcon,
   ChartBarIcon,
@@ -14,8 +12,6 @@ import {
   ClipboardDocumentListIcon,
   UsersIcon,
   ChartPieIcon,
-  Bars3Icon,
-  XMarkIcon,
   ArrowRightOnRectangleIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
@@ -24,6 +20,7 @@ import {
   UserGroupIcon,
   CurrencyDollarIcon
 } from '@heroicons/react/24/outline';
+import './AdminLayout.css'; // Import the CSS file
 
 const AdminLayout = ({ children }) => {
   const { user, logout } = useAuth();
@@ -37,21 +34,14 @@ const AdminLayout = ({ children }) => {
     navigate('/');
   };
 
-  // Handle window resize for responsive behavior
   useEffect(() => {
     const handleResize = () => {
-      if (window.innerWidth >= 1024) {
-        setSidebarOpen(true);
-      } else {
-        setSidebarOpen(false);
-      }
+      setSidebarOpen(window.innerWidth >= 1024);
     };
-
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Get icon components mapping
   const iconComponents = {
     'ChartBarIcon': ChartBarIcon,
     'TagIcon': TagIcon,
@@ -65,7 +55,6 @@ const AdminLayout = ({ children }) => {
     'CurrencyDollarIcon': CurrencyDollarIcon
   };
 
-  // Get accessible menu items based on user role
   const menuItems = getAccessibleTabs().map(tab => ({
     path: tab.path,
     label: tab.label,
@@ -74,41 +63,33 @@ const AdminLayout = ({ children }) => {
 
   return (
     <AdminPanelGuard>
-      <div className="min-h-screen bg-gray-50 flex">
-        {/* Sidebar */}
+      <div className="min-h-screen bg-background flex">
         <div className={`fixed inset-y-0 left-0 z-50 ${sidebarOpen ? 'w-72' : 'w-16'} 
-                        bg-gradient-to-br from-slate-800 to-slate-900 text-white 
-                        transition-all duration-300 ease-in-out shadow-xl flex flex-col`}>
+                        bg-gray-800 text-white
+                        transition-all duration-300 ease-in-out shadow-lg flex flex-col`}>
           
-          {/* Sidebar Header - Always visible */}
-          <div
-            className={`flex border-b border-slate-700 flex-shrink-0 
-                        ${sidebarOpen ? 'items-center justify-between p-4' : 'flex-col items-center p-2 space-y-2'}`}
-          >
+          <div className={`flex border-b border-gray-700 ${sidebarOpen ? 'items-center justify-between p-4' : 'flex-col items-center p-2 space-y-2'}`}>
             <Link to="/admin" className="flex items-center space-x-3">
-              <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-                <CubeIcon className="w-5 h-5 text-white" />
+              <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+                <CubeIcon className="w-5 h-5 text-primary-foreground" />
               </div>
               {sidebarOpen && (
-                <span className="text-xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
-                  GovindJi Admin
-                </span>
+                <span className="text-xl font-bold">GovindJi Admin</span>
               )}
             </Link>
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
-              className={`p-2 rounded-lg transition-colors duration-200 ${sidebarOpen ? 'hover:bg-slate-700 mr-2' : 'bg-slate-700'}`}
+              className={`p-2 rounded-lg transition-colors duration-200 ${sidebarOpen ? 'hover:bg-gray-700' : 'bg-gray-700'}`}
             >
               {sidebarOpen ? (
-                <ChevronLeftIcon className="w-5 h-5 text-white" />
+                <ChevronLeftIcon className="w-5 h-5" />
               ) : (
-                <ChevronRightIcon className="w-5 h-5 text-white" />
+                <ChevronRightIcon className="w-5 h-5" />
               )}
             </button>
           </div>
 
-          {/* Navigation - Scrollable middle section */}
-          <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-slate-800">
+          <div className="flex-1 overflow-y-auto sidebar-scroll">
             <nav className="mt-6 px-3 space-y-1 pb-6">
               {menuItems.map((item) => {
                 const IconComponent = item.icon;
@@ -120,15 +101,13 @@ const AdminLayout = ({ children }) => {
                     className={`flex items-center py-3 text-sm font-medium rounded-lg transition-all duration-200 
                                ${sidebarOpen ? 'px-3' : 'px-2 justify-center'} 
                                ${isActive 
-                                 ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' 
-                                 : 'text-slate-300 hover:bg-slate-700 hover:text-white'
+                                 ? 'bg-primary text-primary-foreground shadow-lg' 
+                                 : 'text-gray-300 hover:bg-gray-700 hover:text-white'
                                }`}
                   >
                     <IconComponent className="w-5 h-5 flex-shrink-0" />
                     {sidebarOpen && (
-                      <span className="ml-3 transition-opacity duration-200">
-                        {item.label}
-                      </span>
+                      <span className="ml-3 transition-opacity duration-200">{item.label}</span>
                     )}
                   </Link>
                 );
@@ -136,20 +115,19 @@ const AdminLayout = ({ children }) => {
             </nav>
           </div>
 
-          {/* Sidebar Footer - Always visible */}
-          <div className="p-3 border-t border-slate-700 space-y-1 flex-shrink-0">
+          <div className="p-3 border-t border-gray-700 space-y-1 flex-shrink-0">
             <Link
               to="/"
-              className="flex items-center px-3 py-3 text-sm font-medium text-slate-300 
-                         hover:bg-slate-700 hover:text-white rounded-lg transition-all duration-200"
+              className="flex items-center px-3 py-3 text-sm font-medium text-gray-300 
+                         hover:bg-gray-700 hover:text-white rounded-lg transition-all duration-200"
             >
               <HomeIcon className="w-5 h-5 flex-shrink-0" />
               {sidebarOpen && <span className="ml-3">Back to Store</span>}
             </Link>
             <button
               onClick={handleLogout}
-              className="w-full flex items-center px-3 py-3 text-sm font-medium text-red-300 
-                         hover:bg-red-600/10 hover:text-red-200 rounded-lg transition-all duration-200"
+              className="w-full flex items-center px-3 py-3 text-sm font-medium text-red-400 
+                         hover:bg-red-500/10 hover:text-red-300 rounded-lg transition-all duration-200"
             >
               <ArrowRightOnRectangleIcon className="w-5 h-5 flex-shrink-0" />
               {sidebarOpen && <span className="ml-3">Logout</span>}
@@ -157,12 +135,9 @@ const AdminLayout = ({ children }) => {
           </div>
         </div>
 
-        {/* Main Content */}
-        <div className={`flex-1 ml-0 ${sidebarOpen ? 'lg:ml-72' : 'lg:ml-16'} transition-all duration-300 flex flex-col min-h-screen`}>
-          {/* Page Content - Scrollable */}
+        <div className={`flex-1 ${sidebarOpen ? 'lg:ml-72' : 'lg:ml-16'} transition-all duration-300 flex flex-col min-h-screen`}>
           <main className="flex-1 overflow-y-auto overflow-x-hidden">
             <div className="p-6">
-              {/* Mobile Sidebar Toggle and Admin Logo */}
               <div className="flex items-center justify-end mb-6">
                 <div className="flex items-center space-x-3">
                   <RoleIndicator />
@@ -173,7 +148,6 @@ const AdminLayout = ({ children }) => {
           </main>
         </div>
 
-        {/* Mobile Sidebar Overlay */}
         {sidebarOpen && window.innerWidth < 1024 && (
           <div 
             className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
@@ -181,11 +155,10 @@ const AdminLayout = ({ children }) => {
           />
         )}
 
-        {/* Mobile expand button (visible only when sidebar closed) */}
         {!sidebarOpen && (
           <button
             onClick={() => setSidebarOpen(true)}
-            className="fixed top-4 left-3 z-50 p-2 bg-slate-700 rounded-lg shadow lg:hidden"
+            className="fixed top-4 left-3 z-50 p-2 bg-gray-800 rounded-lg shadow lg:hidden"
           >
             <ChevronRightIcon className="w-6 h-6 text-white" />
           </button>

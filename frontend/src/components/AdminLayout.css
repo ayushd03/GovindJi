@@ -1,138 +1,38 @@
-/* Enhanced Admin Layout with Fixed Sidebar and Proper Scrolling */
-
-/* Custom scrollbar styles for sidebar - Material Design inspired */
-.scrollbar-thin {
+/* Custom scrollbar styles for sidebar */
+.sidebar-scroll {
   scrollbar-width: thin;
-  scrollbar-color: rgba(148, 163, 184, 0.4) transparent;
+  scrollbar-color: rgba(156, 163, 175, 0.3) transparent;
 }
 
-.scrollbar-thin::-webkit-scrollbar {
-  width: 4px;
+.sidebar-scroll::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
 }
 
-.scrollbar-thin::-webkit-scrollbar-track {
+.sidebar-scroll::-webkit-scrollbar-track {
   background: transparent;
-  margin: 8px 0;
 }
 
-.scrollbar-thin::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.4);
-  border-radius: 8px;
-  transition: background-color 0.2s ease-in-out, opacity 0.2s ease-in-out;
-  opacity: 0;
+.sidebar-scroll::-webkit-scrollbar-thumb {
+  background-color: rgba(156, 163, 175, 0.3);
+  border-radius: 10px;
+  border: 3px solid transparent;
 }
 
-.scrollbar-thin:hover::-webkit-scrollbar-thumb {
-  opacity: 1;
-  background: rgba(148, 163, 184, 0.6);
+.sidebar-scroll:hover::-webkit-scrollbar-thumb {
+  background-color: rgba(156, 163, 175, 0.5);
 }
 
-.scrollbar-thin::-webkit-scrollbar-thumb:hover {
-  background: rgba(148, 163, 184, 0.8);
+.sidebar-scroll::-webkit-scrollbar-thumb:active {
+  background-color: rgba(156, 163, 175, 0.7);
 }
 
-.scrollbar-thin::-webkit-scrollbar-thumb:active {
-  background: rgba(148, 163, 184, 0.9);
+/* Ensure buttons and links are not centered when sidebar is open */
+.flex.items-center.py-3.text-sm.font-medium.rounded-lg.transition-all.duration-200.px-3 {
+  justify-content: flex-start;
 }
 
-/* Enhanced mobile responsiveness */
-@media (max-width: 1024px) {
-  /* Ensure sidebar is properly hidden on mobile */
-  .fixed.inset-y-0.left-0 {
-    transform: translateX(-100%);
-    transition: transform 0.3s ease-in-out;
-  }
-  
-  /* Show sidebar when open (full width) on mobile */
-  .fixed.inset-y-0.left-0.w-72 {
-    transform: translateX(0);
-  }
-
-
-  
-  /* Ensure main content doesn't have left margin on mobile */
-  .ml-72, .ml-16 {
-    margin-left: 0 !important;
-  }
-}
-
-@media (min-width: 1025px) {
-  /* Desktop: sidebar is always visible and positioned */
-  .fixed.inset-y-0.left-0 {
-    position: fixed !important;
-    transform: none !important;
-  }
-}
-
-/* Smooth transitions for all layout changes */
-.transition-all {
-  transition: all 0.3s ease-in-out;
-}
-
-/* Ensure proper z-indexing */
-.z-50 {
-  z-index: 50;
-}
-
-.z-40 {
-  z-index: 40;
-}
-
-/* Premium look enhancements */
-.shadow-xl {
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-}
-
-/* Ensure main content area is properly structured */
-.min-h-screen {
-  min-height: 100vh;
-}
-
-/* Mobile-specific improvements */
-@media (max-width: 768px) {
-  /* Ensure sidebar takes full height on mobile */
-  .fixed.inset-y-0.left-0 {
-    height: 100vh;
-    height: 100dvh; /* Dynamic viewport height for mobile browsers */
-  }
-  
-  /* Adjust padding for mobile */
-  .p-6 {
-    padding: 1rem;
-  }
-  
-  /* Ensure proper touch targets on mobile */
-  button, a {
-    min-height: 44px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-}
-
-/* High-resolution display optimizations */
-@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
-  .shadow-xl {
-    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.15), 0 10px 10px -5px rgba(0, 0, 0, 0.08);
-  }
-}
-
-/* Focus states for accessibility */
-button:focus, a:focus {
-  outline: 2px solid rgba(59, 130, 246, 0.5);
-  outline-offset: 2px;
-}
-
-/* Ensure content doesn't get hidden behind fixed elements */
-.flex-1.overflow-y-auto {
-  height: calc(100vh - 73px); /* Subtract header height */
-}
-
-/* Smooth hover transitions */
-.transition-colors {
-  transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out;
-}
-
-.transition-opacity {
-  transition: opacity 0.2s ease-in-out;
+/* Keep text alignment for logout and back to store buttons */
+a.flex.items-center, button.flex.items-center {
+    justify-content: flex-start;
 }

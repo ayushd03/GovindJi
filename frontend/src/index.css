@@ -6,140 +6,135 @@
 /* Import Google Fonts */
 @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&family=Lato:wght@300;400;500;600&display=swap');
 
-/* Global Design System - GovindJi Dry Fruits */
-:root {
-  /* shadcn/ui CSS Variables */
-  --background: 0 0% 100%;
-  --foreground: 222.2 84% 4.9%;
-  --card: 0 0% 100%;
-  --card-foreground: 222.2 84% 4.9%;
-  --popover: 0 0% 100%;
-  --popover-foreground: 222.2 84% 4.9%;
-  --primary: 221 83% 53%;
-  --primary-foreground: 0 0% 100%;
-  --secondary: 210 40% 98%;
-  --secondary-foreground: 222.2 84% 4.9%;
-  --muted: 210 40% 96%;
-  --muted-foreground: 215.4 16.3% 46.9%;
-  --accent: 210 40% 96%;
-  --accent-foreground: 222.2 84% 4.9%;
-  --destructive: 0 84% 60%;
-  --destructive-foreground: 210 40% 98%;
-  --border: 214.3 31.8% 91.4%;
-  --input: 214.3 31.8% 91.4%;
-  --ring: 221 83% 53%;
-  --radius: 0.5rem;
-
-  /* Legacy CSS Variables (for backwards compatibility) */
-  --color-primary-bg: #FFFFFF;
-  --color-primary-text: #212121;
-  --color-primary-accent: #2563eb;
-  --color-secondary-accent: #1d4ed8;
-  --color-footer-bg: #1E392A;
-  --color-light-gray: #F8F9FA;
-  --color-border: #E5E5E5;
-  --color-shadow: rgba(0, 0, 0, 0.08);
-  
-  /* Typography */
-  --font-heading: 'Montserrat', sans-serif;
-  --font-body: 'Lato', sans-serif;
-  
-  /* Font Sizes */
-  --font-size-h1: 3rem;
-  --font-size-h2: 2.2rem;
-  --font-size-h3: 1.5rem;
-  --font-size-body: 1rem;
-  --font-size-small: 0.875rem;
-  
-  /* Spacing System (8px base) */
-  --spacing-xs: 0.5rem;
-  --spacing-sm: 1rem;
-  --spacing-md: 1.5rem;
-  --spacing-lg: 2rem;
-  --spacing-xl: 3rem;
-  --spacing-2xl: 4rem;
-  
-  /* Border Radius */
-  --border-radius: 8px;
-  
-  /* Box Shadow */
-  --box-shadow: 0 4px 12px var(--color-shadow);
-  --box-shadow-hover: 0 6px 20px rgba(0, 0, 0, 0.12);
-  
-  /* Container Max Width */
-  --container-max-width: 1600px;
-}
-
-/* Custom Base Styles using Tailwind's @layer directive */
+/* 
+  Unified Design System - GovindJi Dry Fruits 
+  This new color system is based on HSL values for easy theming (light/dark modes).
+  - Primary colors are used for main actions, links, and highlights.
+  - Secondary colors are for less prominent elements.
+  - Accent colors are for user interaction feedback.
+  - Semantic colors (destructive, success, warning) are for user feedback.
+*/
 @layer base {
+  :root {
+    /* Base Colors - Light Theme */
+    --background: 0 0% 98%; /* Slightly off-white */
+    --foreground: 240 10% 3.9%; /* Dark gray for text */
+    
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 3.9%;
+    
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 3.9%;
+    
+    --primary: 221 83% 53%;
+    --primary-foreground: 0 0% 100%;
+    
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 240 5.9% 10%;
+    
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 240 3.8% 46.1%;
+    
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 240 5.9% 10%;
+    
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 100%;
+    
+    --success: 142.1 76.2% 36.3%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 47.9 95.8% 53.1%;
+    --warning-foreground: 0 0% 0%;
+
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 221 83% 53%;
+    
+    --radius: 0.5rem;
+    
+    /* Typography */
+    --font-heading: 'Montserrat', sans-serif;
+    --font-body: 'Lato', sans-serif;
+
+    /* Spacing System (8px base) */
+    --spacing-xs: 0.5rem;
+    --spacing-sm: 1rem;
+    --spacing-md: 1.5rem;
+    --spacing-lg: 2rem;
+    --spacing-xl: 3rem;
+  }
+ 
+  .dark {
+    /* Base Colors - Dark Theme */
+    --background: 240 10% 3.9%;
+    --foreground: 0 0% 98%;
+
+    --card: 240 10% 3.9%;
+    --card-foreground: 0 0% 98%;
+
+    --popover: 240 10% 3.9%;
+    --popover-foreground: 0 0% 98%;
+
+    --primary: 217.2 91.2% 59.8%;
+    --primary-foreground: 240 5.9% 10%;
+
+    --secondary: 240 3.7% 15.9%;
+    --secondary-foreground: 0 0% 98%;
+
+    --muted: 240 3.7% 15.9%;
+    --muted-foreground: 240 5% 64.9%;
+
+    --accent: 240 3.7% 15.9%;
+    --accent-foreground: 0 0% 98%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    
+    --success: 142.1 76.2% 36.3%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 47.9 95.8% 53.1%;
+    --warning-foreground: 0 0% 0%;
+
+    --border: 240 3.7% 15.9%;
+    --input: 240 3.7% 15.9%;
+    --ring: 217.2 91.2% 59.8%;
+  }
+
+  /* Global Styles */
   * {
-    @apply m-0 p-0 box-border;
+    @apply border-border;
   }
 
   body {
-    @apply font-body text-base leading-relaxed text-primary-text bg-primary-bg;
+    @apply bg-background text-foreground;
+    font-family: var(--font-body);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
 
   h1, h2, h3, h4, h5, h6 {
-    @apply font-heading font-semibold leading-tight mb-4;
-  }
-
-  h1 {
-    @apply text-h1 font-bold;
-  }
-
-  h2 {
-    @apply text-h2 font-semibold;
-  }
-
-  h3 {
-    @apply text-h3 font-semibold;
-  }
-
-  p {
-    @apply mb-4 leading-relaxed;
-  }
-
-  code {
-    font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
+    font-family: var(--font-heading);
+    @apply font-semibold;
   }
 }
 
-@import './recharts-fixes.css';
-
-/* Custom Component Classes using Tailwind's @layer directive */
+/* Custom Component Classes */
 @layer components {
-  .container {
-    @apply max-w-container mx-auto px-4 sm:px-6 lg:px-8;
-  }
-
   .btn-primary {
-    @apply bg-primary-accent text-white px-6 py-3 rounded-default font-medium transition-all duration-300 hover:bg-secondary-accent hover:shadow-custom-hover transform hover:scale-105;
+    @apply bg-primary text-primary-foreground hover:bg-primary/90;
   }
 
   .btn-secondary {
-    @apply bg-transparent text-primary-accent border-2 border-primary-accent px-6 py-3 rounded-default font-medium transition-all duration-300 hover:bg-primary-accent hover:text-white;
+    @apply bg-secondary text-secondary-foreground hover:bg-secondary/80;
   }
 
-  .card {
-    @apply bg-white rounded-default shadow-custom p-6 transition-all duration-300 hover:shadow-custom-hover transform hover:-translate-y-1;
+  .btn-destructive {
+    @apply bg-destructive text-destructive-foreground hover:bg-destructive/90;
   }
 
-  .product-card {
-    @apply bg-white rounded-default shadow-custom overflow-hidden transition-all duration-300 hover:shadow-custom-hover transform hover:-translate-y-2;
-  }
-
-  .input-field {
-    @apply w-full px-4 py-3 border border-border-color rounded-default focus:outline-none focus:ring-2 focus:ring-primary-accent focus:border-transparent transition-all duration-300;
-  }
-
-  .section-padding {
-    @apply py-12 lg:py-20;
-  }
-
-  .hero-section {
-    @apply min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-blue-50/30;
+  .btn-outline {
+    @apply border border-input bg-transparent shadow-sm hover:bg-accent hover:text-accent-foreground;
   }
 }

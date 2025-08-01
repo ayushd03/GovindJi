@@ -32,6 +32,7 @@ const OrderManagement = () => {
 
   const fetchOrders = async () => {
     try {
+      setLoading(true);
       const token = localStorage.getItem('authToken');
       const url = selectedStatus 
         ? `${API_BASE_URL}/api/admin/orders?status=${selectedStatus}`
@@ -75,25 +76,14 @@ const OrderManagement = () => {
     }
   };
 
-  const getStatusIcon = (status) => {
-    switch (status) {
-      case 'pending': return ClockIcon;
-      case 'processing': return CubeIcon;
-      case 'shipped': return TruckIcon;
-      case 'delivered': return CheckCircleIcon;
-      case 'cancelled': return XCircleIcon;
-      default: return ClockIcon;
-    }
-  };
-
   const getStatusColor = (status) => {
     switch (status) {
-      case 'pending': return 'bg-yellow-100 text-yellow-800';
-      case 'processing': return 'bg-blue-100 text-blue-800';
-      case 'shipped': return 'bg-purple-100 text-purple-800';
-      case 'delivered': return 'bg-green-100 text-green-800';
-      case 'cancelled': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'pending': return 'bg-warning/10 text-warning-foreground';
+      case 'processing': return 'bg-primary/10 text-primary';
+      case 'shipped': return 'bg-secondary/10 text-secondary-foreground';
+      case 'delivered': return 'bg-success/10 text-success';
+      case 'cancelled': return 'bg-destructive/10 text-destructive';
+      default: return 'bg-muted text-muted-foreground';
     }
   };
 
@@ -110,8 +100,8 @@ const OrderManagement = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-96">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-        <span className="ml-3 text-lg text-gray-600">Loading orders...</span>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        <span className="ml-3 text-lg text-muted-foreground">Loading orders...</span>
       </div>
     );
   }
@@ -120,19 +110,19 @@ const OrderManagement = () => {
     <PermissionGuard permission={ADMIN_PERMISSIONS.VIEW_ORDERS}>
       <div className="space-y-6">
       {/* Header */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+      <div className="bg-card rounded-xl shadow-sm border p-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Order Management</h1>
-            <p className="mt-1 text-gray-500">Track and manage customer orders</p>
+            <h1 className="text-3xl font-bold text-foreground">Order Management</h1>
+            <p className="mt-1 text-muted-foreground">Track and manage customer orders</p>
           </div>
           <div className="mt-4 sm:mt-0 flex items-center space-x-3">
             <div className="relative">
-              <FunnelIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <FunnelIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <select 
                 value={selectedStatus} 
                 onChange={(e) => setSelectedStatus(e.target.value)}
-                className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 text-sm min-h-[44px] touch-manipulation"
+                className="input-field pl-10 pr-4 py-2 border rounded-lg text-sm"
               >
                 <option value="">All Orders</option>
                 <option value="pending">Pending</option>
@@ -146,13 +136,13 @@ const OrderManagement = () => {
         </div>
       </div>
 
-      {/* Orders Table - Desktop and Mobile Responsive */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+      {/* Orders Table */}
+      <div className="bg-card rounded-xl shadow-sm border overflow-hidden">
         {orders.length === 0 ? (
           <div className="px-6 py-12 text-center">
-            <CubeIcon className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-            <p className="text-gray-500 text-lg">No orders found</p>
-            <p className="text-gray-400 text-sm">
+            <CubeIcon className="w-12 h-12 text-muted-foreground/50 mx-auto mb-3" />
+            <p className="text-muted-foreground text-lg">No orders found</p>
+            <p className="text-sm">
               {selectedStatus ? 'No orders with this status' : 'Orders will appear here when customers place them'}
             </p>
           </div>
@@ -160,66 +150,36 @@ const OrderManagement = () => {
           <>
             {/* Desktop Table View */}
             <div className="hidden lg:block overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
+              <table className="min-w-full divide-y">
+                <thead className="bg-muted/50">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Order ID
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Customer
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Date
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Items
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Total
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Actions
-                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Order ID</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Customer</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Date</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Items</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Total</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Status</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {orders.map((order) => {
-                    const StatusIcon = getStatusIcon(order.status);
-                    return (
-                      <tr key={order.id} className="hover:bg-gray-50 transition-colors duration-200">
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-medium text-gray-900">
-                            #{order.id.slice(0, 8)}
-                          </div>
-                        </td>
+                <tbody className="bg-card divide-y">
+                  {orders.map((order) => (
+                      <tr key={order.id} className="hover:bg-muted/50 transition-colors duration-200">
+                        <td className="px-6 py-4 whitespace-nowrap"><div className="text-sm font-medium text-foreground">#{order.id.slice(0, 8)}</div></td>
                         <td className="px-6 py-4">
                           <div>
-                            <div className="text-sm font-medium text-gray-900">
-                              {order.users?.name || 'Guest'}
-                            </div>
-                            <div className="text-sm text-gray-500">
-                              {order.users?.email}
-                            </div>
+                            <div className="text-sm font-medium text-foreground">{order.users?.name || 'Guest'}</div>
+                            <div className="text-sm text-muted-foreground">{order.users?.email}</div>
                           </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {formatDate(order.created_at)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {order.order_items?.length || 0} items
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                          ₹{order.total_amount}
-                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">{formatDate(order.created_at)}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">{order.order_items?.length || 0} items</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-foreground">₹{order.total_amount}</td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <select
                             value={order.status}
                             onChange={(e) => updateOrderStatus(order.id, e.target.value)}
-                            className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border-0 focus:ring-2 focus:ring-blue-500 min-h-[32px] ${getStatusColor(order.status)}`}
+                            className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border-0 focus:ring-2 focus:ring-primary ${getStatusColor(order.status)}`}
                           >
                             <option value="pending">Pending</option>
                             <option value="processing">Processing</option>
@@ -231,50 +191,34 @@ const OrderManagement = () => {
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                           <button
                             onClick={() => setSelectedOrder(order)}
-                            className="inline-flex items-center px-3 py-2 border border-blue-300 
-                                     text-sm font-medium rounded-md text-blue-700 bg-blue-50 
-                                     hover:bg-blue-100 focus:outline-none focus:ring-2 
-                                     focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200 min-h-[44px]"
+                            className="btn-secondary inline-flex items-center px-3 py-2 text-sm font-medium rounded-md"
                           >
                             <EyeIcon className="w-4 h-4 mr-1" />
                             View Details
                           </button>
                         </td>
                       </tr>
-                    );
-                  })}
+                  ))}
                 </tbody>
               </table>
             </div>
 
             {/* Mobile Card View */}
-            <div className="lg:hidden divide-y divide-gray-200">
-              {orders.map((order) => {
-                const StatusIcon = getStatusIcon(order.status);
-                return (
-                  <div key={order.id} className="p-4 sm:p-6 hover:bg-gray-50 transition-colors duration-200">
+            <div className="lg:hidden divide-y">
+              {orders.map((order) => (
+                  <div key={order.id} className="p-4 sm:p-6 hover:bg-muted/50 transition-colors duration-200">
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center space-x-2 mb-1">
-                          <h3 className="text-base sm:text-lg font-medium text-gray-900">
-                            #{order.id.slice(0, 8)}
-                          </h3>
+                          <h3 className="text-base sm:text-lg font-medium text-foreground">#{order.id.slice(0, 8)}</h3>
                         </div>
-                        <p className="text-sm text-gray-500">
-                          {order.users?.name || 'Guest'}
-                        </p>
-                        {order.users?.email && (
-                          <p className="text-xs text-gray-400 truncate">
-                            {order.users.email}
-                          </p>
-                        )}
+                        <p className="text-sm text-muted-foreground">{order.users?.name || 'Guest'}</p>
+                        {order.users?.email && <p className="text-xs text-muted-foreground truncate">{order.users.email}</p>}
                       </div>
-                      
-                      {/* Status Badge */}
                       <select
                         value={order.status}
                         onChange={(e) => updateOrderStatus(order.id, e.target.value)}
-                        className={`ml-2 px-2.5 py-1 rounded-full text-xs font-medium border-0 focus:ring-2 focus:ring-blue-500 min-h-[36px] touch-manipulation ${getStatusColor(order.status)}`}
+                        className={`ml-2 px-2.5 py-1 rounded-full text-xs font-medium border-0 focus:ring-2 focus:ring-primary ${getStatusColor(order.status)}`}
                       >
                         <option value="pending">Pending</option>
                         <option value="processing">Processing</option>
@@ -283,45 +227,31 @@ const OrderManagement = () => {
                         <option value="cancelled">Cancelled</option>
                       </select>
                     </div>
-                    
-                    {/* Order Details */}
                     <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm mb-4">
                       <div>
-                        <span className="text-gray-500">Date:</span>
-                        <span className="ml-1 text-gray-900 font-medium">
-                          {new Date(order.created_at).toLocaleDateString('en-IN', {
-                            month: 'short',
-                            day: 'numeric',
-                            year: 'numeric'
-                          })}
-                        </span>
+                        <span className="text-muted-foreground">Date:</span>
+                        <span className="ml-1 text-foreground font-medium">{new Date(order.created_at).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
                       </div>
                       <div>
-                        <span className="text-gray-500">Items:</span>
-                        <span className="ml-1 text-gray-900 font-medium">{order.order_items?.length || 0}</span>
+                        <span className="text-muted-foreground">Items:</span>
+                        <span className="ml-1 text-foreground font-medium">{order.order_items?.length || 0}</span>
                       </div>
                       <div className="col-span-2">
-                        <span className="text-gray-500">Total:</span>
-                        <span className="ml-1 text-lg font-bold text-gray-900">₹{order.total_amount}</span>
+                        <span className="text-muted-foreground">Total:</span>
+                        <span className="ml-1 text-lg font-bold text-foreground">₹{order.total_amount}</span>
                       </div>
                     </div>
-                    
-                    {/* Action Button */}
                     <div className="flex">
                       <button
                         onClick={() => setSelectedOrder(order)}
-                        className="w-full inline-flex items-center justify-center px-4 py-3 border border-blue-300 
-                                 text-sm font-medium rounded-lg text-blue-700 bg-blue-50 
-                                 hover:bg-blue-100 focus:outline-none focus:ring-2 
-                                 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200 min-h-[44px] touch-manipulation"
+                        className="w-full btn-secondary inline-flex items-center justify-center px-4 py-3 text-sm font-medium rounded-lg"
                       >
                         <EyeIcon className="w-4 h-4 mr-2" />
                         View Details
                       </button>
                     </div>
                   </div>
-                );
-              })}
+              ))}
             </div>
           </>
         )}
@@ -330,140 +260,73 @@ const OrderManagement = () => {
       {/* Order Details Modal */}
       <Transition show={!!selectedOrder} as={React.Fragment}>
         <Dialog as="div" className="relative z-50" onClose={() => setSelectedOrder(null)}>
-          <Transition.Child
-            as={React.Fragment}
-            enter="ease-out duration-300"
-            enterFrom="opacity-0"
-            enterTo="opacity-100"
-            leave="ease-in duration-200"
-            leaveFrom="opacity-100"
-            leaveTo="opacity-0"
-          >
+          <Transition.Child as={React.Fragment} enter="ease-out duration-300" enterFrom="opacity-0" enterTo="opacity-100" leave="ease-in duration-200" leaveFrom="opacity-100" leaveTo="opacity-0">
             <div className="fixed inset-0 bg-black bg-opacity-50 transition-opacity" />
           </Transition.Child>
-
           <div className="fixed inset-0 z-10 overflow-y-auto">
             <div className="flex min-h-full items-end justify-center p-2 sm:p-4 text-center sm:items-center">
-              <Transition.Child
-                as={React.Fragment}
-                enter="ease-out duration-300"
-                enterFrom="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
-                enterTo="opacity-100 translate-y-0 sm:scale-100"
-                leave="ease-in duration-200"
-                leaveFrom="opacity-100 translate-y-0 sm:scale-100"
-                leaveTo="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
-              >
-                <Dialog.Panel className="relative transform overflow-hidden rounded-lg bg-white px-4 pb-4 pt-5 text-left shadow-xl transition-all w-full max-w-sm sm:max-w-2xl lg:max-w-4xl sm:my-8 sm:p-6">
+              <Transition.Child as={React.Fragment} enter="ease-out duration-300" enterFrom="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95" enterTo="opacity-100 translate-y-0 sm:scale-100" leave="ease-in duration-200" leaveFrom="opacity-100 translate-y-0 sm:scale-100" leaveTo="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95">
+                <Dialog.Panel className="relative transform overflow-hidden rounded-lg bg-card px-4 pb-4 pt-5 text-left shadow-xl transition-all w-full max-w-sm sm:max-w-2xl lg:max-w-4xl sm:my-8 sm:p-6">
                   <div className="absolute right-0 top-0 pr-3 pt-3 sm:pr-4 sm:pt-4">
-                    <button
-                      type="button"
-                      className="rounded-md bg-white text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 min-h-[44px] min-w-[44px] flex items-center justify-center"
-                      onClick={() => setSelectedOrder(null)}
-                    >
+                    <button type="button" className="rounded-md bg-card text-muted-foreground hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2" onClick={() => setSelectedOrder(null)}>
                       <XMarkIcon className="h-6 w-6" />
                     </button>
                   </div>
-
                   {selectedOrder && (
                     <div>
-                      <Dialog.Title as="h3" className="text-lg font-semibold leading-6 text-gray-900 mb-6">
-                        Order Details - #{selectedOrder.id.slice(0, 8)}
-                      </Dialog.Title>
-
+                      <Dialog.Title as="h3" className="text-lg font-semibold leading-6 text-foreground mb-6">Order Details - #{selectedOrder.id.slice(0, 8)}</Dialog.Title>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 mb-4 sm:mb-6">
-                        {/* Order Information */}
-                        <div className="bg-gray-50 rounded-lg p-4">
-                          <h4 className="text-md font-medium text-gray-900 mb-3">Order Information</h4>
+                        <div className="bg-muted/50 rounded-lg p-4">
+                          <h4 className="text-md font-medium text-foreground mb-3">Order Information</h4>
                           <div className="space-y-2 text-sm">
+                            <div className="flex justify-between"><span className="text-muted-foreground">Order ID:</span><span className="font-medium">{selectedOrder.id}</span></div>
+                            <div className="flex justify-between"><span className="text-muted-foreground">Date:</span><span className="font-medium">{formatDate(selectedOrder.created_at)}</span></div>
                             <div className="flex justify-between">
-                              <span className="text-gray-500">Order ID:</span>
-                              <span className="font-medium">{selectedOrder.id}</span>
+                              <span className="text-muted-foreground">Status:</span>
+                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(selectedOrder.status)}`}>{selectedOrder.status.toUpperCase()}</span>
                             </div>
-                            <div className="flex justify-between">
-                              <span className="text-gray-500">Date:</span>
-                              <span className="font-medium">{formatDate(selectedOrder.created_at)}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-gray-500">Status:</span>
-                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(selectedOrder.status)}`}>
-                                {selectedOrder.status.toUpperCase()}
-                              </span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-gray-500">Total Amount:</span>
-                              <span className="font-medium text-lg">₹{selectedOrder.total_amount}</span>
-                            </div>
+                            <div className="flex justify-between"><span className="text-muted-foreground">Total Amount:</span><span className="font-medium text-lg">₹{selectedOrder.total_amount}</span></div>
                           </div>
                         </div>
-
-                        {/* Customer Information */}
-                        <div className="bg-gray-50 rounded-lg p-4">
-                          <h4 className="text-md font-medium text-gray-900 mb-3">Customer Information</h4>
+                        <div className="bg-muted/50 rounded-lg p-4">
+                          <h4 className="text-md font-medium text-foreground mb-3">Customer Information</h4>
                           <div className="space-y-2 text-sm">
-                            <div className="flex justify-between">
-                              <span className="text-gray-500">Name:</span>
-                              <span className="font-medium">{selectedOrder.users?.name || 'N/A'}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-gray-500">Email:</span>
-                              <span className="font-medium">{selectedOrder.users?.email || 'N/A'}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-gray-500">Phone:</span>
-                              <span className="font-medium">{selectedOrder.phone_number || 'N/A'}</span>
-                            </div>
-                            <div className="flex flex-col">
-                              <span className="text-gray-500 mb-1">Address:</span>
-                              <span className="font-medium text-xs">{selectedOrder.shipping_address || 'N/A'}</span>
-                            </div>
+                            <div className="flex justify-between"><span className="text-muted-foreground">Name:</span><span className="font-medium">{selectedOrder.users?.name || 'N/A'}</span></div>
+                            <div className="flex justify-between"><span className="text-muted-foreground">Email:</span><span className="font-medium">{selectedOrder.users?.email || 'N/A'}</span></div>
+                            <div className="flex justify-between"><span className="text-muted-foreground">Phone:</span><span className="font-medium">{selectedOrder.phone_number || 'N/A'}</span></div>
+                            <div className="flex flex-col"><span className="text-muted-foreground mb-1">Address:</span><span className="font-medium text-xs">{selectedOrder.shipping_address || 'N/A'}</span></div>
                           </div>
                         </div>
                       </div>
-
-                      {/* Order Items */}
                       <div className="mb-6">
-                        <h4 className="text-md font-medium text-gray-900 mb-3">Order Items</h4>
+                        <h4 className="text-md font-medium text-foreground mb-3">Order Items</h4>
                         <div className="overflow-x-auto">
-                          <table className="min-w-full divide-y divide-gray-200 border border-gray-200 rounded-lg">
-                            <thead className="bg-gray-50">
+                          <table className="min-w-full divide-y border rounded-lg">
+                            <thead className="bg-muted/50">
                               <tr>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                  Product
-                                </th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                  Quantity
-                                </th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                  Price
-                                </th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                  Total
-                                </th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Product</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Quantity</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Price</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Total</th>
                               </tr>
                             </thead>
-                            <tbody className="bg-white divide-y divide-gray-200">
+                            <tbody className="bg-card divide-y">
                               {selectedOrder.order_items?.map(item => (
                                 <tr key={item.id}>
-                                  <td className="px-4 py-3 text-sm font-medium text-gray-900">
-                                    {item.products?.name || 'Unknown Product'}
-                                  </td>
-                                  <td className="px-4 py-3 text-sm text-gray-900">{item.quantity}</td>
-                                  <td className="px-4 py-3 text-sm text-gray-900">₹{item.price}</td>
-                                  <td className="px-4 py-3 text-sm font-medium text-gray-900">
-                                    ₹{(item.quantity * item.price).toFixed(2)}
-                                  </td>
+                                  <td className="px-4 py-3 text-sm font-medium text-foreground">{item.products?.name || 'Unknown Product'}</td>
+                                  <td className="px-4 py-3 text-sm text-foreground">{item.quantity}</td>
+                                  <td className="px-4 py-3 text-sm text-foreground">₹{item.price}</td>
+                                  <td className="px-4 py-3 text-sm font-medium text-foreground">₹{(item.quantity * item.price).toFixed(2)}</td>
                                 </tr>
                               ))}
                             </tbody>
                           </table>
                         </div>
                       </div>
-
-                      {/* Order Notes */}
                       {selectedOrder.notes && (
-                        <div className="bg-gray-50 rounded-lg p-4">
-                          <h4 className="text-md font-medium text-gray-900 mb-3">Order Notes</h4>
-                          <p className="text-sm text-gray-700">{selectedOrder.notes}</p>
+                        <div className="bg-muted/50 rounded-lg p-4">
+                          <h4 className="text-md font-medium text-foreground mb-3">Order Notes</h4>
+                          <p className="text-sm text-muted-foreground">{selectedOrder.notes}</p>
                         </div>
                       )}
                     </div>

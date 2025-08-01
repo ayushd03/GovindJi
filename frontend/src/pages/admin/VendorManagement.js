@@ -11,14 +11,10 @@ import {
   EnvelopeIcon,
   UserIcon,
   XMarkIcon,
-  CheckIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
   AdjustmentsHorizontalIcon,
-  ExclamationTriangleIcon,
-  DocumentArrowDownIcon
 } from '@heroicons/react/24/outline';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../components/ui/dialog';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { useToast } from '../../hooks/use-toast';
@@ -39,17 +35,14 @@ const VendorManagement = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   
-  // Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
   const [totalVendors, setTotalVendors] = useState(0);
   
-  // Filters
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   
-  // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingVendor, setEditingVendor] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
@@ -66,7 +59,6 @@ const VendorManagement = () => {
 
   const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
-  // Toast notification functions
   const showSuccess = (message) => {
     toast({
       title: "Success",
@@ -106,9 +98,7 @@ const VendorManagement = () => {
         }
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to fetch vendors');
-      }
+      if (!response.ok) throw new Error('Failed to fetch vendors');
 
       const data = await response.json();
       setVendors(data.vendors || data);
@@ -121,7 +111,6 @@ const VendorManagement = () => {
     }
   };
 
-  // Debounced search effect
   useEffect(() => {
     const timer = setTimeout(() => {
       if (currentPage === 1) {
@@ -134,7 +123,6 @@ const VendorManagement = () => {
     return () => clearTimeout(timer);
   }, [searchTerm, selectedCategory]);
 
-  // Pagination calculations
   const totalPages = Math.ceil(totalVendors / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = Math.min(startIndex + itemsPerPage, totalVendors);
@@ -165,13 +153,11 @@ const VendorManagement = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
     try {
       const token = localStorage.getItem('authToken');
       const url = editingVendor 
         ? `${API_BASE_URL}/api/admin/vendors/${editingVendor.id}`
         : `${API_BASE_URL}/api/admin/vendors`;
-      
       const method = editingVendor ? 'PUT' : 'POST';
       
       const response = await fetch(url, {
@@ -183,9 +169,7 @@ const VendorManagement = () => {
         body: JSON.stringify(formData)
       });
 
-      if (!response.ok) {
-        throw new Error(`Failed to ${editingVendor ? 'update' : 'create'} vendor`);
-      }
+      if (!response.ok) throw new Error(`Failed to ${editingVendor ? 'update' : 'create'} vendor`);
 
       await fetchVendors(currentPage);
       handleCloseModal();
@@ -201,14 +185,10 @@ const VendorManagement = () => {
       const token = localStorage.getItem('authToken');
       const response = await fetch(`${API_BASE_URL}/api/admin/vendors/${vendorId}`, {
         method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+        headers: { 'Authorization': `Bearer ${token}` }
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to delete vendor');
-      }
+      if (!response.ok) throw new Error('Failed to delete vendor');
 
       await fetchVendors(currentPage);
       setDeleteConfirm(null);
@@ -233,15 +213,7 @@ const VendorManagement = () => {
       });
     } else {
       setEditingVendor(null);
-      setFormData({
-        name: '',
-        contact_person: '',
-        phone_number: '',
-        email: '',
-        address: '',
-        category: '',
-        notes: ''
-      });
+      setFormData({ name: '', contact_person: '', phone_number: '', email: '', address: '', category: '', notes: '' });
     }
     setIsModalOpen(true);
   };
@@ -249,29 +221,14 @@ const VendorManagement = () => {
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setEditingVendor(null);
-    setFormData({
-      name: '',
-      contact_person: '',
-      phone_number: '',
-      email: '',
-      address: '',
-      category: '',
-      notes: ''
-    });
+    setFormData({ name: '', contact_person: '', phone_number: '', email: '', address: '', category: '', notes: '' });
   };
-
-  const filteredVendors = vendors.filter(vendor => {
-    const matchesSearch = vendor.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         (vendor.contact_person || '').toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = !selectedCategory || vendor.category === selectedCategory;
-    return matchesSearch && matchesCategory;
-  });
 
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-96">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-        <span className="ml-3 text-lg text-gray-600">Loading vendors...</span>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        <span className="ml-3 text-lg text-muted-foreground">Loading vendors...</span>
       </div>
     );
   }
@@ -279,257 +236,109 @@ const VendorManagement = () => {
   return (
     <PermissionGuard permission={ADMIN_PERMISSIONS.VIEW_VENDORS}>
       <div className="space-y-6">
-        {/* Filters and Controls */}
         <Card>
           <CardHeader className="pb-4">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div className="flex items-center gap-4">
                 <CardTitle className="text-lg">Vendor Management</CardTitle>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowFilters(!showFilters)}
-                  className="md:hidden"
-                >
+                <Button variant="outline" size="sm" onClick={() => setShowFilters(!showFilters)} className="md:hidden">
                   <AdjustmentsHorizontalIcon className="w-4 h-4 mr-2" />
                   Filters
                 </Button>
               </div>
               <PermissionGuard permission={ADMIN_PERMISSIONS.MANAGE_VENDORS}>
-                <Button
-                  onClick={() => handleOpenModal()}
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 text-sm font-medium min-h-[44px] touch-manipulation"
-                >
+                <Button onClick={() => handleOpenModal()} className="btn-primary">
                   <PlusIcon className="w-4 h-4 mr-2" />
                   Add Vendor
                 </Button>
               </PermissionGuard>
             </div>
           </CardHeader>
-          
           <CardContent className="pt-0">
-            {/* Mobile Search */}
             <div className="mb-4 md:hidden">
               <div className="relative">
-                <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Search vendors..."
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 min-h-[44px] touch-manipulation"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
+                <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                <input type="text" placeholder="Search vendors..." className="input-field w-full pl-10" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
               </div>
             </div>
-
-            {/* Desktop Filters */}
             <div className={`${showFilters ? 'block' : 'hidden'} md:block`}>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                 <div className="relative hidden md:block">
-                  <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-                  <input
-                    type="text"
-                    placeholder="Search vendors..."
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 min-h-[44px] touch-manipulation"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                  />
+                  <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                  <input type="text" placeholder="Search vendors..." className="input-field w-full pl-10" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
                 </div>
-                
-                <select
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 min-h-[44px] touch-manipulation"
-                  value={selectedCategory}
-                  onChange={(e) => setSelectedCategory(e.target.value)}
-                >
+                <select className="input-field" value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)}>
                   <option value="">All Categories</option>
-                  {VENDOR_CATEGORIES.map(category => (
-                    <option key={category} value={category}>{category}</option>
-                  ))}
+                  {VENDOR_CATEGORIES.map(category => (<option key={category} value={category}>{category}</option>))}
                 </select>
-                
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setSearchTerm('');
-                    setSelectedCategory('');
-                  }}
-                  className="w-full"
-                >
-                  Clear Filters
-                </Button>
+                <Button variant="outline" onClick={() => { setSearchTerm(''); setSelectedCategory(''); }}>Clear Filters</Button>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* Error Display */}
-        {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-            <p className="text-red-700">{error}</p>
-          </div>
-        )}
+        {error && (<div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4"><p className="text-destructive-foreground">{error}</p></div>)}
 
-        {/* Vendors List */}
         <Card>
           <CardHeader className="pb-4">
             <div className="flex items-center justify-between">
-              <CardTitle>
-                Vendors ({totalVendors})
-              </CardTitle>
-              <div className="text-sm text-gray-500">
-                Showing {startIndex + 1}-{endIndex} of {totalVendors}
-              </div>
+              <CardTitle>Vendors ({totalVendors})</CardTitle>
+              <div className="text-sm text-muted-foreground">Showing {startIndex + 1}-{endIndex} of {totalVendors}</div>
             </div>
           </CardHeader>
-          
           <CardContent className="p-0">
             {vendors.length === 0 ? (
               <div className="p-12 text-center">
-                <BuildingOfficeIcon className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">No vendors found</h3>
-                <p className="text-gray-500">
-                  {searchTerm || selectedCategory 
-                    ? "Try adjusting your search criteria" 
-                    : "Get started by adding your first vendor"}
-                </p>
+                <BuildingOfficeIcon className="w-16 h-16 text-muted-foreground/50 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-foreground mb-2">No vendors found</h3>
+                <p className="text-muted-foreground">{searchTerm || selectedCategory ? "Try adjusting your search criteria" : "Get started by adding your first vendor"}</p>
               </div>
             ) : (
               <>
-                <div className="divide-y divide-gray-200">
+                <div className="divide-y">
                   {vendors.map((vendor) => (
-                <div key={vendor.id} className="p-4 sm:p-6 hover:bg-gray-50 transition-colors">
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-                    <div className="flex-1 mb-3 sm:mb-0">
-                      <div className="flex items-start justify-between sm:items-center sm:space-x-4">
-                        <div className="flex-1 min-w-0">
-                          <h3 className="text-base sm:text-lg font-medium text-gray-900 truncate">{vendor.name}</h3>
-                          <div className="mt-1 space-y-1 sm:space-y-0 sm:flex sm:items-center sm:space-x-4 text-sm text-gray-500">
-                            {vendor.contact_person && (
-                              <div className="flex items-center">
-                                <UserIcon className="w-4 h-4 mr-1 flex-shrink-0" />
-                                <span className="truncate">{vendor.contact_person}</span>
+                    <div key={vendor.id} className="p-4 sm:p-6 hover:bg-muted/50 transition-colors">
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+                        <div className="flex-1 mb-3 sm:mb-0">
+                          <div className="flex items-start justify-between sm:items-center sm:space-x-4">
+                            <div className="flex-1 min-w-0">
+                              <h3 className="text-base sm:text-lg font-medium text-foreground truncate">{vendor.name}</h3>
+                              <div className="mt-1 space-y-1 sm:space-y-0 sm:flex sm:items-center sm:space-x-4 text-sm text-muted-foreground">
+                                {vendor.contact_person && (<div className="flex items-center"><UserIcon className="w-4 h-4 mr-1 flex-shrink-0" /><span className="truncate">{vendor.contact_person}</span></div>)}
+                                {vendor.phone_number && (<div className="flex items-center"><PhoneIcon className="w-4 h-4 mr-1 flex-shrink-0" /><span className="truncate">{vendor.phone_number}</span></div>)}
+                                {vendor.email && (<div className="flex items-center"><EnvelopeIcon className="w-4 h-4 mr-1 flex-shrink-0" /><span className="truncate">{vendor.email}</span></div>)}
                               </div>
-                            )}
-                            {vendor.phone_number && (
-                              <div className="flex items-center">
-                                <PhoneIcon className="w-4 h-4 mr-1 flex-shrink-0" />
-                                <span className="truncate">{vendor.phone_number}</span>
+                              <div className="mt-2"><span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">{vendor.category}</span></div>
+                            </div>
+                            <PermissionGuard permission={ADMIN_PERMISSIONS.MANAGE_VENDORS}>
+                              <div className="hidden sm:flex items-center space-x-2 ml-4">
+                                <Button variant="ghost" size="icon" onClick={() => handleOpenModal(vendor)} className="h-9 w-9 text-muted-foreground hover:text-primary"><PencilIcon className="w-4 h-4" /></Button>
+                                <Button variant="ghost" size="icon" onClick={() => setDeleteConfirm(vendor)} className="h-9 w-9 text-muted-foreground hover:text-destructive"><TrashIcon className="w-4 h-4" /></Button>
                               </div>
-                            )}
-                            {vendor.email && (
-                              <div className="flex items-center">
-                                <EnvelopeIcon className="w-4 h-4 mr-1 flex-shrink-0" />
-                                <span className="truncate">{vendor.email}</span>
-                              </div>
-                            )}
-                          </div>
-                          <div className="mt-2">
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                              {vendor.category}
-                            </span>
+                            </PermissionGuard>
                           </div>
                         </div>
-                        
-                        {/* Desktop Action Buttons */}
                         <PermissionGuard permission={ADMIN_PERMISSIONS.MANAGE_VENDORS}>
-                          <div className="hidden sm:flex items-center space-x-2 ml-4">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleOpenModal(vendor)}
-                              className="h-9 w-9 text-gray-400 hover:text-blue-600 min-h-[44px] min-w-[44px] touch-manipulation"
-                            >
-                              <PencilIcon className="w-4 h-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => setDeleteConfirm(vendor)}
-                              className="h-9 w-9 text-gray-400 hover:text-red-600 min-h-[44px] min-w-[44px] touch-manipulation"
-                            >
-                              <TrashIcon className="w-4 h-4" />
-                            </Button>
+                          <div className="flex sm:hidden space-x-2 mt-3 pt-3 border-t">
+                            <Button variant="outline" size="sm" onClick={() => handleOpenModal(vendor)} className="flex-1"><PencilIcon className="w-4 h-4 mr-2" />Edit</Button>
+                            <Button variant="destructive" size="sm" onClick={() => setDeleteConfirm(vendor)} className="flex-1"><TrashIcon className="w-4 h-4 mr-2" />Delete</Button>
                           </div>
                         </PermissionGuard>
                       </div>
                     </div>
-                    
-                    {/* Mobile Action Buttons */}
-                    <PermissionGuard permission={ADMIN_PERMISSIONS.MANAGE_VENDORS}>
-                      <div className="flex sm:hidden space-x-2 mt-3 pt-3 border-t border-gray-200">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleOpenModal(vendor)}
-                          className="flex-1 min-h-[44px] touch-manipulation"
-                        >
-                          <PencilIcon className="w-4 h-4 mr-2" />
-                          Edit
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setDeleteConfirm(vendor)}
-                          className="flex-1 min-h-[44px] touch-manipulation text-red-600 border-red-300 hover:bg-red-50"
-                        >
-                          <TrashIcon className="w-4 h-4 mr-2" />
-                          Delete
-                        </Button>
-                      </div>
-                    </PermissionGuard>
-                  </div>
+                  ))}
                 </div>
-              ))}
-                </div>
-
-                {/* Pagination */}
                 {totalPages > 1 && (
-                  <div className="p-4 sm:p-6 border-t border-gray-200">
+                  <div className="p-4 sm:p-6 border-t">
                     <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-                      <div className="text-sm text-gray-700">
-                        Showing <span className="font-medium">{startIndex + 1}</span> to{' '}
-                        <span className="font-medium">{endIndex}</span> of{' '}
-                        <span className="font-medium">{totalVendors}</span> results
-                      </div>
-                      
+                      <div className="text-sm text-muted-foreground">Showing <span className="font-medium">{startIndex + 1}</span> to <span className="font-medium">{endIndex}</span> of <span className="font-medium">{totalVendors}</span> results</div>
                       <div className="flex items-center space-x-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handlePageChange(currentPage - 1)}
-                          disabled={currentPage === 1}
-                          className="h-8 w-8 p-0"
-                        >
-                          <ChevronLeftIcon className="w-4 h-4" />
-                        </Button>
-                        
+                        <Button variant="outline" size="sm" onClick={() => handlePageChange(currentPage - 1)} disabled={currentPage === 1} className="h-8 w-8 p-0"><ChevronLeftIcon className="w-4 h-4" /></Button>
                         <div className="hidden sm:flex items-center space-x-1">
-                          {getPaginationPages().map((page) => (
-                            <Button
-                              key={page}
-                              variant={currentPage === page ? "default" : "outline"}
-                              size="sm"
-                              onClick={() => handlePageChange(page)}
-                              className="h-8 w-8 p-0"
-                            >
-                              {page}
-                            </Button>
-                          ))}
+                          {getPaginationPages().map((page) => (<Button key={page} variant={currentPage === page ? "default" : "outline"} size="sm" onClick={() => handlePageChange(page)} className="h-8 w-8 p-0">{page}</Button>))}
                         </div>
-                        
-                        <div className="sm:hidden text-sm text-gray-700">
-                          Page {currentPage} of {totalPages}
-                        </div>
-                        
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handlePageChange(currentPage + 1)}
-                          disabled={currentPage === totalPages}
-                          className="h-8 w-8 p-0"
-                        >
-                          <ChevronRightIcon className="w-4 h-4" />
-                        </Button>
+                        <div className="sm:hidden text-sm text-muted-foreground">Page {currentPage} of {totalPages}</div>
+                        <Button variant="outline" size="sm" onClick={() => handlePageChange(currentPage + 1)} disabled={currentPage === totalPages} className="h-8 w-8 p-0"><ChevronRightIcon className="w-4 h-4" /></Button>
                       </div>
                     </div>
                   </div>
@@ -539,165 +348,51 @@ const VendorManagement = () => {
           </CardContent>
         </Card>
 
-        {/* Add/Edit Modal */}
         {isModalOpen && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-2 sm:p-4 z-50">
-            <div className="bg-white rounded-xl shadow-xl w-full max-w-sm sm:max-w-2xl max-h-[95vh] sm:max-h-[90vh] overflow-y-auto">
-              <div className="p-4 sm:p-6 border-b border-gray-200">
+            <div className="bg-card rounded-xl shadow-xl w-full max-w-sm sm:max-w-2xl max-h-[95vh] sm:max-h-[90vh] overflow-y-auto">
+              <div className="p-4 sm:p-6 border-b">
                 <div className="flex items-center justify-between">
-                  <h2 className="text-lg sm:text-xl font-semibold text-gray-900">
-                    {editingVendor ? 'Edit Vendor' : 'Add New Vendor'}
-                  </h2>
-                  <button
-                    onClick={handleCloseModal}
-                    className="p-2 text-gray-400 hover:text-gray-600 rounded-lg min-h-[44px] min-w-[44px] flex items-center justify-center touch-manipulation"
-                  >
-                    <XMarkIcon className="w-5 h-5" />
-                  </button>
+                  <h2 className="text-lg sm:text-xl font-semibold text-foreground">{editingVendor ? 'Edit Vendor' : 'Add New Vendor'}</h2>
+                  <button onClick={handleCloseModal} className="p-2 text-muted-foreground hover:text-foreground rounded-lg"><XMarkIcon className="w-5 h-5" /></button>
                 </div>
               </div>
-              
               <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div><label className="block text-sm font-medium text-muted-foreground mb-1">Vendor Name *</label><input type="text" required className="input-field" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} /></div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Vendor Name *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 min-h-[44px] touch-manipulation"
-                      value={formData.name}
-                      onChange={(e) => setFormData({...formData, name: e.target.value})}
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Category *
-                    </label>
-                    <select
-                      required
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 min-h-[44px] touch-manipulation"
-                      value={formData.category}
-                      onChange={(e) => setFormData({...formData, category: e.target.value})}
-                    >
+                    <label className="block text-sm font-medium text-muted-foreground mb-1">Category *</label>
+                    <select required className="input-field" value={formData.category} onChange={(e) => setFormData({...formData, category: e.target.value})}>
                       <option value="">Select Category</option>
-                      {VENDOR_CATEGORIES.map(category => (
-                        <option key={category} value={category}>{category}</option>
-                      ))}
+                      {VENDOR_CATEGORIES.map(category => (<option key={category} value={category}>{category}</option>))}
                     </select>
                   </div>
                 </div>
-
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Contact Person
-                    </label>
-                    <input
-                      type="text"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 min-h-[44px] touch-manipulation"
-                      value={formData.contact_person}
-                      onChange={(e) => setFormData({...formData, contact_person: e.target.value})}
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Phone Number
-                    </label>
-                    <input
-                      type="tel"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 min-h-[44px] touch-manipulation"
-                      value={formData.phone_number}
-                      onChange={(e) => setFormData({...formData, phone_number: e.target.value})}
-                    />
-                  </div>
+                  <div><label className="block text-sm font-medium text-muted-foreground mb-1">Contact Person</label><input type="text" className="input-field" value={formData.contact_person} onChange={(e) => setFormData({...formData, contact_person: e.target.value})} /></div>
+                  <div><label className="block text-sm font-medium text-muted-foreground mb-1">Phone Number</label><input type="tel" className="input-field" value={formData.phone_number} onChange={(e) => setFormData({...formData, phone_number: e.target.value})} /></div>
                 </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Email
-                  </label>
-                  <input
-                    type="email"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 min-h-[44px] touch-manipulation"
-                    value={formData.email}
-                    onChange={(e) => setFormData({...formData, email: e.target.value})}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Address
-                  </label>
-                  <textarea
-                    rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 min-h-[44px] touch-manipulation"
-                    value={formData.address}
-                    onChange={(e) => setFormData({...formData, address: e.target.value})}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Notes
-                  </label>
-                  <textarea
-                    rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 min-h-[44px] touch-manipulation"
-                    value={formData.notes}
-                    onChange={(e) => setFormData({...formData, notes: e.target.value})}
-                  />
-                </div>
-
+                <div><label className="block text-sm font-medium text-muted-foreground mb-1">Email</label><input type="email" className="input-field" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} /></div>
+                <div><label className="block text-sm font-medium text-muted-foreground mb-1">Address</label><textarea rows={3} className="input-field" value={formData.address} onChange={(e) => setFormData({...formData, address: e.target.value})} /></div>
+                <div><label className="block text-sm font-medium text-muted-foreground mb-1">Notes</label><textarea rows={3} className="input-field" value={formData.notes} onChange={(e) => setFormData({...formData, notes: e.target.value})} /></div>
                 <div className="flex flex-col sm:flex-row sm:justify-end gap-3 pt-4">
-                  <button
-                    type="button"
-                    onClick={handleCloseModal}
-                    className="w-full sm:w-auto px-4 py-3 sm:py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 min-h-[44px] touch-manipulation"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="w-full sm:w-auto px-4 py-3 sm:py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 min-h-[44px] touch-manipulation"
-                  >
-                    {editingVendor ? 'Update Vendor' : 'Add Vendor'}
-                  </button>
+                  <Button type="button" variant="outline" onClick={handleCloseModal}>Cancel</Button>
+                  <Button type="submit" className="btn-primary">{editingVendor ? 'Update Vendor' : 'Add Vendor'}</Button>
                 </div>
               </form>
             </div>
           </div>
         )}
 
-        {/* Delete Confirmation Modal */}
         {deleteConfirm && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-4 sm:p-6">
-              <div className="flex items-center justify-center w-12 h-12 bg-red-100 rounded-full mx-auto mb-4">
-                <TrashIcon className="w-6 h-6 text-red-600" />
-              </div>
-              <h3 className="text-lg font-medium text-gray-900 text-center mb-2">
-                Delete Vendor
-              </h3>
-              <p className="text-gray-500 text-center mb-6">
-                Are you sure you want to delete "{deleteConfirm.name}"? This action cannot be undone.
-              </p>
+            <div className="bg-card rounded-xl shadow-xl max-w-md w-full p-4 sm:p-6">
+              <div className="flex items-center justify-center w-12 h-12 bg-destructive/10 rounded-full mx-auto mb-4"><TrashIcon className="w-6 h-6 text-destructive" /></div>
+              <h3 className="text-lg font-medium text-foreground text-center mb-2">Delete Vendor</h3>
+              <p className="text-muted-foreground text-center mb-6">Are you sure you want to delete "{deleteConfirm.name}"? This action cannot be undone.</p>
               <div className="flex flex-col sm:flex-row sm:justify-center gap-3">
-                <button
-                  onClick={() => setDeleteConfirm(null)}
-                  className="w-full sm:w-auto px-4 py-3 sm:py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 min-h-[44px] touch-manipulation"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => handleDelete(deleteConfirm.id)}
-                  className="w-full sm:w-auto px-4 py-3 sm:py-2 border border-transparent rounded-lg text-sm font-medium text-white bg-red-600 hover:bg-red-700 min-h-[44px] touch-manipulation"
-                >
-                  Delete
-                </button>
+                <Button variant="outline" onClick={() => setDeleteConfirm(null)}>Cancel</Button>
+                <Button variant="destructive" onClick={() => handleDelete(deleteConfirm.id)}>Delete</Button>
               </div>
             </div>
           </div>
