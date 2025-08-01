@@ -158,6 +158,12 @@ const AdminLayout = ({ children }) => {
           {/* Page Content - Scrollable */}
           <main className="flex-1 overflow-y-auto">
             <div className="p-6">
+              {/* Mobile Sidebar Toggle and Admin Logo */}
+              <div className="flex items-center justify-between mb-6 lg:justify-end">
+                <div className="flex items-center space-x-3">
+                  <RoleIndicator />
+                </div>
+              </div>
               {children}
             </div>
           </main>
