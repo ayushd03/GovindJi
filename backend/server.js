@@ -380,56 +380,26 @@ app.post('/api/admin/products/:id/images/upload', authenticateAdmin, upload.sing
             const ImageProcessingWrapper = require('./services/ImageProcessingWrapper');
             const imageProcessor = new ImageProcessingWrapper();
             
-            // Check if Python is available, use fallback if not
-            let processResult;
-            const isPythonAvailable = await imageProcessor.checkPythonAvailability();
-            
-            if (isPythonAvailable) {
-                processResult = await imageProcessor.processImage(
-                    req.file.buffer,
-                    processingSettings
-                );
-            } else {
-                console.log('Python not available, using Sharp fallback processing');
-                processResult = await imageProcessor.simpleFallbackResize(
-                    req.file.buffer,
-                    processingSettings
-                );
-            }
+            // Process image using Sharp
+            const processResult = await imageProcessor.processImage(
+                req.file.buffer,
+                processingSettings
+            );
             
             if (processResult.success) {
-                if (processResult.fallback && processResult.processed_buffer) {
-                    // Sharp fallback processing - buffer is directly available
-                    processedBuffer = processResult.processed_buffer;
-                    processedMimeType = 'image/webp';
-                    
-                    const originalName = req.file.originalname.split('.')[0];
-                    processedFilename = `${originalName}.webp`;
-                    
-                    console.log(`Image processed with Sharp fallback: ${processResult.original.file_size} -> ${processResult.processed.file_size} bytes (${processResult.compression_ratio}% reduction)`);
-                } else {
-                    // Python processing - read from file
-                    const fs = require('fs');
-                    processedBuffer = await fs.promises.readFile(processResult.output_path);
-                    
-                    // Update MIME type based on processed format
-                    const processedFormat = processResult.processed.format.toLowerCase();
-                    processedMimeType = `image/${processedFormat === 'jpeg' ? 'jpeg' : processedFormat}`;
-                    
-                    // Update filename with processed extension
-                    const originalName = req.file.originalname.split('.')[0];
-                    const extension = processedFormat === 'jpeg' ? 'jpg' : processedFormat;
-                    processedFilename = `${originalName}.${extension}`;
-                    
-                    console.log(`Image processed with Python: ${processResult.original.file_size} -> ${processResult.processed.file_size} bytes (${processResult.compression_ratio}% reduction)`);
-                    
-                    // Clean up processed file
-                    try {
-                        await fs.promises.unlink(processResult.output_path);
-                    } catch (cleanupError) {
-                        console.warn('Could not clean up processed file:', cleanupError.message);
-                    }
-                }
+                // Use processed buffer directly
+                processedBuffer = processResult.processed_buffer;
+                
+                // Update MIME type based on processed format
+                const processedFormat = processResult.processed.format.toLowerCase();
+                processedMimeType = `image/${processedFormat === 'jpeg' ? 'jpeg' : processedFormat}`;
+                
+                // Update filename with processed extension
+                const originalName = req.file.originalname.split('.')[0];
+                const extension = processedFormat === 'jpeg' ? 'jpg' : processedFormat;
+                processedFilename = `${originalName}.${extension}`;
+                
+                console.log(`Image processed: ${processResult.original.file_size} -> ${processResult.processed.file_size} bytes (${processResult.compression_ratio}% reduction)`)
             } else {
                 console.warn('Image processing failed, using original:', processResult.error);
                 // Continue with original file if processing fails
@@ -958,56 +928,26 @@ app.post('/api/admin/categories/:id/images', authenticateAdmin, upload.single('i
             const ImageProcessingWrapper = require('./services/ImageProcessingWrapper');
             const imageProcessor = new ImageProcessingWrapper();
             
-            // Check if Python is available, use fallback if not
-            let processResult;
-            const isPythonAvailable = await imageProcessor.checkPythonAvailability();
-            
-            if (isPythonAvailable) {
-                processResult = await imageProcessor.processImage(
-                    req.file.buffer,
-                    processingSettings
-                );
-            } else {
-                console.log('Python not available, using Sharp fallback processing');
-                processResult = await imageProcessor.simpleFallbackResize(
-                    req.file.buffer,
-                    processingSettings
-                );
-            }
+            // Process category image using Sharp
+            const processResult = await imageProcessor.processImage(
+                req.file.buffer,
+                processingSettings
+            );
             
             if (processResult.success) {
-                if (processResult.fallback && processResult.processed_buffer) {
-                    // Sharp fallback processing - buffer is directly available
-                    processedBuffer = processResult.processed_buffer;
-                    processedMimeType = 'image/webp';
-                    
-                    const originalName = req.file.originalname.split('.')[0];
-                    processedFilename = `${originalName}.webp`;
-                    
-                    console.log(`Category image processed with Sharp fallback: ${processResult.original.file_size} -> ${processResult.processed.file_size} bytes (${processResult.compression_ratio}% reduction)`);
-                } else {
-                    // Python processing - read from file
-                    const fs = require('fs');
-                    processedBuffer = await fs.promises.readFile(processResult.output_path);
-                    
-                    // Update MIME type based on processed format
-                    const processedFormat = processResult.processed.format.toLowerCase();
-                    processedMimeType = `image/${processedFormat === 'jpeg' ? 'jpeg' : processedFormat}`;
-                    
-                    // Update filename with processed extension
-                    const originalName = req.file.originalname.split('.')[0];
-                    const extension = processedFormat === 'jpeg' ? 'jpg' : processedFormat;
-                    processedFilename = `${originalName}.${extension}`;
-                    
-                    console.log(`Category image processed with Python: ${processResult.original.file_size} -> ${processResult.processed.file_size} bytes (${processResult.compression_ratio}% reduction)`);
-                    
-                    // Clean up processed file
-                    try {
-                        await fs.promises.unlink(processResult.output_path);
-                    } catch (cleanupError) {
-                        console.warn('Could not clean up processed file:', cleanupError.message);
-                    }
-                }
+                // Use processed buffer directly
+                processedBuffer = processResult.processed_buffer;
+                
+                // Update MIME type based on processed format
+                const processedFormat = processResult.processed.format.toLowerCase();
+                processedMimeType = `image/${processedFormat === 'jpeg' ? 'jpeg' : processedFormat}`;
+                
+                // Update filename with processed extension
+                const originalName = req.file.originalname.split('.')[0];
+                const extension = processedFormat === 'jpeg' ? 'jpg' : processedFormat;
+                processedFilename = `${originalName}.${extension}`;
+                
+                console.log(`Category image processed: ${processResult.original.file_size} -> ${processResult.processed.file_size} bytes (${processResult.compression_ratio}% reduction)`)
             } else {
                 console.warn('Category image processing failed, using original:', processResult.error);
                 // Continue with original file if processing fails

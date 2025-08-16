@@ -1,115 +1,153 @@
-const { spawn } = require('child_process');
+const sharp = require('sharp');
 const path = require('path');
 const fs = require('fs').promises;
 const { v4: uuidv4 } = require('uuid');
 
 class ImageProcessingWrapper {
   constructor() {
-    this.pythonScript = path.join(__dirname, 'ImageProcessingService.py');
-    this.processedDir = path.join(__dirname, '..', 'uploads', 'processed');
-    this.tempDir = path.join(__dirname, '..', 'uploads', 'temp');
-  }
-
-  async ensureDirectories() {
-    try {
-      await fs.mkdir(this.processedDir, { recursive: true });
-      await fs.mkdir(this.tempDir, { recursive: true });
-    } catch (error) {
-      console.error('Error creating directories:', error);
-    }
+    // No need for directories since we process in memory
   }
 
   /**
-   * Process an image with the Python service
+   * Process an image using Sharp
    * @param {string|Buffer} input - Input file path or buffer
    * @param {Object} settings - Processing settings
    * @param {string} outputFilename - Optional output filename
    * @returns {Promise<Object>} Processing result
    */
   async processImage(input, settings = {}, outputFilename = null) {
-    return new Promise(async (resolve, reject) => {
-      try {
-        // Ensure directories exist first
-        await this.ensureDirectories();
-        
-        let inputPath;
-        let tempFile = false;
-
-        // Handle buffer input
-        if (Buffer.isBuffer(input)) {
-          const tempFilename = `temp_${uuidv4()}.tmp`;
-          inputPath = path.join(this.tempDir, tempFilename);
-          await fs.writeFile(inputPath, input);
-          tempFile = true;
-        } else {
-          inputPath = input;
+    let tempFilePath = null;
+    
+    try {
+      // Merge with default settings
+      const processedSettings = this.validateSettings(settings);
+      
+      let inputBuffer;
+      let originalSize;
+      
+      // Handle input
+      if (Buffer.isBuffer(input)) {
+        inputBuffer = input;
+        originalSize = input.length;
+      } else {
+        inputBuffer = await fs.readFile(input);
+        originalSize = inputBuffer.length;
+        // If input was a file path, remember to clean it up if it's a temp file
+        if (input.includes('temp_')) {
+          tempFilePath = input;
         }
-
-        // Prepare arguments
-        const args = [
-          this.pythonScript,
-          inputPath,
-          '--settings', JSON.stringify(settings),
-          '--output-dir', this.processedDir
-        ];
-
-        if (outputFilename) {
-          args.push('--output-filename', outputFilename);
-        }
-
-        // Check if Python script exists
-        try {
-          await fs.access(this.pythonScript);
-        } catch (scriptError) {
-          throw new Error(`Python script not found: ${this.pythonScript}`);
-        }
-
-        // Spawn Python process
-        const pythonProcess = spawn('python', args);
-        
-        let stdout = '';
-        let stderr = '';
-
-        pythonProcess.stdout.on('data', (data) => {
-          stdout += data.toString();
-        });
-
-        pythonProcess.stderr.on('data', (data) => {
-          stderr += data.toString();
-        });
-
-        pythonProcess.on('close', async (code) => {
-          try {
-            // Clean up temp file if created
-            if (tempFile) {
-              await fs.unlink(inputPath).catch(() => {});
-            }
-
-            if (code !== 0) {
-              console.error('Python process stderr:', stderr);
-              return reject(new Error(`Python process exited with code ${code}: ${stderr}`));
-            }
-
-            try {
-              const result = JSON.parse(stdout);
-              resolve(result);
-            } catch (parseError) {
-              console.error('Error parsing Python output:', stdout);
-              reject(new Error(`Failed to parse Python output: ${parseError.message}`));
-            }
-          } catch (error) {
-            reject(error);
-          }
-        });
-
-        pythonProcess.on('error', (error) => {
-          reject(new Error(`Failed to start Python process: ${error.message}`));
-        });
-
-      } catch (error) {
-        reject(error);
       }
-    });
+
+      // Get original image metadata
+      const metadata = await sharp(inputBuffer).metadata();
+      
+      // Start processing pipeline
+      let pipeline = sharp(inputBuffer);
+      
+      // Auto-orient if enabled
+      if (processedSettings.optimization.autoOrient) {
+        pipeline = pipeline.rotate();
+      }
+      
+      // Resize if enabled
+      if (processedSettings.resize.enabled) {
+        const { width, height, maintainAspectRatio } = processedSettings.resize;
+        if (width || height) {
+          pipeline = pipeline.resize(width, height, {
+            fit: maintainAspectRatio ? 'inside' : 'fill',
+            withoutEnlargement: true
+          });
+        }
+      }
+      
+      // Compress if enabled (resize based on max dimensions)
+      if (processedSettings.compression.enabled) {
+        const { maxWidth, maxHeight } = processedSettings.compression;
+        if (metadata.width > maxWidth || metadata.height > maxHeight) {
+          pipeline = pipeline.resize(maxWidth, maxHeight, {
+            fit: 'inside',
+            withoutEnlargement: true
+          });
+        }
+      }
+      
+      // Determine output format and apply format-specific options
+      const outputFormat = this.determineOutputFormat(metadata.format, processedSettings.format);
+      
+      if (outputFormat === 'webp') {
+        pipeline = pipeline.webp({
+          quality: processedSettings.compression.quality,
+          progressive: processedSettings.optimization.progressive
+        });
+      } else if (outputFormat === 'jpeg') {
+        pipeline = pipeline.jpeg({
+          quality: processedSettings.compression.quality,
+          progressive: processedSettings.optimization.progressive
+        });
+      } else if (outputFormat === 'png') {
+        pipeline = pipeline.png({
+          progressive: processedSettings.optimization.progressive
+        });
+      }
+      
+      // Process the image
+      const processedBuffer = await pipeline.toBuffer();
+      
+      // Get final metadata
+      const finalMetadata = await sharp(processedBuffer).metadata();
+      
+      // Generate filename for reference (but don't save to disk)
+      if (!outputFilename) {
+        const timestamp = Date.now();
+        const extension = outputFormat === 'jpeg' ? 'jpg' : outputFormat;
+        outputFilename = `processed_${timestamp}.${extension}`;
+      }
+      
+      // Clean up temp file immediately after processing
+      if (tempFilePath) {
+        try {
+          await fs.unlink(tempFilePath);
+        } catch (cleanupError) {
+          console.warn('Could not clean up temp file:', cleanupError.message);
+        }
+      }
+      
+      return {
+        success: true,
+        output_filename: outputFilename,
+        processed_buffer: processedBuffer,
+        original: {
+          format: metadata.format,
+          size: [metadata.width, metadata.height],
+          file_size: originalSize
+        },
+        processed: {
+          format: finalMetadata.format,
+          size: [finalMetadata.width, finalMetadata.height],
+          file_size: processedBuffer.length
+        },
+        settings_used: processedSettings,
+        compression_ratio: Math.round((1 - processedBuffer.length / originalSize) * 100)
+      };
+      
+    } catch (error) {
+      console.error('Image processing error:', error);
+      
+      // Clean up temp file even on error
+      if (tempFilePath) {
+        try {
+          await fs.unlink(tempFilePath);
+        } catch (cleanupError) {
+          console.warn('Could not clean up temp file after error:', cleanupError.message);
+        }
+      }
+      
+      return {
+        success: false,
+        error: error.message,
+        error_type: error.constructor.name
+      };
+    }
   }
 
   /**
@@ -229,80 +267,74 @@ class ImageProcessingWrapper {
     return validated;
   }
 
-  /**
-   * Clean up old processed files
-   * @param {number} maxAgeMs - Maximum age in milliseconds
-   */
-  async cleanupOldFiles(maxAgeMs = 24 * 60 * 60 * 1000) { // 24 hours default
-    try {
-      const files = await fs.readdir(this.processedDir);
-      const now = Date.now();
 
-      for (const file of files) {
-        const filePath = path.join(this.processedDir, file);
-        const stats = await fs.stat(filePath);
-        
-        if (now - stats.mtime.getTime() > maxAgeMs) {
-          await fs.unlink(filePath);
-          console.log(`Cleaned up old processed file: ${file}`);
-        }
-      }
-    } catch (error) {
-      console.error('Error cleaning up old files:', error);
+  /**
+   * Determine output format based on settings
+   * @param {string} originalFormat - Original image format
+   * @param {Object} formatSettings - Format settings
+   * @returns {string} Output format
+   */
+  determineOutputFormat(originalFormat, formatSettings) {
+    const outputFormat = formatSettings.outputFormat?.toLowerCase() || 'webp';
+    
+    if (outputFormat === 'original') {
+      return originalFormat?.toLowerCase() || 'jpeg';
     }
+    
+    const supportedFormats = ['webp', 'jpeg', 'jpg', 'png', 'gif'];
+    return supportedFormats.includes(outputFormat) ? outputFormat : 'webp';
   }
 
   /**
-   * Simple fallback image processing using sharp (if available) or basic buffer manipulation
+   * Process image to target file size
    * @param {Buffer} input - Input image buffer
-   * @param {Object} settings - Processing settings
+   * @param {Object} settings - Processing settings with targetFileSize
    * @returns {Promise<Object>} Processing result
    */
-  async simpleFallbackResize(input, settings = {}) {
+  async processToTargetSize(input, settings = {}) {
     try {
-      // Try to use sharp if available
-      let sharp;
-      try {
-        sharp = require('sharp');
-      } catch (sharpError) {
-        // Sharp not available, return original with warning
-        return {
-          success: false,
-          error: 'No image processing libraries available (Python/sharp)',
-          fallback: true
-        };
-      }
-
       const targetSize = settings.targetFileSize || 150 * 1024; // 150KB default
+      const processedSettings = this.validateSettings(settings);
       
-      // Use sharp for basic compression
-      let processed = sharp(input);
+      // Always use WebP for size optimization
+      processedSettings.format.outputFormat = 'webp';
+      
+      let metadata = await sharp(input).metadata();
+      let pipeline = sharp(input);
       
       // Auto-orient
-      processed = processed.rotate();
+      pipeline = pipeline.rotate();
       
-      // Resize if too large (basic heuristic)
-      const metadata = await processed.metadata();
-      if (metadata.width > 1920 || metadata.height > 1080) {
-        processed = processed.resize(1920, 1080, { 
-          fit: 'inside', 
-          withoutEnlargement: true 
-        });
+      // Start with reasonable dimensions if too large
+      if (metadata.width > 2048 || metadata.height > 2048) {
+        pipeline = pipeline.resize(2048, 2048, { fit: 'inside', withoutEnlargement: true });
       }
       
-      // Convert to WebP with quality adjustment
-      let quality = 85;
+      let quality = 95;
       let outputBuffer;
       
-      // Try different quality levels to reach target size
-      for (let attempt = 0; attempt < 5; attempt++) {
-        outputBuffer = await processed.webp({ quality }).toBuffer();
+      // Iteratively reduce quality to reach target size
+      for (let attempt = 0; attempt < 10; attempt++) {
+        outputBuffer = await pipeline.webp({ quality }).toBuffer();
         
-        if (outputBuffer.length <= targetSize || quality <= 30) {
+        if (outputBuffer.length <= targetSize) {
           break;
         }
         
-        quality -= 15;
+        if (outputBuffer.length > targetSize * 1.5 && quality > 30) {
+          quality = Math.max(30, quality - 15);
+        } else if (outputBuffer.length > targetSize && quality > 20) {
+          quality = Math.max(20, quality - 5);
+        } else {
+          // Try reducing dimensions
+          const currentMeta = await sharp(outputBuffer).metadata();
+          const scaleFactor = Math.sqrt(targetSize / outputBuffer.length);
+          const newWidth = Math.max(300, Math.round(currentMeta.width * scaleFactor));
+          const newHeight = Math.max(200, Math.round(currentMeta.height * scaleFactor));
+          
+          pipeline = sharp(input).rotate().resize(newWidth, newHeight, { fit: 'inside' });
+          quality = Math.min(85, quality + 10);
+        }
       }
       
       return {
@@ -310,46 +342,24 @@ class ImageProcessingWrapper {
         processed_buffer: outputBuffer,
         original: {
           file_size: input.length,
-          format: metadata.format
+          format: metadata.format,
+          size: [metadata.width, metadata.height]
         },
         processed: {
           file_size: outputBuffer.length,
-          format: 'webp'
+          format: 'webp',
+          size: await sharp(outputBuffer).metadata().then(m => [m.width, m.height])
         },
         compression_ratio: Math.round((1 - outputBuffer.length / input.length) * 100),
-        fallback: true
+        settings_used: processedSettings
       };
       
     } catch (error) {
       return {
         success: false,
-        error: error.message,
-        fallback: true
+        error: error.message
       };
     }
-  }
-
-  /**
-   * Check if Python and required libraries are available
-   * @returns {Promise<boolean>} True if available
-   */
-  async checkPythonAvailability() {
-    return new Promise((resolve) => {
-      const pythonProcess = spawn('python', ['-c', 'import PIL, pillow_heif; print("OK")']);
-      
-      let output = '';
-      pythonProcess.stdout.on('data', (data) => {
-        output += data.toString();
-      });
-
-      pythonProcess.on('close', (code) => {
-        resolve(code === 0 && output.trim() === 'OK');
-      });
-
-      pythonProcess.on('error', () => {
-        resolve(false);
-      });
-    });
   }
 }
 
