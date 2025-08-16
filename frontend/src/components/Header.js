@@ -135,13 +135,23 @@ const Header = () => {
                 </AnimatePresence>
               </div>
             ) : (
-              <button
+              <motion.button
+                whileHover={{ 
+                  scale: 1.05,
+                  boxShadow: "0 20px 40px rgba(44, 85, 48, 0.35)"
+                }}
+                whileTap={{ scale: 0.95 }}
                 onClick={() => setIsAuthModalOpen(true)}
-                className="btn-secondary flex items-center space-x-2"
+                className="premium-signin-btn flex items-center space-x-2 px-4 py-2 rounded-full font-medium text-white shadow-lg transition-all duration-300 relative overflow-hidden group"
+                style={{
+                  background: 'linear-gradient(135deg, #2c5530 0%, #4a7856 100%)',
+                  boxShadow: '0 10px 25px rgba(44, 85, 48, 0.25)'
+                }}
               >
-                <User className="w-5 h-5" />
-                <span>Sign In</span>
-              </button>
+                <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                <User className="w-5 h-5 relative z-10" />
+                <span className="relative z-10">Sign In</span>
+              </motion.button>
             )}
             
             <div className="relative">
@@ -248,16 +258,26 @@ const Header = () => {
                 </>
               ) : (
                 <div className="border-t pt-4">
-                  <button
+                  <motion.button
+                    whileHover={{ 
+                      scale: 1.02,
+                      boxShadow: "0 20px 40px rgba(44, 85, 48, 0.35)"
+                    }}
+                    whileTap={{ scale: 0.98 }}
                     onClick={() => {
                       setIsMenuOpen(false);
                       setIsAuthModalOpen(true);
                     }}
-                    className="btn-secondary flex items-center space-x-2 w-full"
+                    className="premium-signin-btn flex items-center justify-center space-x-2 w-full px-4 py-3 rounded-full font-medium text-white shadow-lg transition-all duration-300 relative overflow-hidden group"
+                    style={{
+                      background: 'linear-gradient(135deg, #2c5530 0%, #4a7856 100%)',
+                      boxShadow: '0 10px 25px rgba(44, 85, 48, 0.25)'
+                    }}
                   >
-                    <User className="w-5 h-5" />
-                    <span className="font-medium">Sign In</span>
-                  </button>
+                    <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                    <User className="w-5 h-5 relative z-10" />
+                    <span className="font-medium relative z-10">Sign In</span>
+                  </motion.button>
                 </div>
               )}
               
