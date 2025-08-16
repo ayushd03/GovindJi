@@ -7,7 +7,7 @@ const ImageUploadManager = ({
   onUrlSubmit,
   multiple = true,
   maxFiles = 10,
-  maxSize = 50 * 1024 * 1024, // 50MB - increased limit
+  maxSize = Infinity, // No file size limit
   allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
   showAdvancedSettings = true,
   defaultSettings = {}
