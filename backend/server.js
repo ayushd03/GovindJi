@@ -139,84 +139,180 @@ app.get('/api/admin/dashboard', authenticateAdmin, async (req, res) => {
 
 // Admin Product Management
 app.post('/api/admin/products', authenticateAdmin, async (req, res) => {
-    const { name, description, price, image_url, category_id, stock_quantity, min_stock_level, sku, weight, unit } = req.body;
+    const { 
+        name, description, price, image_url, category_id, stock_quantity, min_stock_level, sku, weight, unit,
+        // New enhanced fields
+        item_hsn, is_service, base_unit, secondary_unit, unit_conversion_value,
+        sale_price_without_tax, discount_on_sale_price, discount_type,
+        opening_quantity_at_price, opening_quantity_as_of_date, stock_location,
+        wholesale_prices
+    } = req.body;
     
-    const { data, error } = await supabase
-        .from('products')
-        .insert([{
-            name,
-            description,
-            price,
-            image_url,
-            category_id,
-            stock_quantity: stock_quantity || 0,
-            min_stock_level: min_stock_level || 10,
-            sku,
-            weight,
-            unit: unit || 'kg'
-        }])
-        .select()
-        .single();
+    try {
+        // Insert product with new fields
+        const { data: product, error: productError } = await supabase
+            .from('products')
+            .insert([{
+                name,
+                description,
+                price,
+                image_url,
+                category_id,
+                stock_quantity: stock_quantity || 0,
+                min_stock_level: min_stock_level || 10,
+                sku,
+                weight,
+                unit: unit || 'kg',
+                // New fields
+                item_hsn,
+                is_service: is_service || false,
+                base_unit: base_unit || 'KILOGRAMS',
+                secondary_unit: secondary_unit || 'GRAMS',
+                unit_conversion_value: unit_conversion_value || 1000,
+                sale_price_without_tax: sale_price_without_tax || false,
+                discount_on_sale_price: discount_on_sale_price || 0,
+                discount_type: discount_type || 'percentage',
+                opening_quantity_at_price,
+                opening_quantity_as_of_date,
+                stock_location
+            }])
+            .select()
+            .single();
 
-    if (error) return res.status(500).json({ error: error.message });
+        if (productError) return res.status(500).json({ error: productError.message });
 
-    // Log admin action
-    await supabase.from('admin_logs').insert([{
-        admin_id: req.user.id,
-        action: 'CREATE_PRODUCT',
-        entity_type: 'product',
-        entity_id: data.id,
-        details: { product_name: name }
-    }]);
+        // Handle wholesale prices if provided
+        if (wholesale_prices && Array.isArray(wholesale_prices) && wholesale_prices.length > 0) {
+            const wholesalePriceData = wholesale_prices
+                .filter(wp => wp.quantity && wp.price) // Only insert valid entries
+                .map(wp => ({
+                    product_id: product.id,
+                    quantity: parseFloat(wp.quantity),
+                    price: parseFloat(wp.price)
+                }));
 
-    res.status(201).json(data);
+            if (wholesalePriceData.length > 0) {
+                const { error: wholesaleError } = await supabase
+                    .from('wholesale_prices')
+                    .insert(wholesalePriceData);
+
+                if (wholesaleError) {
+                    console.error('Error inserting wholesale prices:', wholesaleError);
+                    // Don't fail the entire request, just log the error
+                }
+            }
+        }
+
+        // Log admin action
+        await supabase.from('admin_logs').insert([{
+            admin_id: req.user.id,
+            action: 'CREATE_PRODUCT',
+            entity_type: 'product',
+            entity_id: product.id,
+            details: { product_name: name, is_service, wholesale_price_tiers: wholesale_prices?.length || 0 }
+        }]);
+
+        res.status(201).json(product);
+    } catch (error) {
+        console.error('Error creating product:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
 });
 
 app.put('/api/admin/products/:id', authenticateAdmin, async (req, res) => {
     const { id } = req.params;
-    const updates = req.body;
-    updates.updated_at = new Date().toISOString();
+    const { wholesale_prices, ...productUpdates } = req.body;
+    productUpdates.updated_at = new Date().toISOString();
 
-    const { data, error } = await supabase
-        .from('products')
-        .update(updates)
-        .eq('id', id)
-        .select()
-        .single();
+    try {
+        // Update product
+        const { data: product, error: productError } = await supabase
+            .from('products')
+            .update(productUpdates)
+            .eq('id', id)
+            .select()
+            .single();
 
-    if (error) return res.status(500).json({ error: error.message });
+        if (productError) return res.status(500).json({ error: productError.message });
 
-    // Log admin action
-    await supabase.from('admin_logs').insert([{
-        admin_id: req.user.id,
-        action: 'UPDATE_PRODUCT',
-        entity_type: 'product',
-        entity_id: id,
-        details: updates
-    }]);
+        // Handle wholesale prices update if provided
+        if (wholesale_prices !== undefined) {
+            // Delete existing wholesale prices
+            await supabase
+                .from('wholesale_prices')
+                .delete()
+                .eq('product_id', id);
 
-    res.json(data);
+            // Insert new wholesale prices
+            if (Array.isArray(wholesale_prices) && wholesale_prices.length > 0) {
+                const wholesalePriceData = wholesale_prices
+                    .filter(wp => wp.quantity && wp.price) // Only insert valid entries
+                    .map(wp => ({
+                        product_id: id,
+                        quantity: parseFloat(wp.quantity),
+                        price: parseFloat(wp.price)
+                    }));
+
+                if (wholesalePriceData.length > 0) {
+                    const { error: wholesaleError } = await supabase
+                        .from('wholesale_prices')
+                        .insert(wholesalePriceData);
+
+                    if (wholesaleError) {
+                        console.error('Error updating wholesale prices:', wholesaleError);
+                        // Don't fail the entire request, just log the error
+                    }
+                }
+            }
+        }
+
+        // Log admin action
+        await supabase.from('admin_logs').insert([{
+            admin_id: req.user.id,
+            action: 'UPDATE_PRODUCT',
+            entity_type: 'product',
+            entity_id: id,
+            details: { ...productUpdates, wholesale_price_tiers_updated: wholesale_prices !== undefined }
+        }]);
+
+        res.json(product);
+    } catch (error) {
+        console.error('Error updating product:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
 });
 
 app.delete('/api/admin/products/:id', authenticateAdmin, async (req, res) => {
     const { id } = req.params;
 
-    const { error } = await supabase
-        .from('products')
-        .delete()
-        .eq('id', id);
+    try {
+        // Delete wholesale prices first (due to foreign key constraint)
+        await supabase
+            .from('wholesale_prices')
+            .delete()
+            .eq('product_id', id);
 
-    if (error) return res.status(500).json({ error: error.message });
+        // Delete the product
+        const { error } = await supabase
+            .from('products')
+            .delete()
+            .eq('id', id);
 
-    // Log admin action
-    await supabase.from('admin_logs').insert([{
-        admin_id: req.user.id,
-        action: 'DELETE_PRODUCT',
-        entity_type: 'product',
-        entity_id: id
-    }]);
+        if (error) return res.status(500).json({ error: error.message });
 
-    res.json({ message: 'Product deleted successfully' });
+        // Log admin action
+        await supabase.from('admin_logs').insert([{
+            admin_id: req.user.id,
+            action: 'DELETE_PRODUCT',
+            entity_type: 'product',
+            entity_id: id
+        }]);
+
+        res.json({ message: 'Product deleted successfully' });
+    } catch (error) {
+        console.error('Error deleting product:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
 });
 
 // Admin Order Management
@@ -1252,23 +1348,83 @@ app.post('/api/admin/init-categories', authenticateAdmin, async (req, res) => {
 
 // Product Routes
 app.get('/api/products', async (req, res) => {
-    const { data, error } = await supabase
-        .from('products')
-        .select('*');
-    if (error) return res.status(500).json({ error: error.message });
-    res.json(data);
+    try {
+        const { data: products, error: productsError } = await supabase
+            .from('products')
+            .select('*');
+        
+        if (productsError) return res.status(500).json({ error: productsError.message });
+
+        // Fetch wholesale prices for all products
+        const { data: wholesalePrices, error: wholesaleError } = await supabase
+            .from('wholesale_prices')
+            .select('*')
+            .order('quantity', { ascending: true });
+
+        if (wholesaleError) {
+            console.error('Error fetching wholesale prices:', wholesaleError);
+            // Continue without wholesale prices if there's an error
+            return res.json(products);
+        }
+
+        // Group wholesale prices by product_id
+        const wholesalePricesByProduct = {};
+        wholesalePrices?.forEach(wp => {
+            if (!wholesalePricesByProduct[wp.product_id]) {
+                wholesalePricesByProduct[wp.product_id] = [];
+            }
+            wholesalePricesByProduct[wp.product_id].push(wp);
+        });
+
+        // Attach wholesale prices to products
+        const productsWithWholesale = products.map(product => ({
+            ...product,
+            wholesale_prices: wholesalePricesByProduct[product.id] || []
+        }));
+
+        res.json(productsWithWholesale);
+    } catch (error) {
+        console.error('Error fetching products:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
 });
 
 app.get('/api/products/:id', async (req, res) => {
     const { id } = req.params;
-    const { data, error } = await supabase
-        .from('products')
-        .select('*')
-        .eq('id', id)
-        .single();
-    if (error) return res.status(500).json({ error: error.message });
-    if (!data) return res.status(404).json({ message: 'Product not found' });
-    res.json(data);
+    
+    try {
+        const { data: product, error: productError } = await supabase
+            .from('products')
+            .select('*')
+            .eq('id', id)
+            .single();
+        
+        if (productError) return res.status(500).json({ error: productError.message });
+        if (!product) return res.status(404).json({ message: 'Product not found' });
+
+        // Fetch wholesale prices for this product
+        const { data: wholesalePrices, error: wholesaleError } = await supabase
+            .from('wholesale_prices')
+            .select('*')
+            .eq('product_id', id)
+            .order('quantity', { ascending: true });
+
+        if (wholesaleError) {
+            console.error('Error fetching wholesale prices:', wholesaleError);
+            // Continue without wholesale prices if there's an error
+            return res.json(product);
+        }
+
+        const productWithWholesale = {
+            ...product,
+            wholesale_prices: wholesalePrices || []
+        };
+
+        res.json(productWithWholesale);
+    } catch (error) {
+        console.error('Error fetching product:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
 });
 
 app.get('/api/products/category/:category_name', async (req, res) => {
@@ -1289,6 +1445,74 @@ app.get('/api/products/category/:category_name', async (req, res) => {
     
     if (productsError) return res.status(500).json({ error: productsError.message });
     res.json(productsData);
+});
+
+// Wholesale Prices Routes
+app.get('/api/admin/products/:id/wholesale-prices', authenticateAdmin, async (req, res) => {
+    const { id } = req.params;
+    
+    try {
+        const { data, error } = await supabase
+            .from('wholesale_prices')
+            .select('*')
+            .eq('product_id', id)
+            .order('quantity', { ascending: true });
+
+        if (error) return res.status(500).json({ error: error.message });
+        res.json(data || []);
+    } catch (error) {
+        console.error('Error fetching wholesale prices:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+app.post('/api/admin/products/:id/wholesale-prices', authenticateAdmin, async (req, res) => {
+    const { id } = req.params;
+    const { wholesale_prices } = req.body;
+    
+    try {
+        // Delete existing wholesale prices
+        await supabase
+            .from('wholesale_prices')
+            .delete()
+            .eq('product_id', id);
+
+        // Insert new wholesale prices
+        if (Array.isArray(wholesale_prices) && wholesale_prices.length > 0) {
+            const wholesalePriceData = wholesale_prices
+                .filter(wp => wp.quantity && wp.price)
+                .map(wp => ({
+                    product_id: id,
+                    quantity: parseFloat(wp.quantity),
+                    price: parseFloat(wp.price)
+                }));
+
+            if (wholesalePriceData.length > 0) {
+                const { data, error } = await supabase
+                    .from('wholesale_prices')
+                    .insert(wholesalePriceData)
+                    .select();
+
+                if (error) return res.status(500).json({ error: error.message });
+                
+                // Log admin action
+                await supabase.from('admin_logs').insert([{
+                    admin_id: req.user.id,
+                    action: 'UPDATE_WHOLESALE_PRICES',
+                    entity_type: 'product',
+                    entity_id: id,
+                    details: { wholesale_price_count: wholesalePriceData.length }
+                }]);
+
+                return res.json(data);
+            }
+        }
+
+        res.json([]);
+    } catch (error) {
+        console.error('Error updating wholesale prices:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
 });
 
 // Admin user creation route

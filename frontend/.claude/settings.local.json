@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pip install:*)",
+      "Bash(npm install:*)",
+      "Bash(rm:*)",
+      "Bash(npm start)",
+      "Bash(node:*)"
+    ],
+    "defaultMode": "acceptEdits",
+    "additionalDirectories": [
+      "D:\\Personal\\GovindJiDryFruits\\GovindJiDryFruits\\backend"
+    ]
+  }
+}

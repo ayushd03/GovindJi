@@ -3,7 +3,8 @@ import { PermissionGuard } from '../../components/PermissionGuard';
 import { ADMIN_PERMISSIONS } from '../../enums/roles';
 import EnhancedImageGalleryManager from '../../components/EnhancedImageGalleryManager';
 import ProductImagePreview from '../../components/ProductImagePreview';
-import { Dialog, Transition } from '@headlessui/react';
+import UnitSelectionDialog from '../../components/UnitSelectionDialog';
+import { Dialog, Transition, Tab } from '@headlessui/react';
 import {
   PlusIcon,
   XMarkIcon,
@@ -13,7 +14,9 @@ import {
   MagnifyingGlassIcon,
   ExclamationTriangleIcon,
   CheckCircleIcon,
-  CubeIcon
+  CubeIcon,
+  Cog6ToothIcon,
+  CalculatorIcon
 } from '@heroicons/react/24/outline';
 import { categoriesAPI } from '../../services/api';
 
@@ -28,6 +31,8 @@ const ProductManagement = () => {
   const [showImageGallery, setShowImageGallery] = useState(false);
   const [selectedProductForImages, setSelectedProductForImages] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [showUnitSelectionDialog, setShowUnitSelectionDialog] = useState(false);
+  const [selectedTabIndex, setSelectedTabIndex] = useState(0);
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -38,7 +43,20 @@ const ProductManagement = () => {
     min_stock_level: '',
     sku: '',
     weight: '',
-    unit: 'kg'
+    unit: 'kg',
+    // New fields for enhanced product management
+    item_hsn: '',
+    is_service: false,
+    base_unit: 'KILOGRAMS',
+    secondary_unit: 'GRAMS',
+    unit_conversion_value: 1000,
+    sale_price_without_tax: false,
+    discount_on_sale_price: '',
+    discount_type: 'percentage',
+    wholesale_prices: [],
+    opening_quantity_at_price: '',
+    opening_quantity_as_of_date: '',
+    stock_location: ''
   });
 
   useEffect(() => {
@@ -130,7 +148,19 @@ const ProductManagement = () => {
       min_stock_level: product.min_stock_level || '',
       sku: product.sku || '',
       weight: product.weight || '',
-      unit: product.unit || 'kg'
+      unit: product.unit || 'kg',
+      item_hsn: product.item_hsn || '',
+      is_service: product.is_service || false,
+      base_unit: product.base_unit || 'KILOGRAMS',
+      secondary_unit: product.secondary_unit || 'GRAMS',
+      unit_conversion_value: product.unit_conversion_value || 1000,
+      sale_price_without_tax: product.sale_price_without_tax || false,
+      discount_on_sale_price: product.discount_on_sale_price || '',
+      discount_type: product.discount_type || 'percentage',
+      wholesale_prices: product.wholesale_prices || [],
+      opening_quantity_at_price: product.opening_quantity_at_price || '',
+      opening_quantity_as_of_date: product.opening_quantity_as_of_date || '',
+      stock_location: product.stock_location || ''
     });
     setShowAddForm(true);
   };
@@ -167,8 +197,21 @@ const ProductManagement = () => {
       min_stock_level: '',
       sku: '',
       weight: '',
-      unit: 'kg'
+      unit: 'kg',
+      item_hsn: '',
+      is_service: false,
+      base_unit: 'KILOGRAMS',
+      secondary_unit: 'GRAMS',
+      unit_conversion_value: 1000,
+      sale_price_without_tax: false,
+      discount_on_sale_price: '',
+      discount_type: 'percentage',
+      wholesale_prices: [],
+      opening_quantity_at_price: '',
+      opening_quantity_as_of_date: '',
+      stock_location: ''
     });
+    setSelectedTabIndex(0);
   };
 
   const handleOpenImageGallery = (product) => {
@@ -185,10 +228,101 @@ const ProductManagement = () => {
     fetchProducts();
   };
 
+  // Generate unique SKU
+  const generateSKU = () => {
+    const timestamp = Date.now().toString().slice(-6);
+    const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+    const sku = `SKU${timestamp}${random}`;
+    setFormData({ ...formData, sku });
+  };
+
+  // Handle unit selection save
+  const handleUnitSave = (unitData) => {
+    setFormData({
+      ...formData,
+      base_unit: unitData.base_unit,
+      secondary_unit: unitData.secondary_unit,
+      unit_conversion_value: unitData.unit_conversion_value
+    });
+  };
+
+  // Add wholesale price tier
+  const addWholesalePrice = () => {
+    setFormData({
+      ...formData,
+      wholesale_prices: [...formData.wholesale_prices, { quantity: '', price: '' }]
+    });
+  };
+
+  // Update wholesale price tier
+  const updateWholesalePrice = (index, field, value) => {
+    const updated = formData.wholesale_prices.map((item, i) => 
+      i === index ? { ...item, [field]: value } : item
+    );
+    setFormData({ ...formData, wholesale_prices: updated });
+  };
+
+  // Remove wholesale price tier
+  const removeWholesalePrice = (index) => {
+    const updated = formData.wholesale_prices.filter((_, i) => i !== index);
+    setFormData({ ...formData, wholesale_prices: updated });
+  };
+
+  // Handle save and new
+  const handleSubmitAndNew = async (e) => {
+    e.preventDefault();
+    const token = localStorage.getItem('authToken');
+    
+    try {
+      const url = editingProduct 
+        ? `${API_BASE_URL}/api/admin/products/${editingProduct.id}`
+        : `${API_BASE_URL}/api/admin/products`;
+      
+      const method = editingProduct ? 'PUT' : 'POST';
+      
+      const response = await fetch(url, {
+        method,
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(formData)
+      });
+
+      if (response.ok) {
+        await fetchProducts();
+        resetForm();
+        // Keep modal open for new entry
+        setEditingProduct(null);
+      }
+    } catch (error) {
+      console.error('Error saving product:', error);
+    }
+  };
+
+  // Get unit display text
+  const getUnitDisplayText = () => {
+    if (formData.base_unit && formData.secondary_unit && formData.unit_conversion_value) {
+      return `1 ${formData.base_unit} = ${formData.unit_conversion_value} ${formData.secondary_unit}`;
+    }
+    return 'Click to configure units';
+  };
+
   const filteredProducts = products.filter(product =>
     product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    product.sku?.toLowerCase().includes(searchTerm.toLowerCase())
+    product.sku?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    product.item_hsn?.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  // Tab configuration
+  const tabs = [
+    { name: 'Pricing', icon: CalculatorIcon },
+    { name: 'Stock', icon: CubeIcon }
+  ];
+
+  function classNames(...classes) {
+    return classes.filter(Boolean).join(' ');
+  }
 
   return (
     <PermissionGuard permission={ADMIN_PERMISSIONS.VIEW_PRODUCTS}>
@@ -386,71 +520,379 @@ const ProductManagement = () => {
           <div className="fixed inset-0 z-10 overflow-y-auto">
             <div className="flex min-h-full items-end justify-center p-2 sm:p-4 text-center sm:items-center">
               <Transition.Child as={React.Fragment} enter="ease-out duration-300" enterFrom="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95" enterTo="opacity-100 translate-y-0 sm:scale-100" leave="ease-in duration-200" leaveFrom="opacity-100 translate-y-0 sm:scale-100" leaveTo="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95">
-                <Dialog.Panel className="relative transform overflow-hidden rounded-lg bg-card px-4 pb-4 pt-5 text-left shadow-xl transition-all w-full max-w-sm sm:max-w-2xl lg:max-w-4xl sm:my-8 sm:p-6">
+                <Dialog.Panel className="relative transform overflow-hidden rounded-lg bg-card px-4 pb-4 pt-5 text-left shadow-xl transition-all w-full max-w-sm sm:max-w-2xl lg:max-w-5xl sm:my-8 sm:p-6">
                   <div className="absolute right-0 top-0 pr-3 pt-3 sm:pr-4 sm:pt-4">
                     <button type="button" className="rounded-md bg-card text-muted-foreground hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2" onClick={() => { setShowAddForm(false); setEditingProduct(null); resetForm(); }}>
                       <XMarkIcon className="h-6 w-6" />
                     </button>
                   </div>
                   <div className="w-full">
-                    <Dialog.Title as="h3" className="text-lg font-semibold leading-6 text-foreground mb-6">
-                      {editingProduct ? 'Edit Product' : 'Add New Product'}
-                    </Dialog.Title>
-                    <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
+                    {/* Product/Service Toggle */}
+                    <div className="flex items-center justify-between mb-6">
+                      <Dialog.Title as="h3" className="text-lg font-semibold leading-6 text-foreground">
+                        {editingProduct ? 'Edit Product' : 'Add New Product'}
+                      </Dialog.Title>
+                      <div className="flex items-center space-x-3">
+                        <span className="text-sm text-muted-foreground">Type:</span>
+                        <div className="flex rounded-lg border border-input p-1">
+                          <button
+                            type="button"
+                            onClick={() => setFormData({ ...formData, is_service: false })}
+                            className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${
+                              !formData.is_service 
+                                ? 'bg-primary text-primary-foreground' 
+                                : 'text-muted-foreground hover:text-foreground'
+                            }`}
+                          >
+                            Product
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setFormData({ ...formData, is_service: true })}
+                            className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${
+                              formData.is_service 
+                                ? 'bg-primary text-primary-foreground' 
+                                : 'text-muted-foreground hover:text-foreground'
+                            }`}
+                          >
+                            Service
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Basic Product Information */}
+                    <form onSubmit={handleSubmit} className="space-y-6">
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                         <div>
-                          <label className="block text-sm font-medium text-muted-foreground mb-2">Product Name *</label>
-                          <input type="text" name="name" value={formData.name} onChange={handleInputChange} required className="input-field" />
+                          <label className="block text-sm font-medium text-muted-foreground mb-2">Item Name *</label>
+                          <input 
+                            type="text" 
+                            name="name" 
+                            value={formData.name} 
+                            onChange={handleInputChange} 
+                            required 
+                            className="input-field" 
+                            placeholder="Enter item name"
+                          />
                         </div>
                         <div>
-                          <label className="block text-sm font-medium text-muted-foreground mb-2">SKU</label>
-                          <input type="text" name="sku" value={formData.sku} onChange={handleInputChange} className="input-field" />
+                          <label className="block text-sm font-medium text-muted-foreground mb-2">Item HSN</label>
+                          <div className="relative">
+                            <input 
+                              type="text" 
+                              name="item_hsn" 
+                              value={formData.item_hsn} 
+                              onChange={handleInputChange} 
+                              className="input-field pr-10" 
+                              placeholder="HSN code"
+                            />
+                            <MagnifyingGlassIcon className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                          </div>
                         </div>
                         <div>
-                          <label className="block text-sm font-medium text-muted-foreground mb-2">Price (₹) *</label>
-                          <input type="number" step="0.01" name="price" value={formData.price} onChange={handleInputChange} required className="input-field" />
+                          <label className="block text-sm font-medium text-muted-foreground mb-2">Item Code (SKU)</label>
+                          <div className="flex space-x-2">
+                            <input 
+                              type="text" 
+                              name="sku" 
+                              value={formData.sku} 
+                              onChange={handleInputChange} 
+                              className="input-field flex-1" 
+                              placeholder="Auto-generated or custom"
+                            />
+                            <button
+                              type="button"
+                              onClick={generateSKU}
+                              className="btn-outline px-3 py-2 whitespace-nowrap"
+                            >
+                              Assign Code
+                            </button>
+                          </div>
                         </div>
                         <div>
                           <label className="block text-sm font-medium text-muted-foreground mb-2">Category</label>
                           <select name="category_id" value={formData.category_id} onChange={handleInputChange} className="input-field">
                             <option value="">Select Category</option>
-                            {categories.map(category => (<option key={category.id} value={category.id}>{category.name}</option>))}
+                            {categories.map(category => (
+                              <option key={category.id} value={category.id}>{category.name}</option>
+                            ))}
                           </select>
                         </div>
-                        <div>
-                          <label className="block text-sm font-medium text-muted-foreground mb-2">Stock Quantity</label>
-                          <input type="number" name="stock_quantity" value={formData.stock_quantity} onChange={handleInputChange} className="input-field" />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-muted-foreground mb-2">Min Stock Level</label>
-                          <input type="number" name="min_stock_level" value={formData.min_stock_level} onChange={handleInputChange} className="input-field" />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-muted-foreground mb-2">Weight</label>
-                          <input type="number" step="0.01" name="weight" value={formData.weight} onChange={handleInputChange} className="input-field" />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-muted-foreground mb-2">Unit</label>
-                          <select name="unit" value={formData.unit} onChange={handleInputChange} className="input-field">
-                            <option value="kg">Kilogram</option>
-                            <option value="g">Gram</option>
-                            <option value="piece">Piece</option>
-                            <option value="packet">Packet</option>
-                          </select>
+                        
+                        {/* Unit Configuration */}
+                        <div className="col-span-full">
+                          <label className="block text-sm font-medium text-muted-foreground mb-2">Unit Configuration</label>
+                          <div className="flex items-center space-x-3">
+                            <div className="flex-1 p-3 border rounded-lg bg-muted/50">
+                              <span className="text-sm text-foreground">
+                                {getUnitDisplayText()}
+                              </span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setShowUnitSelectionDialog(true)}
+                              className="btn-outline flex items-center space-x-2"
+                            >
+                              <Cog6ToothIcon className="w-4 h-4" />
+                              <span>Edit Unit</span>
+                            </button>
+                          </div>
                         </div>
                       </div>
+
+                      {/* Description */}
                       <div>
                         <label className="block text-sm font-medium text-muted-foreground mb-2">Description</label>
-                        <textarea name="description" value={formData.description} onChange={handleInputChange} rows="4" className="input-field" />
+                        <textarea 
+                          name="description" 
+                          value={formData.description} 
+                          onChange={handleInputChange} 
+                          rows="3" 
+                          className="input-field" 
+                          placeholder="Item description..."
+                        />
                       </div>
+
+                      {/* Tabbed Interface */}
+                      <div className="mt-8">
+                        <Tab.Group selectedIndex={selectedTabIndex} onChange={setSelectedTabIndex}>
+                          <Tab.List className="flex space-x-1 rounded-xl bg-muted p-1">
+                            {tabs.map((tab) => (
+                              <Tab
+                                key={tab.name}
+                                className={({ selected }) =>
+                                  classNames(
+                                    'w-full rounded-lg py-2.5 text-sm font-medium leading-5 text-foreground',
+                                    'ring-white ring-opacity-60 ring-offset-2 ring-offset-primary focus:outline-none focus:ring-2',
+                                    selected
+                                      ? 'bg-card shadow text-foreground'
+                                      : 'text-muted-foreground hover:bg-card/50 hover:text-foreground'
+                                  )
+                                }
+                              >
+                                <div className="flex items-center justify-center space-x-2">
+                                  <tab.icon className="w-4 h-4" />
+                                  <span>{tab.name}</span>
+                                </div>
+                              </Tab>
+                            ))}
+                          </Tab.List>
+                          <Tab.Panels className="mt-6">
+                            {/* Pricing Tab */}
+                            <Tab.Panel className="space-y-6">
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+                                <div>
+                                  <label className="block text-sm font-medium text-muted-foreground mb-2">Sale Price (₹) *</label>
+                                  <div className="space-y-2">
+                                    <input 
+                                      type="number" 
+                                      step="0.01" 
+                                      name="price" 
+                                      value={formData.price} 
+                                      onChange={handleInputChange} 
+                                      required 
+                                      className="input-field" 
+                                      placeholder="0.00"
+                                    />
+                                    <div className="flex items-center space-x-2">
+                                      <input
+                                        type="checkbox"
+                                        id="without-tax"
+                                        checked={formData.sale_price_without_tax}
+                                        onChange={(e) => setFormData({ ...formData, sale_price_without_tax: e.target.checked })}
+                                        className="h-4 w-4 rounded border-input text-primary focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                                      />
+                                      <label htmlFor="without-tax" className="text-sm text-muted-foreground">
+                                        Without Tax
+                                      </label>
+                                    </div>
+                                  </div>
+                                </div>
+                                <div>
+                                  <label className="block text-sm font-medium text-muted-foreground mb-2">Discount on Sale Price</label>
+                                  <div className="flex space-x-2">
+                                    <input 
+                                      type="number" 
+                                      step="0.01" 
+                                      name="discount_on_sale_price" 
+                                      value={formData.discount_on_sale_price} 
+                                      onChange={handleInputChange} 
+                                      className="input-field flex-1" 
+                                      placeholder="0"
+                                    />
+                                    <select 
+                                      name="discount_type" 
+                                      value={formData.discount_type} 
+                                      onChange={handleInputChange} 
+                                      className="input-field w-32"
+                                    >
+                                      <option value="percentage">%</option>
+                                      <option value="amount">₹</option>
+                                    </select>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Wholesale Prices */}
+                              <div>
+                                <div className="flex items-center justify-between mb-3">
+                                  <label className="block text-sm font-medium text-muted-foreground">Wholesale Prices</label>
+                                  <button
+                                    type="button"
+                                    onClick={addWholesalePrice}
+                                    className="btn-outline text-sm"
+                                  >
+                                    + Add Wholesale Price
+                                  </button>
+                                </div>
+                                {formData.wholesale_prices.map((item, index) => (
+                                  <div key={index} className="flex items-center space-x-3 mb-3">
+                                    <div className="flex-1">
+                                      <input
+                                        type="number"
+                                        placeholder="Min Quantity"
+                                        value={item.quantity}
+                                        onChange={(e) => updateWholesalePrice(index, 'quantity', e.target.value)}
+                                        className="input-field"
+                                      />
+                                    </div>
+                                    <div className="flex-1">
+                                      <input
+                                        type="number"
+                                        step="0.01"
+                                        placeholder="Price per unit"
+                                        value={item.price}
+                                        onChange={(e) => updateWholesalePrice(index, 'price', e.target.value)}
+                                        className="input-field"
+                                      />
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={() => removeWholesalePrice(index)}
+                                      className="text-destructive hover:text-destructive/80 p-2"
+                                    >
+                                      <XMarkIcon className="w-4 h-4" />
+                                    </button>
+                                  </div>
+                                ))}
+                                {formData.wholesale_prices.length === 0 && (
+                                  <p className="text-sm text-muted-foreground italic">No wholesale prices configured</p>
+                                )}
+                              </div>
+                            </Tab.Panel>
+
+                            {/* Stock Tab */}
+                            <Tab.Panel className="space-y-6">
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+                                <div>
+                                  <label className="block text-sm font-medium text-muted-foreground mb-2">Opening Quantity</label>
+                                  <input 
+                                    type="number" 
+                                    name="stock_quantity" 
+                                    value={formData.stock_quantity} 
+                                    onChange={handleInputChange} 
+                                    className="input-field" 
+                                    placeholder="0"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-sm font-medium text-muted-foreground mb-2">At Price (₹)</label>
+                                  <input 
+                                    type="number" 
+                                    step="0.01" 
+                                    name="opening_quantity_at_price" 
+                                    value={formData.opening_quantity_at_price} 
+                                    onChange={handleInputChange} 
+                                    className="input-field" 
+                                    placeholder="0.00"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-sm font-medium text-muted-foreground mb-2">As Of Date</label>
+                                  <input 
+                                    type="date" 
+                                    name="opening_quantity_as_of_date" 
+                                    value={formData.opening_quantity_as_of_date} 
+                                    onChange={handleInputChange} 
+                                    className="input-field"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-sm font-medium text-muted-foreground mb-2">Min Stock to Maintain</label>
+                                  <input 
+                                    type="number" 
+                                    name="min_stock_level" 
+                                    value={formData.min_stock_level} 
+                                    onChange={handleInputChange} 
+                                    className="input-field" 
+                                    placeholder="10"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-sm font-medium text-muted-foreground mb-2">Weight</label>
+                                  <input 
+                                    type="number" 
+                                    step="0.01" 
+                                    name="weight" 
+                                    value={formData.weight} 
+                                    onChange={handleInputChange} 
+                                    className="input-field" 
+                                    placeholder="0.00"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-sm font-medium text-muted-foreground mb-2">Location</label>
+                                  <input 
+                                    type="text" 
+                                    name="stock_location" 
+                                    value={formData.stock_location} 
+                                    onChange={handleInputChange} 
+                                    className="input-field" 
+                                    placeholder="Warehouse, Aisle, etc."
+                                  />
+                                </div>
+                              </div>
+                            </Tab.Panel>
+                          </Tab.Panels>
+                        </Tab.Group>
+                      </div>
+
+                      {/* Legacy Image URL field - keeping for backward compatibility */}
                       <div>
-                        <label className="block text-sm font-medium text-muted-foreground mb-2">Image URL</label>
-                        <input type="url" name="image_url" value={formData.image_url} onChange={handleInputChange} className="input-field" />
+                        <label className="block text-sm font-medium text-muted-foreground mb-2">Image URL (Legacy)</label>
+                        <input 
+                          type="url" 
+                          name="image_url" 
+                          value={formData.image_url} 
+                          onChange={handleInputChange} 
+                          className="input-field" 
+                          placeholder="https://example.com/image.jpg"
+                        />
                       </div>
-                      <div className="flex flex-col sm:flex-row sm:justify-end gap-3 pt-4 sm:pt-6">
-                        <button type="button" onClick={() => { setShowAddForm(false); setEditingProduct(null); resetForm(); }} className="btn-outline">
+
+                      {/* Action Buttons */}
+                      <div className="flex flex-col sm:flex-row sm:justify-end gap-3 pt-6 border-t">
+                        <button 
+                          type="button" 
+                          onClick={() => { 
+                            setShowAddForm(false); 
+                            setEditingProduct(null); 
+                            resetForm(); 
+                          }} 
+                          className="btn-outline"
+                        >
                           Cancel
                         </button>
+                        {!editingProduct && (
+                          <button 
+                            type="button" 
+                            onClick={handleSubmitAndNew}
+                            className="btn-secondary"
+                          >
+                            Save & New
+                          </button>
+                        )}
                         <button type="submit" className="btn-primary">
                           {editingProduct ? 'Update Product' : 'Add Product'}
                         </button>
@@ -469,6 +911,15 @@ const ProductManagement = () => {
         isOpen={showImageGallery}
         onClose={handleCloseImageGallery}
         onImagesUpdate={handleImagesUpdate}
+      />
+
+      <UnitSelectionDialog
+        isOpen={showUnitSelectionDialog}
+        onClose={() => setShowUnitSelectionDialog(false)}
+        onSave={handleUnitSave}
+        baseUnit={formData.base_unit}
+        secondaryUnit={formData.secondary_unit}
+        unitConversionValue={formData.unit_conversion_value}
       />
       </div>
     </PermissionGuard>
