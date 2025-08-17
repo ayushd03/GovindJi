@@ -20,6 +20,12 @@ import {
   ClipboardDocumentListIcon,
   CreditCardIcon,
   EyeIcon,
+  BanknotesIcon,
+  ReceiptPercentIcon,
+  CalendarIcon,
+  DocumentDuplicateIcon,
+  ClockIcon,
+  CheckCircleIcon,
 } from '@heroicons/react/24/outline';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
@@ -79,6 +85,20 @@ const PartyManagement = () => {
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [activeTab, setActiveTab] = useState('basic');
   const [showPartyDetails, setShowPartyDetails] = useState(null);
+  const [showVendorDetailsModal, setShowVendorDetailsModal] = useState(null);
+  const [vendorDetailsTab, setVendorDetailsTab] = useState('orders');
+  const [showPaymentModal, setShowPaymentModal] = useState(null);
+  const [vendorOrders, setVendorOrders] = useState([]);
+  const [vendorOrderItems, setVendorOrderItems] = useState([]);
+  const [vendorPayments, setVendorPayments] = useState([]);
+  const [hoveredPO, setHoveredPO] = useState(null);
+  const [paymentFormData, setPaymentFormData] = useState({
+    payment_type: 'payment',
+    amount: '',
+    payment_date: new Date().toISOString().split('T')[0],
+    reference_number: '',
+    notes: ''
+  });
   
   const [formData, setFormData] = useState({
     name: '',
@@ -333,6 +353,153 @@ const PartyManagement = () => {
     }
   };
 
+  const fetchVendorDetails = async (partyId) => {
+    try {
+      const token = localStorage.getItem('authToken');
+      
+      // Fetch vendor orders (for summary statistics)
+      const ordersResponse = await fetch(`${API_BASE_URL}/api/admin/purchase-orders?party_id=${partyId}&limit=1000`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      // Fetch vendor payments
+      const paymentsResponse = await fetch(`${API_BASE_URL}/api/admin/party-payments?party_id=${partyId}&limit=1000`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!ordersResponse.ok || !paymentsResponse.ok) {
+        throw new Error('Failed to fetch vendor details');
+      }
+
+      const ordersData = await ordersResponse.json();
+      const paymentsData = await paymentsResponse.json();
+      
+      const orders = ordersData.purchase_orders || [];
+      setVendorOrders(orders);
+      setVendorPayments(paymentsData.payments || []);
+      
+      // Extract all items from all purchase orders
+      const allItems = [];
+      orders.forEach(order => {
+        if (order.purchase_order_items && order.purchase_order_items.length > 0) {
+          order.purchase_order_items.forEach(item => {
+            allItems.push({
+              ...item,
+              po_number: order.po_number,
+              order_date: order.order_date,
+              order_status: order.status,
+              order_id: order.id
+            });
+          });
+        }
+      });
+      
+      setVendorOrderItems(allItems);
+      
+      const vendor = parties.find(p => p.id === partyId);
+      setShowVendorDetailsModal(vendor);
+    } catch (err) {
+      showError('Failed to load vendor details');
+    }
+  };
+
+  const handleVendorPayment = async (e) => {
+    e.preventDefault();
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`${API_BASE_URL}/api/admin/party-payments`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          ...paymentFormData,
+          party_id: showPaymentModal.id,
+          amount: parseFloat(paymentFormData.amount)
+        })
+      });
+
+      if (!response.ok) throw new Error('Failed to record payment');
+
+      // Refresh vendor details and party list
+      await fetchVendorDetails(showPaymentModal.id);
+      await fetchParties(currentPage);
+      
+      setShowPaymentModal(null);
+      setPaymentFormData({
+        payment_type: 'payment',
+        amount: '',
+        payment_date: new Date().toISOString().split('T')[0],
+        reference_number: '',
+        notes: ''
+      });
+      
+      showSuccess('Payment recorded successfully');
+    } catch (err) {
+      showError('Failed to record payment');
+    }
+  };
+
+  const calculateVendorBalance = (vendor, orders, payments) => {
+    const totalOrderAmount = orders
+      .filter(order => order.status !== 'cancelled')
+      .reduce((sum, order) => sum + (order.final_amount || 0), 0);
+    
+    const totalPayments = payments
+      .filter(payment => payment.payment_type === 'payment')
+      .reduce((sum, payment) => sum + (payment.amount || 0), 0);
+    
+    return totalOrderAmount - totalPayments;
+  };
+
+  const getTotalItemsValue = (items) => {
+    return items
+      .filter(item => item.order_status !== 'cancelled')
+      .reduce((sum, item) => sum + (item.total_amount || 0), 0);
+  };
+
+  const getCombinedTransactionHistory = (orders, payments) => {
+    const transactions = [];
+    
+    // Add PO entries (amounts due)
+    orders
+      .filter(order => order.status !== 'cancelled')
+      .forEach(order => {
+        transactions.push({
+          type: 'po_created',
+          date: order.order_date,
+          amount: order.final_amount,
+          description: `Amount due for ${order.po_number}`,
+          po_number: order.po_number,
+          po_items: order.purchase_order_items || [],
+          id: `po_${order.id}`
+        });
+      });
+    
+    // Add payment entries
+    payments.forEach(payment => {
+      transactions.push({
+        type: 'payment',
+        date: payment.payment_date,
+        amount: payment.amount,
+        description: payment.payment_type === 'payment' ? 'Payment' : 'Adjustment',
+        reference_number: payment.reference_number,
+        notes: payment.notes,
+        id: `payment_${payment.id}`
+      });
+    });
+    
+    // Sort by date (newest first)
+    return transactions.sort((a, b) => new Date(b.date) - new Date(a.date));
+  };
+
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('en-IN', {
       style: 'currency',
@@ -510,7 +677,7 @@ const PartyManagement = () => {
                             </div>
                             <PermissionGuard permission={ADMIN_PERMISSIONS.MANAGE_VENDORS}>
                               <div className="hidden sm:flex items-center space-x-2 ml-4">
-                                <Button variant="ghost" size="icon" onClick={() => fetchPartyDetails(party.id)} className="h-9 w-9 text-muted-foreground hover:text-primary">
+                                <Button variant="ghost" size="icon" onClick={() => fetchVendorDetails(party.id)} className="h-9 w-9 text-muted-foreground hover:text-primary">
                                   <EyeIcon className="w-4 h-4" />
                                 </Button>
                                 <Button variant="ghost" size="icon" onClick={() => handleOpenModal(party)} className="h-9 w-9 text-muted-foreground hover:text-primary">
@@ -525,7 +692,7 @@ const PartyManagement = () => {
                         </div>
                         <PermissionGuard permission={ADMIN_PERMISSIONS.MANAGE_VENDORS}>
                           <div className="flex sm:hidden space-x-2 mt-3 pt-3 border-t">
-                            <Button variant="outline" size="sm" onClick={() => fetchPartyDetails(party.id)} className="flex-1">
+                            <Button variant="outline" size="sm" onClick={() => fetchVendorDetails(party.id)} className="flex-1">
                               <EyeIcon className="w-4 h-4 mr-2" />View
                             </Button>
                             <Button variant="outline" size="sm" onClick={() => handleOpenModal(party)} className="flex-1">
@@ -796,6 +963,431 @@ const PartyManagement = () => {
                   </Card>
                 )}
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Enhanced Vendor Details Modal */}
+        {showVendorDetailsModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-2 sm:p-4 z-50">
+            <div className="bg-card rounded-xl shadow-xl w-full max-w-6xl max-h-[95vh] overflow-y-auto">
+              <div className="p-4 sm:p-6 border-b">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <h2 className="text-lg sm:text-xl font-semibold text-foreground">
+                      {showVendorDetailsModal.name} - Vendor Details
+                    </h2>
+                    <div className="flex items-center gap-2">
+                      <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                        calculateVendorBalance(showVendorDetailsModal, vendorOrders, vendorPayments) > 0 
+                          ? 'bg-red-100 text-red-800' 
+                          : 'bg-green-100 text-green-800'
+                      }`}>
+                        Balance: {formatCurrency(calculateVendorBalance(showVendorDetailsModal, vendorOrders, vendorPayments))}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <PermissionGuard permission={ADMIN_PERMISSIONS.MANAGE_VENDORS}>
+                      <Button 
+                        onClick={() => setShowPaymentModal(showVendorDetailsModal)} 
+                        size="sm" 
+                        className="btn-primary"
+                      >
+                        <BanknotesIcon className="w-4 h-4 mr-2" />
+                        Add Payment
+                      </Button>
+                    </PermissionGuard>
+                    <button onClick={() => setShowVendorDetailsModal(null)} className="p-2 text-muted-foreground hover:text-foreground rounded-lg">
+                      <XMarkIcon className="w-5 h-5" />
+                    </button>
+                  </div>
+                </div>
+                
+                {/* Tabs */}
+                <div className="mt-4 border-b">
+                  <nav className="flex space-x-8">
+                    <button 
+                      className={`py-2 px-1 border-b-2 font-medium text-sm ${vendorDetailsTab === 'orders' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
+                      onClick={() => setVendorDetailsTab('orders')}
+                    >
+                      <ClipboardDocumentListIcon className="w-4 h-4 mr-2 inline" />
+                      Ordered Items
+                    </button>
+                    <button 
+                      className={`py-2 px-1 border-b-2 font-medium text-sm ${vendorDetailsTab === 'balance' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
+                      onClick={() => setVendorDetailsTab('balance')}
+                    >
+                      <ReceiptPercentIcon className="w-4 h-4 mr-2 inline" />
+                      Balance Sheet
+                    </button>
+                  </nav>
+                </div>
+              </div>
+              
+              <div className="p-4 sm:p-6">
+                {/* Orders Tab */}
+                {vendorDetailsTab === 'orders' && (
+                  <div className="space-y-6">
+                    {/* Summary Cards */}
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                      <Card>
+                        <CardContent className="p-4">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-sm font-medium text-muted-foreground">Total Items</p>
+                              <p className="text-2xl font-bold text-foreground">{vendorOrderItems.length}</p>
+                            </div>
+                            <ClipboardDocumentListIcon className="w-8 h-8 text-primary" />
+                          </div>
+                        </CardContent>
+                      </Card>
+                      
+                      <Card>
+                        <CardContent className="p-4">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-sm font-medium text-muted-foreground">Total Quantity</p>
+                              <p className="text-2xl font-bold text-foreground">
+                                {vendorOrderItems.reduce((sum, item) => sum + (item.quantity || 0), 0).toFixed(2)}
+                              </p>
+                            </div>
+                            <ClockIcon className="w-8 h-8 text-warning" />
+                          </div>
+                        </CardContent>
+                      </Card>
+                      
+                      <Card>
+                        <CardContent className="p-4">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-sm font-medium text-muted-foreground">Unique Products</p>
+                              <p className="text-2xl font-bold text-foreground">
+                                {new Set(vendorOrderItems.map(item => item.item_name)).size}
+                              </p>
+                            </div>
+                            <CheckCircleIcon className="w-8 h-8 text-success" />
+                          </div>
+                        </CardContent>
+                      </Card>
+                      
+                      <Card>
+                        <CardContent className="p-4">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-sm font-medium text-muted-foreground">Total Value</p>
+                              <p className="text-2xl font-bold text-foreground">
+                                {formatCurrency(getTotalItemsValue(vendorOrderItems))}
+                              </p>
+                            </div>
+                            <CurrencyRupeeIcon className="w-8 h-8 text-info" />
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </div>
+
+                    {/* Items List */}
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-base">Ordered Items</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        {vendorOrderItems.length === 0 ? (
+                          <div className="text-center py-8">
+                            <ClipboardDocumentListIcon className="w-16 h-16 text-muted-foreground/50 mx-auto mb-4" />
+                            <p className="text-muted-foreground">No items found for this vendor</p>
+                          </div>
+                        ) : (
+                          <div className="space-y-4">
+                            {vendorOrderItems.slice(0, 15).map((item, index) => (
+                              <div key={index} className="flex items-center justify-between p-4 border border-muted rounded-lg hover:bg-muted/50 transition-colors">
+                                <div className="flex-1">
+                                  <div className="mb-1">
+                                    <h4 className="font-medium text-foreground">{item.item_name}</h4>
+                                  </div>
+                                  <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                                    <span>Qty: {item.quantity} {item.unit}</span>
+                                    <span>•</span>
+                                    <span>Rate: {formatCurrency(item.price_per_unit)}</span>
+                                    <span>•</span>
+                                    <span>Date: {new Date(item.order_date).toLocaleDateString()}</span>
+                                    {item.sku && (
+                                      <>
+                                        <span>•</span>
+                                        <span>SKU: {item.sku}</span>
+                                      </>
+                                    )}
+                                  </div>
+                                  {item.description && (
+                                    <p className="text-sm text-muted-foreground mt-1">{item.description}</p>
+                                  )}
+                                </div>
+                                <div className="text-right">
+                                  <p className="font-medium text-foreground">{formatCurrency(item.total_amount)}</p>
+                                </div>
+                              </div>
+                            ))}
+                            {vendorOrderItems.length > 15 && (
+                              <div className="text-center pt-4">
+                                <p className="text-sm text-muted-foreground">
+                                  Showing 15 of {vendorOrderItems.length} items
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </div>
+                )}
+
+                {/* Balance Sheet Tab */}
+                {vendorDetailsTab === 'balance' && (
+                  <div className="space-y-6">
+                    {/* Balance Summary */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <Card>
+                        <CardContent className="p-4">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-sm font-medium text-muted-foreground">Total Items Amount</p>
+                              <p className="text-2xl font-bold text-red-600">
+                                {formatCurrency(getTotalItemsValue(vendorOrderItems))}
+                              </p>
+                            </div>
+                            <DocumentDuplicateIcon className="w-8 h-8 text-red-500" />
+                          </div>
+                        </CardContent>
+                      </Card>
+                      
+                      <Card>
+                        <CardContent className="p-4">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-sm font-medium text-muted-foreground">Total Payments</p>
+                              <p className="text-2xl font-bold text-green-600">
+                                {formatCurrency(vendorPayments.filter(payment => payment.payment_type === 'payment').reduce((sum, payment) => sum + (payment.amount || 0), 0))}
+                              </p>
+                            </div>
+                            <BanknotesIcon className="w-8 h-8 text-green-500" />
+                          </div>
+                        </CardContent>
+                      </Card>
+                      
+                      <Card>
+                        <CardContent className="p-4">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-sm font-medium text-muted-foreground">Outstanding Balance</p>
+                              <p className={`text-2xl font-bold ${
+                                calculateVendorBalance(showVendorDetailsModal, vendorOrders, vendorPayments) > 0 
+                                  ? 'text-red-600' 
+                                  : 'text-green-600'
+                              }`}>
+                                {formatCurrency(Math.abs(calculateVendorBalance(showVendorDetailsModal, vendorOrders, vendorPayments)))}
+                              </p>
+                            </div>
+                            <ReceiptPercentIcon className={`w-8 h-8 ${
+                              calculateVendorBalance(showVendorDetailsModal, vendorOrders, vendorPayments) > 0 
+                                ? 'text-red-500' 
+                                : 'text-green-500'
+                            }`} />
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </div>
+
+                    {/* Transaction History */}
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-base">Transaction History</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        {getCombinedTransactionHistory(vendorOrders, vendorPayments).length === 0 ? (
+                          <div className="text-center py-8">
+                            <DocumentDuplicateIcon className="w-16 h-16 text-muted-foreground/50 mx-auto mb-4" />
+                            <p className="text-muted-foreground">No transactions found for this vendor</p>
+                          </div>
+                        ) : (
+                          <div className="space-y-3 relative">
+                            {getCombinedTransactionHistory(vendorOrders, vendorPayments).slice(0, 15).map((transaction, index) => (
+                              <div key={transaction.id} className={`flex items-center justify-between p-3 border rounded-lg relative ${
+                                transaction.type === 'po_created' 
+                                  ? 'bg-red-50 border-red-200' 
+                                  : 'bg-green-50 border-green-200'
+                              }`}>
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-medium text-foreground">
+                                      {transaction.description}
+                                    </span>
+                                    {transaction.reference_number && (
+                                      <span className="text-sm text-muted-foreground">
+                                        • Ref: {transaction.reference_number}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                    <CalendarIcon className="w-4 h-4" />
+                                    <span>{new Date(transaction.date).toLocaleDateString()}</span>
+                                    {transaction.notes && (
+                                      <>
+                                        <span>•</span>
+                                        <span>{transaction.notes}</span>
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="text-right">
+                                  <p className={`font-bold ${
+                                    transaction.type === 'po_created' 
+                                      ? 'text-red-600' 
+                                      : 'text-green-600'
+                                  }`}>
+                                    {transaction.type === 'po_created' ? '-' : '+'}
+                                    {formatCurrency(transaction.amount)}
+                                  </p>
+                                  <p className={`text-xs ${
+                                    transaction.type === 'po_created' 
+                                      ? 'text-red-500' 
+                                      : 'text-green-500'
+                                  }`}>
+                                    {transaction.type === 'po_created' ? 'Amount Due' : 'Payment Made'}
+                                  </p>
+                                </div>
+
+                                {/* Hover tooltip for PO items */}
+                                {transaction.type === 'po_created' && transaction.po_items.length > 0 && (
+                                  <div className="absolute inset-0 cursor-help" 
+                                       onMouseEnter={() => setHoveredPO(transaction.id)}
+                                       onMouseLeave={() => setHoveredPO(null)}>
+                                  </div>
+                                )}
+
+                                {/* Tooltip */}
+                                {hoveredPO === transaction.id && transaction.type === 'po_created' && (
+                                  <div className="absolute z-50 top-full left-0 mt-2 w-80 bg-white border border-gray-300 rounded-lg shadow-lg p-4">
+                                    <div className="font-semibold text-sm mb-2">Items in {transaction.po_number}:</div>
+                                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                                      {transaction.po_items.map((item, itemIndex) => (
+                                        <div key={itemIndex} className="text-xs border-b border-gray-100 pb-2">
+                                          <div className="font-medium">{item.item_name}</div>
+                                          <div className="text-gray-600">
+                                            Qty: {item.quantity} {item.unit} • Rate: {formatCurrency(item.price_per_unit)} • Total: {formatCurrency(item.total_amount)}
+                                          </div>
+                                          {item.description && (
+                                            <div className="text-gray-500 italic">{item.description}</div>
+                                          )}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                            {getCombinedTransactionHistory(vendorOrders, vendorPayments).length > 15 && (
+                              <div className="text-center pt-4">
+                                <p className="text-sm text-muted-foreground">
+                                  Showing 15 of {getCombinedTransactionHistory(vendorOrders, vendorPayments).length} transactions
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Vendor Payment Modal */}
+        {showPaymentModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-2 sm:p-4 z-50">
+            <div className="bg-card rounded-xl shadow-xl w-full max-w-md">
+              <div className="p-4 sm:p-6 border-b">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-lg font-semibold text-foreground">Add Vendor Payment</h2>
+                  <button onClick={() => setShowPaymentModal(null)} className="p-2 text-muted-foreground hover:text-foreground rounded-lg">
+                    <XMarkIcon className="w-5 h-5" />
+                  </button>
+                </div>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Recording payment for: <span className="font-medium">{showPaymentModal.name}</span>
+                </p>
+              </div>
+              
+              <form onSubmit={handleVendorPayment} className="p-4 sm:p-6 space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-muted-foreground mb-1">Payment Type</label>
+                  <select 
+                    className="input-field" 
+                    value={paymentFormData.payment_type} 
+                    onChange={(e) => setPaymentFormData({...paymentFormData, payment_type: e.target.value})}
+                  >
+                    <option value="payment">Payment</option>
+                    <option value="adjustment">Adjustment</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-muted-foreground mb-1">Amount *</label>
+                  <input 
+                    type="number" 
+                    step="0.01" 
+                    required 
+                    className="input-field" 
+                    placeholder="0.00"
+                    value={paymentFormData.amount} 
+                    onChange={(e) => setPaymentFormData({...paymentFormData, amount: e.target.value})} 
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-muted-foreground mb-1">Payment Date *</label>
+                  <input 
+                    type="date" 
+                    required 
+                    className="input-field" 
+                    value={paymentFormData.payment_date} 
+                    onChange={(e) => setPaymentFormData({...paymentFormData, payment_date: e.target.value})} 
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-muted-foreground mb-1">Reference Number</label>
+                  <input 
+                    type="text" 
+                    className="input-field" 
+                    placeholder="Transaction ID, Check number, etc."
+                    value={paymentFormData.reference_number} 
+                    onChange={(e) => setPaymentFormData({...paymentFormData, reference_number: e.target.value})} 
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-muted-foreground mb-1">Notes</label>
+                  <textarea 
+                    rows={3} 
+                    className="input-field" 
+                    placeholder="Payment details or notes"
+                    value={paymentFormData.notes} 
+                    onChange={(e) => setPaymentFormData({...paymentFormData, notes: e.target.value})} 
+                  />
+                </div>
+
+                <div className="flex flex-col sm:flex-row sm:justify-end gap-3 pt-4 border-t">
+                  <Button type="button" variant="outline" onClick={() => setShowPaymentModal(null)}>
+                    Cancel
+                  </Button>
+                  <Button type="submit" className="btn-primary">
+                    <BanknotesIcon className="w-4 h-4 mr-2" />
+                    Record Payment
+                  </Button>
+                </div>
+              </form>
             </div>
           </div>
         )}

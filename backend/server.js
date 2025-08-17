@@ -3366,6 +3366,72 @@ app.get('/api/admin/party-payments', roleMiddleware.requirePermission(roleMiddle
     }
 });
 
+// Create new party payment
+app.post('/api/admin/party-payments', roleMiddleware.requirePermission(roleMiddleware.ADMIN_PERMISSIONS.MANAGE_VENDORS), async (req, res) => {
+    try {
+        const { 
+            party_id, 
+            payment_type, 
+            amount, 
+            payment_date, 
+            reference_number, 
+            notes 
+        } = req.body;
+
+        // Validate required fields
+        if (!party_id || !payment_type || !amount || !payment_date) {
+            return res.status(400).json({ 
+                error: 'Missing required fields: party_id, payment_type, amount, payment_date' 
+            });
+        }
+
+        // Validate payment_type
+        if (!['payment', 'adjustment'].includes(payment_type)) {
+            return res.status(400).json({ 
+                error: 'Invalid payment_type. Must be either "payment" or "adjustment"' 
+            });
+        }
+
+        // Validate amount
+        if (isNaN(amount) || parseFloat(amount) <= 0) {
+            return res.status(400).json({ 
+                error: 'Amount must be a positive number' 
+            });
+        }
+
+        // Create payment record
+        const { data: payment, error: paymentError } = await supabase
+            .from('party_payments')
+            .insert([{
+                party_id,
+                payment_type,
+                amount: parseFloat(amount),
+                payment_date,
+                reference_number: reference_number || null,
+                notes: notes || null,
+                created_by: req.user.id
+            }])
+            .select(`
+                *,
+                party:party_id(name, contact_person)
+            `)
+            .single();
+
+        if (paymentError) {
+            console.error('Error creating party payment:', paymentError);
+            return res.status(500).json({ error: paymentError.message });
+        }
+
+        res.status(201).json({
+            message: 'Party payment created successfully',
+            payment
+        });
+    } catch (error) {
+        console.error('Error creating party payment:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 app.listen(port, () => {
     console.log(`Backend server listening at http://localhost:${port}`);
 }); 

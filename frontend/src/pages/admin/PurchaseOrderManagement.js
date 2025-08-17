@@ -239,7 +239,10 @@ const PurchaseOrderManagement = () => {
         price_per_unit: 0,
         discount_percentage: 0,
         tax_percentage: 0,
-        total_amount: 0
+        total_amount: 0,
+        has_miscellaneous_expenses: false,
+        miscellaneous_amount: 0,
+        miscellaneous_note: ''
       }]
     });
     // Auto-expand the new item
@@ -332,10 +335,11 @@ const PurchaseOrderManagement = () => {
     const discount = (subtotal * item.discount_percentage) / 100;
     const afterDiscount = subtotal - discount;
     const tax = (afterDiscount * item.tax_percentage) / 100;
+    const miscellaneousAmount = item.has_miscellaneous_expenses ? (item.miscellaneous_amount || 0) : 0;
     
     newItems[index].discount_amount = discount;
     newItems[index].tax_amount = tax;
-    newItems[index].total_amount = afterDiscount + tax;
+    newItems[index].total_amount = afterDiscount + tax + miscellaneousAmount;
 
     // Update form data
     setFormData({ ...formData, items: newItems });
@@ -383,16 +387,17 @@ const PurchaseOrderManagement = () => {
     newItems[index] = { ...newItems[index], [field]: value };
     
     // Recalculate totals
-    if (['quantity', 'price_per_unit', 'discount_percentage', 'tax_percentage'].includes(field)) {
+    if (['quantity', 'price_per_unit', 'discount_percentage', 'tax_percentage', 'miscellaneous_amount'].includes(field)) {
       const item = newItems[index];
       const subtotal = item.quantity * item.price_per_unit;
       const discount = (subtotal * item.discount_percentage) / 100;
       const afterDiscount = subtotal - discount;
       const tax = (afterDiscount * item.tax_percentage) / 100;
+      const miscellaneousAmount = item.has_miscellaneous_expenses ? (item.miscellaneous_amount || 0) : 0;
       
       newItems[index].discount_amount = discount;
       newItems[index].tax_amount = tax;
-      newItems[index].total_amount = afterDiscount + tax;
+      newItems[index].total_amount = afterDiscount + tax + miscellaneousAmount;
     }
     
     setFormData({ ...formData, items: newItems });
@@ -521,7 +526,12 @@ const PurchaseOrderManagement = () => {
         payment_terms: po.payment_terms || '',
         delivery_address: po.delivery_address || '',
         notes: po.notes || '',
-        items: po.purchase_order_items || []
+        items: (po.purchase_order_items || []).map(item => ({
+          ...item,
+          has_miscellaneous_expenses: item.has_miscellaneous_expenses || false,
+          miscellaneous_amount: item.miscellaneous_amount || 0,
+          miscellaneous_note: item.miscellaneous_note || ''
+        }))
       });
     } else {
       setEditingPO(null);
@@ -1104,9 +1114,63 @@ const PurchaseOrderManagement = () => {
                                     />
                                   </div>
                                 </div>
+                                
+                                {/* Miscellaneous Expenses Section */}
+                                <div className="bg-muted/30 border border-muted rounded-lg p-4">
+                                  <div className="flex items-center space-x-3 mb-4">
+                                    <input
+                                      type="checkbox"
+                                      id={`misc-expenses-${index}`}
+                                      className="w-4 h-4 text-primary bg-card border-border rounded focus:ring-primary"
+                                      checked={item.has_miscellaneous_expenses || false}
+                                      onChange={(e) => {
+                                        handleItemChange(index, 'has_miscellaneous_expenses', e.target.checked);
+                                        if (!e.target.checked) {
+                                          handleItemChange(index, 'miscellaneous_amount', 0);
+                                          handleItemChange(index, 'miscellaneous_note', '');
+                                        }
+                                      }}
+                                    />
+                                    <label htmlFor={`misc-expenses-${index}`} className="text-sm font-medium text-foreground">
+                                      Add miscellaneous expenses
+                                    </label>
+                                  </div>
+                                  
+                                  {item.has_miscellaneous_expenses && (
+                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                                      <div>
+                                        <label className="block text-sm font-medium text-muted-foreground mb-2">
+                                          Miscellaneous Amount *
+                                        </label>
+                                        <input
+                                          type="number"
+                                          step="0.01"
+                                          min="0"
+                                          className="input-field"
+                                          placeholder="0.00"
+                                          value={item.miscellaneous_amount || 0}
+                                          onChange={(e) => handleItemChange(index, 'miscellaneous_amount', parseFloat(e.target.value) || 0)}
+                                        />
+                                      </div>
+                                      <div>
+                                        <label className="block text-sm font-medium text-muted-foreground mb-2">
+                                          Side Note
+                                        </label>
+                                        <input
+                                          type="text"
+                                          className="input-field"
+                                          placeholder="Description for miscellaneous expense"
+                                          value={item.miscellaneous_note || ''}
+                                          onChange={(e) => handleItemChange(index, 'miscellaneous_note', e.target.value)}
+                                        />
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                                
                                 {/* Calculation Summary */}
                                 <div className="bg-gradient-to-r from-primary/5 to-primary/10 border border-primary/20 rounded-lg p-4">
-                                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
+                                  <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 text-sm">
                                     <div className="text-center">
                                       <div className="text-muted-foreground">Subtotal</div>
                                       <div className="font-semibold text-foreground">{formatCurrency((item.quantity || 0) * (item.price_per_unit || 0))}</div>
@@ -1119,6 +1183,12 @@ const PurchaseOrderManagement = () => {
                                       <div className="text-muted-foreground">Tax</div>
                                       <div className="font-semibold text-blue-600">+{formatCurrency(item.tax_amount || 0)}</div>
                                     </div>
+                                    {item.has_miscellaneous_expenses && (
+                                      <div className="text-center">
+                                        <div className="text-muted-foreground">Misc. Exp.</div>
+                                        <div className="font-semibold text-purple-600">+{formatCurrency(item.miscellaneous_amount || 0)}</div>
+                                      </div>
+                                    )}
                                     <div className="text-center">
                                       <div className="text-muted-foreground">Final Total</div>
                                       <div className="font-bold text-lg text-primary">{formatCurrency(item.total_amount || 0)}</div>
@@ -1175,25 +1245,61 @@ const PurchaseOrderManagement = () => {
                   {/* Order Summary */}
                   {formData.items.length > 0 && (
                     <div className="mt-6 p-4 bg-gradient-to-r from-primary/5 to-primary/10 border border-primary/20 rounded-lg">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-6">
-                          <div className="text-center">
-                            <div className="text-sm text-muted-foreground">Total Items</div>
-                            <div className="text-xl font-bold text-foreground">{formData.items.length}</div>
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-6">
+                            <div className="text-center">
+                              <div className="text-sm text-muted-foreground">Total Items</div>
+                              <div className="text-xl font-bold text-foreground">{formData.items.length}</div>
+                            </div>
+                            <div className="text-center">
+                              <div className="text-sm text-muted-foreground">Total Quantity</div>
+                              <div className="text-xl font-bold text-foreground">
+                                {formData.items.reduce((sum, item) => sum + (item.quantity || 0), 0).toFixed(2)}
+                              </div>
+                            </div>
                           </div>
-                          <div className="text-center">
-                            <div className="text-sm text-muted-foreground">Total Quantity</div>
-                            <div className="text-xl font-bold text-foreground">
-                              {formData.items.reduce((sum, item) => sum + (item.quantity || 0), 0).toFixed(2)}
+                          <div className="text-right">
+                            <div className="text-sm text-muted-foreground">Order Total</div>
+                            <div className="text-2xl font-bold text-primary">
+                              {formatCurrency(formData.items.reduce((sum, item) => sum + (item.total_amount || 0), 0))}
                             </div>
                           </div>
                         </div>
-                        <div className="text-right">
-                          <div className="text-sm text-muted-foreground">Order Total</div>
-                          <div className="text-2xl font-bold text-primary">
-                            {formatCurrency(formData.items.reduce((sum, item) => sum + (item.total_amount || 0), 0))}
+                        
+                        {/* Vendor vs Miscellaneous Breakdown */}
+                        {formData.items.some(item => item.has_miscellaneous_expenses && item.miscellaneous_amount > 0) && (
+                          <div className="border-t pt-4">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                              <div className="text-center p-3 bg-card/50 rounded-lg">
+                                <div className="text-muted-foreground font-medium">Vendor Expenses</div>
+                                <div className="text-lg font-bold text-blue-600">
+                                  {formatCurrency(formData.items.reduce((sum, item) => {
+                                    const vendorAmount = (item.quantity || 0) * (item.price_per_unit || 0) - (item.discount_amount || 0) + (item.tax_amount || 0);
+                                    return sum + vendorAmount;
+                                  }, 0))}
+                                </div>
+                                <div className="text-xs text-muted-foreground">Items + Tax - Discount</div>
+                              </div>
+                              <div className="text-center p-3 bg-card/50 rounded-lg">
+                                <div className="text-muted-foreground font-medium">Miscellaneous Expenses</div>
+                                <div className="text-lg font-bold text-purple-600">
+                                  {formatCurrency(formData.items.reduce((sum, item) => {
+                                    return sum + (item.has_miscellaneous_expenses ? (item.miscellaneous_amount || 0) : 0);
+                                  }, 0))}
+                                </div>
+                                <div className="text-xs text-muted-foreground">Additional expenses</div>
+                              </div>
+                              <div className="text-center p-3 bg-primary/10 rounded-lg">
+                                <div className="text-muted-foreground font-medium">Grand Total</div>
+                                <div className="text-lg font-bold text-primary">
+                                  {formatCurrency(formData.items.reduce((sum, item) => sum + (item.total_amount || 0), 0))}
+                                </div>
+                                <div className="text-xs text-muted-foreground">Vendor + Miscellaneous</div>
+                              </div>
+                            </div>
                           </div>
-                        </div>
+                        )}
                       </div>
                     </div>
                   )}
