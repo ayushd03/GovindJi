@@ -23,7 +23,9 @@ import CategoryManagement from './pages/admin/CategoryManagement';
 import InventoryManagement from './pages/admin/InventoryManagement';
 import CustomerManagement from './pages/admin/CustomerManagement';
 import AnalyticsManagement from './pages/admin/AnalyticsManagement';
-import VendorManagement from './pages/admin/VendorManagement';
+import PartyManagement from './pages/admin/PartyManagement';
+import PurchaseOrderManagement from './pages/admin/PurchaseOrderManagement';
+import PurchaseBillManagement from './pages/admin/PurchaseBillManagement';
 import EmployeeManagement from './pages/admin/EmployeeManagement';
 import ExpenseManagement from './pages/admin/ExpenseManagement';
 import './App.css';
@@ -73,7 +75,9 @@ const AppContent = () => {
                 <Route path="/inventory" element={<InventoryManagement />} />
                 <Route path="/customers" element={<CustomerManagement />} />
                 <Route path="/analytics" element={<AnalyticsManagement />} />
-                <Route path="/vendors" element={<VendorManagement />} />
+                <Route path="/parties" element={<PartyManagement />} />
+                <Route path="/purchase-orders" element={<PurchaseOrderManagement />} />
+                <Route path="/purchase-bills" element={<PurchaseBillManagement />} />
                 <Route path="/employees" element={<EmployeeManagement />} />
                 <Route path="/expenses" element={<ExpenseManagement />} />
               </Routes>

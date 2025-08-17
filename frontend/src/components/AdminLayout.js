@@ -18,7 +18,8 @@ import {
   TagIcon,
   BuildingOfficeIcon,
   UserGroupIcon,
-  CurrencyDollarIcon
+  CurrencyDollarIcon,
+  DocumentTextIcon
 } from '@heroicons/react/24/outline';
 import './AdminLayout.css'; // Import the CSS file
 
@@ -118,7 +119,8 @@ const AdminLayout = ({ children }) => {
     'ChartPieIcon': ChartPieIcon,
     'BuildingOfficeIcon': BuildingOfficeIcon,
     'UserGroupIcon': UserGroupIcon,
-    'CurrencyDollarIcon': CurrencyDollarIcon
+    'CurrencyDollarIcon': CurrencyDollarIcon,
+    'DocumentTextIcon': DocumentTextIcon
   };
 
   const menuItems = getAccessibleTabs().map(tab => ({

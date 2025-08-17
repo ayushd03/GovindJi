@@ -1898,106 +1898,6 @@ app.get('/api/admin/storage/config', authenticateAdmin, async (req, res) => {
     }
 });
 
-// ======================================
-// VENDOR MANAGEMENT ROUTES
-// ======================================
-
-// Get all vendors
-app.get('/api/admin/vendors', roleMiddleware.requirePermission(roleMiddleware.ADMIN_PERMISSIONS.VIEW_VENDORS), async (req, res) => {
-    try {
-        const { data, error } = await supabase
-            .from('vendors')
-            .select('*')
-            .eq('is_active', true)
-            .order('name');
-
-        if (error) throw error;
-        res.json(data);
-    } catch (error) {
-        console.error('Error fetching vendors:', error);
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// Create new vendor
-app.post('/api/admin/vendors', roleMiddleware.requirePermission(roleMiddleware.ADMIN_PERMISSIONS.MANAGE_VENDORS), async (req, res) => {
-    try {
-        const { name, contact_person, phone_number, email, address, category, notes } = req.body;
-
-        const { data, error } = await supabase
-            .from('vendors')
-            .insert([{
-                name,
-                contact_person,
-                phone_number,
-                email,
-                address,
-                category,
-                notes
-            }])
-            .select()
-            .single();
-
-        if (error) throw error;
-        res.status(201).json(data);
-    } catch (error) {
-        console.error('Error creating vendor:', error);
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// Update vendor
-app.put('/api/admin/vendors/:id', roleMiddleware.requirePermission(roleMiddleware.ADMIN_PERMISSIONS.MANAGE_VENDORS), async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { name, contact_person, phone_number, email, address, category, notes } = req.body;
-
-        const { data, error } = await supabase
-            .from('vendors')
-            .update({
-                name,
-                contact_person,
-                phone_number,
-                email,
-                address,
-                category,
-                notes,
-                updated_at: new Date().toISOString()
-            })
-            .eq('id', id)
-            .select()
-            .single();
-
-        if (error) throw error;
-        res.json(data);
-    } catch (error) {
-        console.error('Error updating vendor:', error);
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// Delete vendor (soft delete)
-app.delete('/api/admin/vendors/:id', roleMiddleware.requirePermission(roleMiddleware.ADMIN_PERMISSIONS.MANAGE_VENDORS), async (req, res) => {
-    try {
-        const { id } = req.params;
-
-        const { data, error } = await supabase
-            .from('vendors')
-            .update({
-                is_active: false,
-                updated_at: new Date().toISOString()
-            })
-            .eq('id', id)
-            .select()
-            .single();
-
-        if (error) throw error;
-        res.json({ message: 'Vendor deleted successfully' });
-    } catch (error) {
-        console.error('Error deleting vendor:', error);
-        res.status(500).json({ error: error.message });
-    }
-});
 
 // ======================================
 // EMPLOYEE MANAGEMENT ROUTES
@@ -2404,6 +2304,1064 @@ app.delete('/api/admin/expenses/:id', roleMiddleware.requirePermission(roleMiddl
         res.json({ message: 'Expense deleted successfully' });
     } catch (error) {
         console.error('Error deleting expense:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ======================================
+// PARTY MANAGEMENT ROUTES (Enhanced Vendor Management)
+// ======================================
+
+// Get all parties with advanced filtering
+app.get('/api/admin/parties', roleMiddleware.requirePermission(roleMiddleware.ADMIN_PERMISSIONS.VIEW_VENDORS), async (req, res) => {
+    try {
+        const { 
+            page = 1, 
+            limit = 10, 
+            search = '', 
+            category = '', 
+            party_type = 'vendor',
+            gst_type = '',
+            state = ''
+        } = req.query;
+
+        // Build query for filtering
+        let query = supabase
+            .from('parties')
+            .select('*', { count: 'exact' });
+
+        // Apply filters
+        if (search) {
+            query = query.or(`name.ilike.%${search}%,contact_person.ilike.%${search}%,email.ilike.%${search}%,phone_number.ilike.%${search}%`);
+        }
+        
+        if (category) {
+            query = query.eq('category', category);
+        }
+
+        if (party_type) {
+            query = query.eq('party_type', party_type);
+        }
+
+        if (gst_type) {
+            query = query.eq('gst_type', gst_type);
+        }
+
+        if (state) {
+            query = query.eq('state', state);
+        }
+
+        query = query.eq('is_active', true);
+
+        // Apply pagination and ordering
+        const offset = (parseInt(page) - 1) * parseInt(limit);
+        query = query
+            .order('name')
+            .range(offset, offset + parseInt(limit) - 1);
+
+        const { data, error, count } = await query;
+
+        if (error) throw error;
+
+        res.json({
+            parties: data,
+            total: count || 0,
+            page: parseInt(page),
+            limit: parseInt(limit),
+            totalPages: Math.ceil((count || 0) / parseInt(limit))
+        });
+    } catch (error) {
+        console.error('Error fetching parties:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get party by ID with transaction history
+app.get('/api/admin/parties/:id', roleMiddleware.requirePermission(roleMiddleware.ADMIN_PERMISSIONS.VIEW_VENDORS), async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const { data: party, error: partyError } = await supabase
+            .from('parties')
+            .select('*')
+            .eq('id', id)
+            .single();
+
+        if (partyError) throw partyError;
+
+        // Get recent transactions
+        const { data: transactions, error: transError } = await supabase
+            .from('party_transactions')
+            .select('*')
+            .eq('party_id', id)
+            .order('transaction_date', { ascending: false })
+            .limit(10);
+
+        // Get recent purchase orders
+        const { data: purchaseOrders, error: poError } = await supabase
+            .from('purchase_orders')
+            .select('*')
+            .eq('party_id', id)
+            .order('order_date', { ascending: false })
+            .limit(5);
+
+        res.json({
+            party,
+            transactions: transactions || [],
+            purchaseOrders: purchaseOrders || []
+        });
+    } catch (error) {
+        console.error('Error fetching party details:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Create new party
+app.post('/api/admin/parties', roleMiddleware.requirePermission(roleMiddleware.ADMIN_PERMISSIONS.MANAGE_VENDORS), async (req, res) => {
+    try {
+        const { 
+            name, contact_person, phone_number, email, address, shipping_address,
+            gstin, gst_type, state, party_type, category, opening_balance,
+            balance_as_of_date, credit_limit, credit_limit_type, notes 
+        } = req.body;
+
+        const { data, error } = await supabase
+            .from('parties')
+            .insert([{
+                name,
+                contact_person,
+                phone_number,
+                email,
+                address,
+                shipping_address,
+                gstin,
+                gst_type: gst_type || 'Unregistered/Consumer',
+                state,
+                party_type: party_type || 'vendor',
+                category,
+                opening_balance: opening_balance || 0,
+                balance_as_of_date,
+                credit_limit,
+                credit_limit_type: credit_limit_type || 'no_limit',
+                current_balance: opening_balance || 0,
+                notes
+            }])
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        // Create opening balance transaction if provided
+        if (opening_balance && opening_balance !== 0) {
+            await supabase
+                .from('party_transactions')
+                .insert([{
+                    party_id: data.id,
+                    transaction_type: 'opening_balance',
+                    transaction_date: balance_as_of_date || new Date().toISOString().split('T')[0],
+                    debit_amount: opening_balance > 0 ? opening_balance : 0,
+                    credit_amount: opening_balance < 0 ? Math.abs(opening_balance) : 0,
+                    balance: opening_balance,
+                    description: 'Opening Balance',
+                    created_by: req.user.id
+                }]);
+        }
+
+        res.status(201).json(data);
+    } catch (error) {
+        console.error('Error creating party:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Update party
+app.put('/api/admin/parties/:id', roleMiddleware.requirePermission(roleMiddleware.ADMIN_PERMISSIONS.MANAGE_VENDORS), async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { 
+            name, contact_person, phone_number, email, address, shipping_address,
+            gstin, gst_type, state, party_type, category, opening_balance,
+            balance_as_of_date, credit_limit, credit_limit_type, notes 
+        } = req.body;
+
+        const { data, error } = await supabase
+            .from('parties')
+            .update({
+                name,
+                contact_person,
+                phone_number,
+                email,
+                address,
+                shipping_address,
+                gstin,
+                gst_type,
+                state,
+                party_type,
+                category,
+                opening_balance,
+                balance_as_of_date,
+                credit_limit,
+                credit_limit_type,
+                notes,
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', id)
+            .select()
+            .single();
+
+        if (error) throw error;
+        res.json(data);
+    } catch (error) {
+        console.error('Error updating party:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ======================================
+// PURCHASE ORDER MANAGEMENT ROUTES
+// ======================================
+
+// Get all purchase orders with advanced filtering
+app.get('/api/admin/purchase-orders', roleMiddleware.requirePermission(roleMiddleware.ADMIN_PERMISSIONS.VIEW_VENDORS), async (req, res) => {
+    try {
+        const { 
+            page = 1, 
+            limit = 10, 
+            search = '', 
+            status = '', 
+            party_id = '',
+            start_date = '',
+            end_date = ''
+        } = req.query;
+
+        // Build query for filtering
+        let query = supabase
+            .from('purchase_orders')
+            .select(`
+                *,
+                party:party_id(name, contact_person, phone_number),
+                purchase_order_items(
+                    id, item_name, quantity, unit, price_per_unit, total_amount, received_quantity
+                )
+            `, { count: 'exact' });
+
+        // Apply filters
+        if (search) {
+            query = query.or(`po_number.ilike.%${search}%,notes.ilike.%${search}%`);
+        }
+        
+        if (status) {
+            query = query.eq('status', status);
+        }
+
+        if (party_id) {
+            query = query.eq('party_id', party_id);
+        }
+
+        if (start_date) {
+            query = query.gte('order_date', start_date);
+        }
+
+        if (end_date) {
+            query = query.lte('order_date', end_date);
+        }
+
+        // Apply pagination and ordering
+        const offset = (parseInt(page) - 1) * parseInt(limit);
+        query = query
+            .order('order_date', { ascending: false })
+            .order('created_at', { ascending: false })
+            .range(offset, offset + parseInt(limit) - 1);
+
+        const { data, error, count } = await query;
+
+        if (error) throw error;
+
+        res.json({
+            purchase_orders: data,
+            total: count || 0,
+            page: parseInt(page),
+            limit: parseInt(limit),
+            totalPages: Math.ceil((count || 0) / parseInt(limit))
+        });
+    } catch (error) {
+        console.error('Error fetching purchase orders:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get purchase order by ID with items
+app.get('/api/admin/purchase-orders/:id', roleMiddleware.requirePermission(roleMiddleware.ADMIN_PERMISSIONS.VIEW_VENDORS), async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const { data, error } = await supabase
+            .from('purchase_orders')
+            .select(`
+                *,
+                party:party_id(name, contact_person, phone_number, email, address),
+                purchase_order_items(
+                    id, product_id, item_name, description, quantity, unit, 
+                    price_per_unit, discount_percentage, discount_amount, 
+                    tax_percentage, tax_amount, total_amount, received_quantity, pending_quantity,
+                    product:product_id(name, sku, unit)
+                )
+            `)
+            .eq('id', id)
+            .single();
+
+        if (error) throw error;
+
+        res.json(data);
+    } catch (error) {
+        console.error('Error fetching purchase order:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Create new purchase order
+app.post('/api/admin/purchase-orders', roleMiddleware.requirePermission(roleMiddleware.ADMIN_PERMISSIONS.MANAGE_VENDORS), async (req, res) => {
+    try {
+        const { 
+            party_id, order_date, expected_delivery_date, payment_terms, 
+            delivery_address, notes, items 
+        } = req.body;
+
+        // Generate PO number
+        const { data: poNumberData, error: poError } = await supabase
+            .rpc('generate_po_number');
+        
+        if (poError) throw poError;
+        const po_number = poNumberData;
+
+        // Create purchase order
+        const { data: purchaseOrder, error: poInsertError } = await supabase
+            .from('purchase_orders')
+            .insert([{
+                po_number,
+                party_id,
+                order_date,
+                expected_delivery_date,
+                payment_terms,
+                delivery_address,
+                notes,
+                total_amount: 0, // Will be updated by trigger
+                status: 'draft',
+                created_by: req.user.id
+            }])
+            .select()
+            .single();
+
+        if (poInsertError) throw poInsertError;
+
+        // Create purchase order items
+        if (items && items.length > 0) {
+            const itemsToInsert = items.map(item => ({
+                purchase_order_id: purchaseOrder.id,
+                product_id: item.product_id || null,
+                item_name: item.item_name,
+                description: item.description || '',
+                quantity: item.quantity,
+                unit: item.unit || 'kg',
+                price_per_unit: item.price_per_unit,
+                discount_percentage: item.discount_percentage || 0,
+                discount_amount: item.discount_amount || 0,
+                tax_percentage: item.tax_percentage || 0,
+                tax_amount: item.tax_amount || 0,
+                total_amount: item.total_amount,
+                pending_quantity: item.quantity
+            }));
+
+            const { error: itemsError } = await supabase
+                .from('purchase_order_items')
+                .insert(itemsToInsert);
+
+            if (itemsError) throw itemsError;
+        }
+
+        // Fetch the complete purchase order with items
+        const { data: completePO, error: fetchError } = await supabase
+            .from('purchase_orders')
+            .select(`
+                *,
+                party:party_id(name, contact_person, phone_number),
+                purchase_order_items(*)
+            `)
+            .eq('id', purchaseOrder.id)
+            .single();
+
+        if (fetchError) throw fetchError;
+
+        res.status(201).json(completePO);
+    } catch (error) {
+        console.error('Error creating purchase order:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Update purchase order status
+app.put('/api/admin/purchase-orders/:id/status', roleMiddleware.requirePermission(roleMiddleware.ADMIN_PERMISSIONS.MANAGE_VENDORS), async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { status, notes } = req.body;
+
+        const validStatuses = ['draft', 'sent', 'confirmed', 'partial_received', 'received', 'cancelled'];
+        if (!validStatuses.includes(status)) {
+            return res.status(400).json({ error: 'Invalid status' });
+        }
+
+        const { data, error } = await supabase
+            .from('purchase_orders')
+            .update({
+                status,
+                notes: notes || null,
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', id)
+            .select()
+            .single();
+
+        if (error) throw error;
+        res.json(data);
+    } catch (error) {
+        console.error('Error updating purchase order status:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Receive items from purchase order
+app.post('/api/admin/purchase-orders/:id/receive', roleMiddleware.requirePermission(roleMiddleware.ADMIN_PERMISSIONS.MANAGE_VENDORS), async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { received_items, notes } = req.body;
+
+        // Update received quantities for each item
+        for (const receivedItem of received_items) {
+            const { item_id, received_quantity } = receivedItem;
+            
+            // Get current item details
+            const { data: currentItem, error: itemError } = await supabase
+                .from('purchase_order_items')
+                .select('*')
+                .eq('id', item_id)
+                .single();
+
+            if (itemError) throw itemError;
+
+            const newReceivedQty = parseFloat(currentItem.received_quantity || 0) + parseFloat(received_quantity);
+            const newPendingQty = parseFloat(currentItem.quantity) - newReceivedQty;
+
+            // Update item quantities
+            const { error: updateError } = await supabase
+                .from('purchase_order_items')
+                .update({
+                    received_quantity: newReceivedQty,
+                    pending_quantity: Math.max(0, newPendingQty)
+                })
+                .eq('id', item_id);
+
+            if (updateError) throw updateError;
+
+            // Create stock movement if product is linked
+            if (currentItem.product_id && received_quantity > 0) {
+                const { error: stockError } = await supabase
+                    .from('stock_movements')
+                    .insert([{
+                        product_id: currentItem.product_id,
+                        movement_type: 'in',
+                        quantity: received_quantity,
+                        reason: `Purchase Order Receipt - ${currentItem.item_name}`,
+                        reference_id: id,
+                        purchase_order_id: id,
+                        unit_cost: currentItem.price_per_unit,
+                        created_by: req.user.id
+                    }]);
+
+                if (stockError) throw stockError;
+
+                // Update product stock
+                const { error: productError } = await supabase
+                    .rpc('adjust_product_stock', {
+                        product_uuid: currentItem.product_id,
+                        quantity_change: received_quantity
+                    });
+
+                if (productError) throw productError;
+            }
+        }
+
+        // Check if all items are fully received and update PO status
+        const { data: allItems, error: allItemsError } = await supabase
+            .from('purchase_order_items')
+            .select('quantity, received_quantity')
+            .eq('purchase_order_id', id);
+
+        if (allItemsError) throw allItemsError;
+
+        const allReceived = allItems.every(item => 
+            parseFloat(item.received_quantity || 0) >= parseFloat(item.quantity)
+        );
+        const anyReceived = allItems.some(item => 
+            parseFloat(item.received_quantity || 0) > 0
+        );
+
+        let newStatus = 'confirmed';
+        if (allReceived) {
+            newStatus = 'received';
+        } else if (anyReceived) {
+            newStatus = 'partial_received';
+        }
+
+        // Update PO status
+        const { data: updatedPO, error: statusError } = await supabase
+            .from('purchase_orders')
+            .update({
+                status: newStatus,
+                notes: notes ? `${notes}\n\nItems received on ${new Date().toLocaleDateString()}` : null,
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', id)
+            .select()
+            .single();
+
+        if (statusError) throw statusError;
+
+        res.json({
+            message: 'Items received successfully',
+            purchase_order: updatedPO,
+            status: newStatus
+        });
+    } catch (error) {
+        console.error('Error receiving purchase order items:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get purchase order summary/analytics
+app.get('/api/admin/purchase-orders/summary', roleMiddleware.requirePermission(roleMiddleware.ADMIN_PERMISSIONS.VIEW_VENDORS), async (req, res) => {
+    try {
+        const { party_id, start_date, end_date } = req.query;
+
+        let query = supabase
+            .from('purchase_orders')
+            .select('status, final_amount, order_date');
+
+        if (party_id) {
+            query = query.eq('party_id', party_id);
+        }
+
+        if (start_date) {
+            query = query.gte('order_date', start_date);
+        }
+
+        if (end_date) {
+            query = query.lte('order_date', end_date);
+        }
+
+        const { data, error } = await query;
+
+        if (error) throw error;
+
+        // Calculate summary statistics
+        const summary = {
+            total_orders: data.length,
+            total_amount: data.reduce((sum, po) => sum + parseFloat(po.final_amount || 0), 0),
+            status_breakdown: {},
+            monthly_trend: {}
+        };
+
+        // Status breakdown
+        data.forEach(po => {
+            const status = po.status;
+            summary.status_breakdown[status] = (summary.status_breakdown[status] || 0) + 1;
+        });
+
+        // Monthly trend
+        data.forEach(po => {
+            const month = new Date(po.order_date).toISOString().substring(0, 7); // YYYY-MM
+            summary.monthly_trend[month] = (summary.monthly_trend[month] || 0) + parseFloat(po.final_amount || 0);
+        });
+
+        res.json(summary);
+    } catch (error) {
+        console.error('Error fetching purchase order summary:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ======================================
+// PURCHASE BILLS MANAGEMENT ROUTES
+// ======================================
+
+// Get all purchase bills with advanced filtering
+app.get('/api/admin/purchase-bills', roleMiddleware.requirePermission(roleMiddleware.ADMIN_PERMISSIONS.VIEW_VENDORS), async (req, res) => {
+    try {
+        const { 
+            page = 1, 
+            limit = 10, 
+            search = '', 
+            payment_status = '', 
+            party_id = '',
+            start_date = '',
+            end_date = ''
+        } = req.query;
+
+        // Build query for filtering
+        let query = supabase
+            .from('purchase_bills')
+            .select(`
+                *,
+                party:party_id(name, contact_person, phone_number, gstin),
+                purchase_order:purchase_order_id(po_number, status),
+                purchase_bill_items(
+                    id, item_name, quantity, unit, price_per_unit, total_amount
+                )
+            `, { count: 'exact' });
+
+        // Apply filters
+        if (search) {
+            query = query.or(`bill_number.ilike.%${search}%,vendor_bill_number.ilike.%${search}%,notes.ilike.%${search}%`);
+        }
+        
+        if (payment_status) {
+            query = query.eq('payment_status', payment_status);
+        }
+
+        if (party_id) {
+            query = query.eq('party_id', party_id);
+        }
+
+        if (start_date) {
+            query = query.gte('bill_date', start_date);
+        }
+
+        if (end_date) {
+            query = query.lte('bill_date', end_date);
+        }
+
+        // Apply pagination and ordering
+        const offset = (parseInt(page) - 1) * parseInt(limit);
+        query = query
+            .order('bill_date', { ascending: false })
+            .order('created_at', { ascending: false })
+            .range(offset, offset + parseInt(limit) - 1);
+
+        const { data, error, count } = await query;
+
+        if (error) throw error;
+
+        res.json({
+            purchase_bills: data,
+            total: count || 0,
+            page: parseInt(page),
+            limit: parseInt(limit),
+            totalPages: Math.ceil((count || 0) / parseInt(limit))
+        });
+    } catch (error) {
+        console.error('Error fetching purchase bills:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get purchase bill by ID with items
+app.get('/api/admin/purchase-bills/:id', roleMiddleware.requirePermission(roleMiddleware.ADMIN_PERMISSIONS.VIEW_VENDORS), async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const { data, error } = await supabase
+            .from('purchase_bills')
+            .select(`
+                *,
+                party:party_id(name, contact_person, phone_number, email, address, gstin, gst_type),
+                purchase_order:purchase_order_id(po_number, order_date, status),
+                purchase_bill_items(
+                    id, product_id, item_name, description, quantity, unit, 
+                    price_per_unit, discount_percentage, discount_amount, 
+                    tax_percentage, tax_amount, total_amount,
+                    product:product_id(name, sku, unit),
+                    purchase_order_item:purchase_order_item_id(id, quantity as po_quantity)
+                ),
+                party_payments!party_payments_purchase_bill_id_fkey(
+                    id, payment_type, amount, payment_date, reference_number
+                )
+            `)
+            .eq('id', id)
+            .single();
+
+        if (error) throw error;
+
+        res.json(data);
+    } catch (error) {
+        console.error('Error fetching purchase bill:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Create new purchase bill
+app.post('/api/admin/purchase-bills', roleMiddleware.requirePermission(roleMiddleware.ADMIN_PERMISSIONS.MANAGE_VENDORS), async (req, res) => {
+    try {
+        const { 
+            party_id, purchase_order_id, bill_date, vendor_bill_number,
+            subtotal_amount, discount_amount, tax_amount, other_charges,
+            round_off_amount, final_amount, due_date, notes, items,
+            auto_update_inventory = true
+        } = req.body;
+
+        // Generate bill number
+        const year = new Date(bill_date).getFullYear();
+        const { data: billCount } = await supabase
+            .from('purchase_bills')
+            .select('id', { count: 'exact' })
+            .like('bill_number', `PB-${year}-%`);
+
+        const billNumber = `PB-${year}-${String((billCount?.length || 0) + 1).padStart(4, '0')}`;
+
+        // Create purchase bill
+        const { data: purchaseBill, error: billError } = await supabase
+            .from('purchase_bills')
+            .insert([{
+                bill_number: billNumber,
+                vendor_bill_number,
+                bill_date,
+                party_id,
+                purchase_order_id,
+                subtotal_amount: subtotal_amount || 0,
+                discount_amount: discount_amount || 0,
+                tax_amount: tax_amount || 0,
+                other_charges: other_charges || 0,
+                round_off_amount: round_off_amount || 0,
+                final_amount,
+                due_amount: final_amount,
+                due_date,
+                payment_status: 'unpaid',
+                notes,
+                is_inventory_updated: false,
+                created_by: req.user.id
+            }])
+            .select()
+            .single();
+
+        if (billError) throw billError;
+
+        // Create purchase bill items
+        if (items && items.length > 0) {
+            const itemsToInsert = items.map(item => ({
+                bill_id: purchaseBill.id,
+                purchase_order_item_id: item.purchase_order_item_id || null,
+                product_id: item.product_id || null,
+                item_name: item.item_name,
+                description: item.description || '',
+                quantity: item.quantity,
+                unit: item.unit || 'kg',
+                price_per_unit: item.price_per_unit,
+                discount_percentage: item.discount_percentage || 0,
+                discount_amount: item.discount_amount || 0,
+                tax_percentage: item.tax_percentage || 0,
+                tax_amount: item.tax_amount || 0,
+                total_amount: item.total_amount
+            }));
+
+            const { error: itemsError } = await supabase
+                .from('purchase_bill_items')
+                .insert(itemsToInsert);
+
+            if (itemsError) throw itemsError;
+        }
+
+        // Create party transaction record
+        await supabase
+            .from('party_transactions')
+            .insert([{
+                party_id,
+                transaction_type: 'purchase_bill',
+                transaction_date: bill_date,
+                reference_id: purchaseBill.id,
+                reference_number: billNumber,
+                debit_amount: final_amount,
+                credit_amount: 0,
+                description: `Purchase Bill ${billNumber} - ${vendor_bill_number || 'No vendor bill number'}`,
+                created_by: req.user.id
+            }]);
+
+        // Auto-update inventory if requested
+        if (auto_update_inventory && items && items.length > 0) {
+            for (const item of items) {
+                if (item.product_id && item.quantity > 0) {
+                    // Create stock movement
+                    await supabase
+                        .from('stock_movements')
+                        .insert([{
+                            product_id: item.product_id,
+                            movement_type: 'in',
+                            quantity: item.quantity,
+                            reason: `Purchase Bill ${billNumber} - ${item.item_name}`,
+                            reference_id: purchaseBill.id,
+                            purchase_bill_id: purchaseBill.id,
+                            party_id: party_id,
+                            unit_cost: item.price_per_unit,
+                            created_by: req.user.id
+                        }]);
+
+                    // Update product stock
+                    await supabase
+                        .rpc('adjust_product_stock', {
+                            product_uuid: item.product_id,
+                            quantity_change: item.quantity
+                        });
+                }
+            }
+
+            // Mark as inventory updated
+            await supabase
+                .from('purchase_bills')
+                .update({ is_inventory_updated: true })
+                .eq('id', purchaseBill.id);
+        }
+
+        // Create expense record
+        await supabase
+            .from('expenses')
+            .insert([{
+                amount: final_amount,
+                description: `Purchase Bill ${billNumber} - ${vendor_bill_number || 'Purchase from vendor'}`,
+                category: 'Vendor Payment',
+                vendor_id: party_id, // For backward compatibility
+                party_id: party_id,
+                payment_mode: 'Credit', // Will be updated when payment is made
+                expense_date: bill_date,
+                notes: notes || `Purchase bill from ${vendor_bill_number || 'vendor'}`,
+                created_by: req.user.id
+            }]);
+
+        // Fetch complete bill data
+        const { data: completeBill, error: fetchError } = await supabase
+            .from('purchase_bills')
+            .select(`
+                *,
+                party:party_id(name, contact_person, phone_number),
+                purchase_bill_items(*)
+            `)
+            .eq('id', purchaseBill.id)
+            .single();
+
+        if (fetchError) throw fetchError;
+
+        res.status(201).json(completeBill);
+    } catch (error) {
+        console.error('Error creating purchase bill:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Update purchase bill payment status
+app.put('/api/admin/purchase-bills/:id/payment', roleMiddleware.requirePermission(roleMiddleware.ADMIN_PERMISSIONS.MANAGE_VENDORS), async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { payment_amount, payment_type, payment_date, reference_number, notes } = req.body;
+
+        // Get current bill details
+        const { data: bill, error: billError } = await supabase
+            .from('purchase_bills')
+            .select('*')
+            .eq('id', id)
+            .single();
+
+        if (billError) throw billError;
+
+        const newPaidAmount = parseFloat(bill.paid_amount || 0) + parseFloat(payment_amount);
+        const newDueAmount = parseFloat(bill.final_amount) - newPaidAmount;
+        
+        let newPaymentStatus = 'unpaid';
+        if (newDueAmount <= 0) {
+            newPaymentStatus = 'paid';
+        } else if (newPaidAmount > 0) {
+            newPaymentStatus = 'partial';
+        }
+
+        // Update bill payment status
+        const { data: updatedBill, error: updateError } = await supabase
+            .from('purchase_bills')
+            .update({
+                paid_amount: newPaidAmount,
+                due_amount: Math.max(0, newDueAmount),
+                payment_status: newPaymentStatus,
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', id)
+            .select()
+            .single();
+
+        if (updateError) throw updateError;
+
+        // Create payment record
+        const { data: payment, error: paymentError } = await supabase
+            .from('party_payments')
+            .insert([{
+                party_id: bill.party_id,
+                payment_type,
+                amount: payment_amount,
+                payment_date,
+                reference_number,
+                purchase_bill_id: id,
+                notes,
+                created_by: req.user.id
+            }])
+            .select()
+            .single();
+
+        if (paymentError) throw paymentError;
+
+        // Create party transaction record
+        await supabase
+            .from('party_transactions')
+            .insert([{
+                party_id: bill.party_id,
+                transaction_type: 'payment',
+                transaction_date: payment_date,
+                reference_id: payment.id,
+                reference_number: reference_number || payment.id,
+                debit_amount: 0,
+                credit_amount: payment_amount,
+                description: `Payment for Bill ${bill.bill_number} - ${payment_type}`,
+                created_by: req.user.id
+            }]);
+
+        // Update expense record payment mode
+        await supabase
+            .from('expenses')
+            .update({ payment_mode: payment_type })
+            .eq('party_id', bill.party_id)
+            .eq('amount', bill.final_amount)
+            .eq('expense_date', bill.bill_date);
+
+        res.json({
+            message: 'Payment recorded successfully',
+            purchase_bill: updatedBill,
+            payment: payment
+        });
+    } catch (error) {
+        console.error('Error recording payment:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get purchase bills summary/analytics
+app.get('/api/admin/purchase-bills/summary', roleMiddleware.requirePermission(roleMiddleware.ADMIN_PERMISSIONS.VIEW_VENDORS), async (req, res) => {
+    try {
+        const { party_id, start_date, end_date } = req.query;
+
+        let query = supabase
+            .from('purchase_bills')
+            .select('payment_status, final_amount, paid_amount, due_amount, bill_date');
+
+        if (party_id) {
+            query = query.eq('party_id', party_id);
+        }
+
+        if (start_date) {
+            query = query.gte('bill_date', start_date);
+        }
+
+        if (end_date) {
+            query = query.lte('bill_date', end_date);
+        }
+
+        const { data, error } = await query;
+
+        if (error) throw error;
+
+        // Calculate summary statistics
+        const summary = {
+            total_bills: data.length,
+            total_amount: data.reduce((sum, bill) => sum + parseFloat(bill.final_amount || 0), 0),
+            paid_amount: data.reduce((sum, bill) => sum + parseFloat(bill.paid_amount || 0), 0),
+            unpaid_amount: data.reduce((sum, bill) => sum + parseFloat(bill.due_amount || 0), 0),
+            payment_status_breakdown: {},
+            monthly_trend: {}
+        };
+
+        // Payment status breakdown
+        data.forEach(bill => {
+            const status = bill.payment_status;
+            summary.payment_status_breakdown[status] = (summary.payment_status_breakdown[status] || 0) + 1;
+        });
+
+        // Monthly trend
+        data.forEach(bill => {
+            const month = new Date(bill.bill_date).toISOString().substring(0, 7); // YYYY-MM
+            if (!summary.monthly_trend[month]) {
+                summary.monthly_trend[month] = { total: 0, paid: 0, unpaid: 0 };
+            }
+            summary.monthly_trend[month].total += parseFloat(bill.final_amount || 0);
+            summary.monthly_trend[month].paid += parseFloat(bill.paid_amount || 0);
+            summary.monthly_trend[month].unpaid += parseFloat(bill.due_amount || 0);
+        });
+
+        res.json(summary);
+    } catch (error) {
+        console.error('Error fetching purchase bills summary:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ======================================
+// PARTY PAYMENTS ROUTES
+// ======================================
+
+// Get all party payments
+app.get('/api/admin/party-payments', roleMiddleware.requirePermission(roleMiddleware.ADMIN_PERMISSIONS.VIEW_VENDORS), async (req, res) => {
+    try {
+        const { 
+            page = 1, 
+            limit = 10, 
+            party_id = '',
+            payment_type = '',
+            start_date = '',
+            end_date = ''
+        } = req.query;
+
+        let query = supabase
+            .from('party_payments')
+            .select(`
+                *,
+                party:party_id(name, contact_person),
+                purchase_bill:purchase_bill_id(bill_number, vendor_bill_number)
+            `, { count: 'exact' });
+
+        if (party_id) {
+            query = query.eq('party_id', party_id);
+        }
+
+        if (payment_type) {
+            query = query.eq('payment_type', payment_type);
+        }
+
+        if (start_date) {
+            query = query.gte('payment_date', start_date);
+        }
+
+        if (end_date) {
+            query = query.lte('payment_date', end_date);
+        }
+
+        const offset = (parseInt(page) - 1) * parseInt(limit);
+        query = query
+            .order('payment_date', { ascending: false })
+            .range(offset, offset + parseInt(limit) - 1);
+
+        const { data, error, count } = await query;
+
+        if (error) throw error;
+
+        res.json({
+            payments: data,
+            total: count || 0,
+            page: parseInt(page),
+            limit: parseInt(limit),
+            totalPages: Math.ceil((count || 0) / parseInt(limit))
+        });
+    } catch (error) {
+        console.error('Error fetching party payments:', error);
         res.status(500).json({ error: error.message });
     }
 });
