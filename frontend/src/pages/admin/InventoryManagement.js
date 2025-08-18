@@ -34,12 +34,19 @@ const InventoryManagement = () => {
   
   const [showMovements, setShowMovements] = useState(null);
   const [showAdjustment, setShowAdjustment] = useState(null);
+  const [showPOBreakdown, setShowPOBreakdown] = useState(null);
+  const [showReceiveItem, setShowReceiveItem] = useState(null);
   const [adjustmentData, setAdjustmentData] = useState({
     quantity: 0,
     type: 'in',
     reason: '',
     notes: ''
   });
+  const [receiveData, setReceiveData] = useState({
+    receive_quantity: 0,
+    notes: ''
+  });
+  const [purchaseOrders, setPurchaseOrders] = useState([]);
 
   const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
@@ -103,6 +110,53 @@ const InventoryManagement = () => {
       setStockMovements(data.movements || data || []);
     } catch (err) {
       showError('Failed to load stock movements');
+    }
+  };
+
+  const fetchPurchaseOrders = async (productId) => {
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`${API_BASE_URL}/api/admin/products/${productId}/purchase-orders`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) throw new Error('Failed to fetch purchase orders');
+
+      const data = await response.json();
+      setPurchaseOrders(data.purchase_orders || []);
+    } catch (err) {
+      showError('Failed to load purchase orders');
+    }
+  };
+
+  const handleReceiveItem = async () => {
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`${API_BASE_URL}/api/admin/inventory/receive-item`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          purchase_order_item_id: showReceiveItem.purchase_order_item_id,
+          receive_quantity: receiveData.receive_quantity,
+          notes: receiveData.notes
+        })
+      });
+
+      if (!response.ok) throw new Error('Failed to receive item');
+
+      await fetchProducts();
+      await fetchPurchaseOrders(showReceiveItem.product_id); // Refresh PO data
+      setShowReceiveItem(null);
+      setReceiveData({ receive_quantity: 0, notes: '' });
+      showSuccess('Item received successfully');
+    } catch (err) {
+      showError('Failed to receive item');
     }
   };
 
@@ -315,10 +369,13 @@ const InventoryManagement = () => {
                             </div>
                             <PermissionGuard permission={ADMIN_PERMISSIONS.MANAGE_INVENTORY}>
                               <div className="hidden sm:flex items-center space-x-2 ml-4">
-                                <Button variant="ghost" size="icon" onClick={() => { setShowMovements(product); fetchStockMovements(product.id); }} className="h-9 w-9 text-muted-foreground hover:text-primary">
+                                <Button variant="ghost" size="icon" onClick={() => { setShowMovements(product); fetchStockMovements(product.id); }} className="h-9 w-9 text-muted-foreground hover:text-primary" title="View Stock History">
                                   <EyeIcon className="w-4 h-4" />
                                 </Button>
-                                <Button variant="ghost" size="icon" onClick={() => setShowAdjustment(product)} className="h-9 w-9 text-muted-foreground hover:text-primary">
+                                <Button variant="ghost" size="icon" onClick={() => { setShowPOBreakdown(product); fetchPurchaseOrders(product.id); }} className="h-9 w-9 text-muted-foreground hover:text-blue-600" title="View Purchase Orders">
+                                  <ClipboardDocumentListIcon className="w-4 h-4" />
+                                </Button>
+                                <Button variant="ghost" size="icon" onClick={() => setShowAdjustment(product)} className="h-9 w-9 text-muted-foreground hover:text-primary" title="Adjust Stock">
                                   <AdjustmentsHorizontalIcon className="w-4 h-4" />
                                 </Button>
                               </div>
@@ -328,7 +385,10 @@ const InventoryManagement = () => {
                         <PermissionGuard permission={ADMIN_PERMISSIONS.MANAGE_INVENTORY}>
                           <div className="flex sm:hidden space-x-2 mt-3 pt-3 border-t">
                             <Button variant="outline" size="sm" onClick={() => { setShowMovements(product); fetchStockMovements(product.id); }} className="flex-1">
-                              <EyeIcon className="w-4 h-4 mr-2" />View History
+                              <EyeIcon className="w-4 h-4 mr-2" />History
+                            </Button>
+                            <Button variant="outline" size="sm" onClick={() => { setShowPOBreakdown(product); fetchPurchaseOrders(product.id); }} className="flex-1">
+                              <ClipboardDocumentListIcon className="w-4 h-4 mr-2" />POs
                             </Button>
                             <Button variant="outline" size="sm" onClick={() => setShowAdjustment(product)} className="flex-1">
                               <AdjustmentsHorizontalIcon className="w-4 h-4 mr-2" />Adjust
@@ -497,6 +557,179 @@ const InventoryManagement = () => {
                     ))}
                   </div>
                 )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Purchase Orders Breakdown Modal */}
+        {showPOBreakdown && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-2 sm:p-4 z-50">
+            <div className="bg-card rounded-xl shadow-xl w-full max-w-6xl max-h-[95vh] overflow-y-auto">
+              <div className="p-4 sm:p-6 border-b">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-lg sm:text-xl font-semibold text-foreground">
+                    Purchase Orders - {showPOBreakdown.name}
+                  </h2>
+                  <button onClick={() => setShowPOBreakdown(null)} className="p-2 text-muted-foreground hover:text-foreground rounded-lg">
+                    <XMarkIcon className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+              
+              <div className="p-4 sm:p-6 space-y-6">
+                <div className="bg-muted/50 p-4 rounded-lg">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                    <div><span className="font-medium">Current Stock:</span> {showPOBreakdown.stock_quantity || 0} {showPOBreakdown.unit}</div>
+                    <div><span className="font-medium">Min Level:</span> {showPOBreakdown.min_stock_level || 0}</div>
+                    <div><span className="font-medium">Price:</span> {formatCurrency(showPOBreakdown.price)}</div>
+                    <div><span className="font-medium">Total POs:</span> {purchaseOrders.length}</div>
+                  </div>
+                </div>
+
+                {purchaseOrders.length === 0 ? (
+                  <div className="text-center py-8">
+                    <ClipboardDocumentListIcon className="w-12 h-12 text-muted-foreground/50 mx-auto mb-4" />
+                    <p className="text-muted-foreground">No purchase orders found for this product</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {purchaseOrders.map((po, index) => (
+                      <div key={index} className="border border-muted rounded-lg p-4">
+                        <div className="flex justify-between items-start mb-3">
+                          <div>
+                            <h3 className="font-medium text-foreground">{po.po_number}</h3>
+                            <div className="text-sm text-muted-foreground">
+                              <span>Party: {po.party?.name}</span> • 
+                              <span className="ml-1">Date: {new Date(po.order_date).toLocaleDateString()}</span> •
+                              <span className="ml-1 capitalize">{po.status}</span>
+                            </div>
+                          </div>
+                          <span className={`px-2 py-1 rounded text-xs font-medium ${
+                            po.status === 'received' ? 'bg-green-100 text-green-800' :
+                            po.status === 'partial_received' ? 'bg-yellow-100 text-yellow-800' :
+                            po.status === 'confirmed' ? 'bg-blue-100 text-blue-800' :
+                            'bg-gray-100 text-gray-800'
+                          }`}>
+                            {po.status.replace('_', ' ')}
+                          </span>
+                        </div>
+                        
+                        <div className="space-y-2">
+                          {po.items?.map((item, itemIndex) => (
+                            <div key={itemIndex} className="bg-muted/30 p-3 rounded border-l-4 border-primary/30">
+                              <div className="flex justify-between items-center">
+                                <div className="flex-1">
+                                  <div className="flex items-center space-x-4 text-sm">
+                                    <span><strong>Qty:</strong> {item.quantity} {item.unit}</span>
+                                    <span><strong>Received:</strong> {item.received_quantity || 0}</span>
+                                    <span><strong>Pending:</strong> {item.pending_quantity || item.quantity}</span>
+                                    <span><strong>Rate:</strong> {formatCurrency(item.price_per_unit)}</span>
+                                  </div>
+                                  {item.pending_quantity > 0 && po.status === 'confirmed' && (
+                                    <div className="mt-2">
+                                      <span className="text-xs text-orange-600 font-medium">⏳ Pending Receipt</span>
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                  {item.pending_quantity > 0 && ['confirmed', 'partial_received'].includes(po.status) && (
+                                    <Button 
+                                      variant="outline" 
+                                      size="sm" 
+                                      onClick={() => {
+                                        setShowReceiveItem({
+                                          product_id: showPOBreakdown.id,
+                                          purchase_order_item_id: item.id,
+                                          item_name: item.item_name,
+                                          pending_quantity: item.pending_quantity,
+                                          unit: item.unit,
+                                          po_number: po.po_number
+                                        });
+                                      }}
+                                      className="text-xs"
+                                    >
+                                      <TruckIcon className="w-3 h-3 mr-1" />
+                                      Receive
+                                    </Button>
+                                  )}
+                                  {item.is_fully_received && (
+                                    <span className="text-xs text-green-600 font-medium">✅ Fully Received</span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Receive Item Modal */}
+        {showReceiveItem && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-2 sm:p-4 z-50">
+            <div className="bg-card rounded-xl shadow-xl w-full max-w-2xl">
+              <div className="p-4 sm:p-6 border-b">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-lg sm:text-xl font-semibold text-foreground">
+                    Receive Item - {showReceiveItem.item_name}
+                  </h2>
+                  <button onClick={() => setShowReceiveItem(null)} className="p-2 text-muted-foreground hover:text-foreground rounded-lg">
+                    <XMarkIcon className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+              
+              <div className="p-4 sm:p-6 space-y-6">
+                <div className="bg-muted/50 p-4 rounded-lg">
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div><span className="font-medium">PO Number:</span> {showReceiveItem.po_number}</div>
+                    <div><span className="font-medium">Pending Quantity:</span> {showReceiveItem.pending_quantity} {showReceiveItem.unit}</div>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-muted-foreground mb-1">Receive Quantity *</label>
+                  <input 
+                    type="number" 
+                    step="0.001" 
+                    max={showReceiveItem.pending_quantity}
+                    required 
+                    className="input-field" 
+                    placeholder="0"
+                    value={receiveData.receive_quantity} 
+                    onChange={(e) => setReceiveData({...receiveData, receive_quantity: parseFloat(e.target.value) || 0})} 
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-muted-foreground mb-1">Notes</label>
+                  <textarea 
+                    rows={3} 
+                    className="input-field" 
+                    placeholder="Optional notes about this receipt..."
+                    value={receiveData.notes} 
+                    onChange={(e) => setReceiveData({...receiveData, notes: e.target.value})} 
+                  />
+                </div>
+
+                <div className="flex flex-col sm:flex-row sm:justify-end gap-3 pt-4 border-t">
+                  <Button type="button" variant="outline" onClick={() => setShowReceiveItem(null)}>Cancel</Button>
+                  <Button 
+                    type="button" 
+                    className="btn-primary" 
+                    onClick={handleReceiveItem}
+                    disabled={receiveData.receive_quantity <= 0 || receiveData.receive_quantity > showReceiveItem.pending_quantity}
+                  >
+                    <TruckIcon className="w-4 h-4 mr-2" />
+                    Receive {receiveData.receive_quantity} {showReceiveItem.unit}
+                  </Button>
+                </div>
               </div>
             </div>
           </div>

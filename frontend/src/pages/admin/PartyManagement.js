@@ -96,7 +96,7 @@ const PartyManagement = () => {
   const [paymentFormData, setPaymentFormData] = useState({
     payment_type: 'payment',
     amount: '',
-    payment_date: new Date().toISOString().split('T')[0],
+    payment_date: new Date().toISOString(),
     reference_number: '',
     notes: '',
     transaction_type_id: '',
@@ -418,7 +418,7 @@ const PartyManagement = () => {
     setPaymentFormData({
       payment_type: 'payment',
       amount: '',
-      payment_date: new Date().toISOString().split('T')[0],
+      payment_date: new Date().toISOString(),
       reference_number: '',
       notes: '',
       transaction_type_id: '',
@@ -526,8 +526,8 @@ const PartyManagement = () => {
       });
     });
     
-    // Sort by date chronologically (oldest first)
-    return transactions.sort((a, b) => new Date(a.date) - new Date(b.date));
+    // Sort by date with latest entries first
+    return transactions.sort((a, b) => new Date(b.date) - new Date(a.date));
   };
 
   const formatCurrency = (amount) => {
@@ -1259,7 +1259,7 @@ const PartyManagement = () => {
                                   </div>
                                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                     <CalendarIcon className="w-4 h-4" />
-                                    <span>{new Date(transaction.date).toLocaleDateString()}</span>
+                                    <span>{new Date(transaction.date).toLocaleDateString()} {new Date(transaction.date).toLocaleTimeString()}</span>
                                     {transaction.notes && (
                                       <>
                                         <span>•</span>
@@ -1376,13 +1376,13 @@ const PartyManagement = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-muted-foreground mb-1">Payment Date *</label>
+                  <label className="block text-sm font-medium text-muted-foreground mb-1">Payment Date & Time *</label>
                   <input 
-                    type="date" 
+                    type="datetime-local" 
                     required 
                     className="input-field" 
-                    value={paymentFormData.payment_date} 
-                    onChange={(e) => setPaymentFormData({...paymentFormData, payment_date: e.target.value})} 
+                    value={paymentFormData.payment_date.slice(0, 16)} 
+                    onChange={(e) => setPaymentFormData({...paymentFormData, payment_date: new Date(e.target.value).toISOString()})} 
                   />
                 </div>
 

@@ -2759,108 +2759,132 @@ app.put('/api/admin/purchase-orders/:id/status', roleMiddleware.requirePermissio
     }
 });
 
-// Receive items from purchase order
+// Receive items from purchase order (Enhanced with item-level tracking)
 app.post('/api/admin/purchase-orders/:id/receive', roleMiddleware.requirePermission(roleMiddleware.ADMIN_PERMISSIONS.MANAGE_VENDORS), async (req, res) => {
     try {
         const { id } = req.params;
         const { received_items, notes } = req.body;
 
-        // Update received quantities for each item
+        if (!received_items || !Array.isArray(received_items) || received_items.length === 0) {
+            return res.status(400).json({ error: 'received_items array is required' });
+        }
+
+        const results = [];
+        const errors = [];
+
+        // Process each item with enhanced tracking
         for (const receivedItem of received_items) {
-            const { item_id, received_quantity } = receivedItem;
-            
-            // Get current item details
-            const { data: currentItem, error: itemError } = await supabase
-                .from('purchase_order_items')
-                .select('*')
-                .eq('id', item_id)
-                .single();
+            try {
+                const { item_id, receive_now } = receivedItem;
+                
+                if (!item_id || !receive_now || receive_now <= 0) {
+                    errors.push(`Item ${item_id}: receive_now quantity must be positive`);
+                    continue;
+                }
 
-            if (itemError) throw itemError;
+                // Get current item details
+                const { data: currentItem, error: fetchError } = await supabase
+                    .from('purchase_order_items')
+                    .select(`
+                        *,
+                        purchase_order:purchase_order_id(party_id),
+                        product:product_id(name, unit)
+                    `)
+                    .eq('id', item_id)
+                    .eq('purchase_order_id', id)
+                    .single();
 
-            const newReceivedQty = parseFloat(currentItem.received_quantity || 0) + parseFloat(received_quantity);
-            const newPendingQty = parseFloat(currentItem.quantity) - newReceivedQty;
+                if (fetchError) throw fetchError;
 
-            // Update item quantities
-            const { error: updateError } = await supabase
-                .from('purchase_order_items')
-                .update({
-                    received_quantity: newReceivedQty,
-                    pending_quantity: Math.max(0, newPendingQty)
-                })
-                .eq('id', item_id);
+                // Check pending quantity
+                const pendingQuantity = currentItem.quantity - (currentItem.received_quantity || 0);
+                if (receive_now > pendingQuantity) {
+                    errors.push(`${currentItem.item_name}: Cannot receive ${receive_now}, only ${pendingQuantity} pending`);
+                    continue;
+                }
 
-            if (updateError) throw updateError;
+                const newReceivedQuantity = (currentItem.received_quantity || 0) + receive_now;
+                const now = new Date().toISOString();
 
-            // Create stock movement if product is linked
-            if (currentItem.product_id && received_quantity > 0) {
-                const { error: stockError } = await supabase
-                    .from('stock_movements')
-                    .insert([{
-                        product_id: currentItem.product_id,
-                        movement_type: 'in',
-                        quantity: received_quantity,
-                        reason: `Purchase Order Receipt - ${currentItem.item_name}`,
-                        reference_id: id,
-                        purchase_order_id: id,
-                        unit_cost: currentItem.price_per_unit,
-                        created_by: req.user.id
-                    }]);
+                // Update purchase order item with enhanced tracking
+                const { error: updateError } = await supabase
+                    .from('purchase_order_items')
+                    .update({
+                        received_quantity: newReceivedQuantity,
+                        last_received_at: now,
+                        first_received_at: currentItem.first_received_at || now,
+                        receiving_notes: notes || currentItem.receiving_notes,
+                        updated_at: now
+                    })
+                    .eq('id', item_id);
 
-                if (stockError) throw stockError;
+                if (updateError) throw updateError;
 
-                // Update product stock
-                const { error: productError } = await supabase
-                    .rpc('adjust_product_stock', {
-                        product_uuid: currentItem.product_id,
-                        quantity_change: received_quantity
-                    });
+                // Update inventory using enhanced function with PO tracking
+                if (currentItem.product_id) {
+                    const { error: stockError } = await supabase
+                        .rpc('adjust_product_stock_with_po', {
+                            p_product_id: currentItem.product_id,
+                            p_quantity_change: receive_now,
+                            p_reason: `PO ${id} Item Received - ${currentItem.item_name}`,
+                            p_purchase_order_id: id,
+                            p_purchase_order_item_id: item_id,
+                            p_party_id: currentItem.purchase_order?.party_id,
+                            p_created_by: req.user.id
+                        });
 
-                if (productError) throw productError;
+                    if (stockError) {
+                        console.warn('Stock update warning:', stockError.message);
+                        // Try fallback method
+                        const { error: fallbackError } = await supabase
+                            .rpc('adjust_product_stock', {
+                                product_uuid: currentItem.product_id,
+                                quantity_change: receive_now
+                            });
+                        
+                        if (fallbackError) throw fallbackError;
+                    }
+                }
+
+                results.push({
+                    item_id: item_id,
+                    item_name: currentItem.item_name,
+                    received_quantity: receive_now,
+                    total_received: newReceivedQuantity,
+                    pending_quantity: currentItem.quantity - newReceivedQuantity
+                });
+
+            } catch (itemError) {
+                console.error(`Error processing item ${receivedItem.item_id}:`, itemError);
+                errors.push(`Item ${receivedItem.item_id}: ${itemError.message}`);
             }
         }
 
-        // Check if all items are fully received and update PO status
-        const { data: allItems, error: allItemsError } = await supabase
-            .from('purchase_order_items')
-            .select('quantity, received_quantity')
-            .eq('purchase_order_id', id);
-
-        if (allItemsError) throw allItemsError;
-
-        const allReceived = allItems.every(item => 
-            parseFloat(item.received_quantity || 0) >= parseFloat(item.quantity)
-        );
-        const anyReceived = allItems.some(item => 
-            parseFloat(item.received_quantity || 0) > 0
-        );
-
-        let newStatus = 'confirmed';
-        if (allReceived) {
-            newStatus = 'received';
-        } else if (anyReceived) {
-            newStatus = 'partial_received';
-        }
-
-        // Update PO status
-        const { data: updatedPO, error: statusError } = await supabase
+        // Get updated purchase order with all items
+        const { data: updatedPO, error: poError } = await supabase
             .from('purchase_orders')
-            .update({
-                status: newStatus,
-                notes: notes ? `${notes}\n\nItems received on ${new Date().toLocaleDateString()}` : null,
-                updated_at: new Date().toISOString()
-            })
+            .select(`
+                *,
+                party:party_id(name),
+                purchase_order_items(
+                    id, item_name, quantity, received_quantity, 
+                    pending_quantity, is_fully_received
+                )
+            `)
             .eq('id', id)
-            .select()
             .single();
 
-        if (statusError) throw statusError;
+        if (poError) throw poError;
 
+        // Status will be automatically updated by the database trigger
         res.json({
-            message: 'Items received successfully',
-            purchase_order: updatedPO,
-            status: newStatus
+            success: true,
+            message: `Processed ${results.length} items${errors.length > 0 ? ` with ${errors.length} errors` : ''}`,
+            results,
+            errors,
+            purchase_order: updatedPO
         });
+
     } catch (error) {
         console.error('Error receiving purchase order items:', error);
         res.status(500).json({ error: error.message });
@@ -3538,6 +3562,377 @@ app.get('/api/admin/transaction-types/:id/form-schema', authenticateAdmin, (req,
         res.json(schema);
     } catch (error) {
         console.error('Error fetching form schema:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ======================================
+// ENHANCED INVENTORY MANAGEMENT ROUTES
+// ======================================
+
+// Get inventory movements/history for a product
+app.get('/api/admin/inventory/movements', roleMiddleware.requirePermission(roleMiddleware.ADMIN_PERMISSIONS.VIEW_INVENTORY), async (req, res) => {
+    try {
+        const { product_id, limit = 50, offset = 0 } = req.query;
+
+        if (!product_id) {
+            return res.status(400).json({ error: 'product_id is required' });
+        }
+
+        const { data, error } = await supabase
+            .from('stock_movements')
+            .select(`
+                *,
+                product:product_id(name, sku, unit),
+                party:party_id(name),
+                purchase_order:purchase_order_id(po_number),
+                purchase_order_item:purchase_order_item_id(item_name, quantity as po_quantity)
+            `)
+            .eq('product_id', product_id)
+            .order('created_at', { ascending: false })
+            .range(parseInt(offset), parseInt(offset) + parseInt(limit) - 1);
+
+        if (error) throw error;
+
+        res.json({ movements: data || [] });
+    } catch (error) {
+        console.error('Error fetching inventory movements:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get all purchase orders containing a specific product
+app.get('/api/admin/products/:productId/purchase-orders', roleMiddleware.requirePermission(roleMiddleware.ADMIN_PERMISSIONS.VIEW_INVENTORY), async (req, res) => {
+    try {
+        const { productId } = req.params;
+        const { status = '', limit = 50 } = req.query;
+
+        let query = supabase
+            .from('purchase_order_items')
+            .select(`
+                *,
+                purchase_order:purchase_order_id(
+                    id, po_number, order_date, status, final_amount,
+                    party:party_id(name, contact_person)
+                )
+            `)
+            .eq('product_id', productId)
+            .order('created_at', { ascending: false })
+            .limit(parseInt(limit));
+
+        if (status) {
+            query = query.eq('purchase_order.status', status);
+        }
+
+        const { data, error } = await query;
+
+        if (error) throw error;
+
+        // Format the response to group by purchase order
+        const purchaseOrders = {};
+        data?.forEach(item => {
+            const poId = item.purchase_order.id;
+            if (!purchaseOrders[poId]) {
+                purchaseOrders[poId] = {
+                    ...item.purchase_order,
+                    items: []
+                };
+            }
+            purchaseOrders[poId].items.push({
+                id: item.id,
+                item_name: item.item_name,
+                quantity: item.quantity,
+                received_quantity: item.received_quantity,
+                pending_quantity: item.pending_quantity,
+                is_fully_received: item.is_fully_received,
+                price_per_unit: item.price_per_unit,
+                total_amount: item.total_amount,
+                unit: item.unit
+            });
+        });
+
+        res.json({ 
+            purchase_orders: Object.values(purchaseOrders),
+            total_pos: Object.keys(purchaseOrders).length
+        });
+    } catch (error) {
+        console.error('Error fetching product purchase orders:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Receive individual items directly from inventory view
+app.post('/api/admin/inventory/receive-item', roleMiddleware.requirePermission(roleMiddleware.ADMIN_PERMISSIONS.MANAGE_INVENTORY), async (req, res) => {
+    try {
+        const { purchase_order_item_id, receive_quantity, notes } = req.body;
+
+        if (!purchase_order_item_id || !receive_quantity || receive_quantity <= 0) {
+            return res.status(400).json({ error: 'purchase_order_item_id and positive receive_quantity are required' });
+        }
+
+        // Get the purchase order item details
+        const { data: currentItem, error: fetchError } = await supabase
+            .from('purchase_order_items')
+            .select(`
+                *,
+                purchase_order:purchase_order_id(id, po_number, party_id),
+                product:product_id(name, unit)
+            `)
+            .eq('id', purchase_order_item_id)
+            .single();
+
+        if (fetchError) throw fetchError;
+        if (!currentItem) {
+            return res.status(404).json({ error: 'Purchase order item not found' });
+        }
+
+        // Check if receive quantity doesn't exceed pending quantity
+        const pendingQuantity = currentItem.quantity - (currentItem.received_quantity || 0);
+        if (receive_quantity > pendingQuantity) {
+            return res.status(400).json({ 
+                error: `Cannot receive ${receive_quantity}. Only ${pendingQuantity} pending.` 
+            });
+        }
+
+        const newReceivedQuantity = (currentItem.received_quantity || 0) + receive_quantity;
+        const now = new Date().toISOString();
+
+        // Update the purchase order item
+        const { error: updateError } = await supabase
+            .from('purchase_order_items')
+            .update({
+                received_quantity: newReceivedQuantity,
+                last_received_at: now,
+                first_received_at: currentItem.first_received_at || now,
+                receiving_notes: notes || currentItem.receiving_notes,
+                updated_at: now
+            })
+            .eq('id', purchase_order_item_id);
+
+        if (updateError) throw updateError;
+
+        // Update inventory if product is linked
+        if (currentItem.product_id) {
+            const { error: stockError } = await supabase
+                .rpc('adjust_product_stock_with_po', {
+                    p_product_id: currentItem.product_id,
+                    p_quantity_change: receive_quantity,
+                    p_reason: `Item Received - ${currentItem.item_name}`,
+                    p_purchase_order_id: currentItem.purchase_order.id,
+                    p_purchase_order_item_id: purchase_order_item_id,
+                    p_party_id: currentItem.purchase_order.party_id,
+                    p_created_by: req.user.id
+                });
+
+            if (stockError) throw stockError;
+        }
+
+        // Get updated purchase order details
+        const { data: updatedPO, error: poError } = await supabase
+            .from('purchase_orders')
+            .select(`
+                *,
+                purchase_order_items(
+                    id, item_name, quantity, received_quantity, 
+                    pending_quantity, is_fully_received
+                )
+            `)
+            .eq('id', currentItem.purchase_order.id)
+            .single();
+
+        if (poError) throw poError;
+
+        res.json({
+            success: true,
+            message: `Successfully received ${receive_quantity} ${currentItem.product?.unit || currentItem.unit} of ${currentItem.item_name}`,
+            received_quantity: receive_quantity,
+            total_received: newReceivedQuantity,
+            pending_quantity: currentItem.quantity - newReceivedQuantity,
+            purchase_order: updatedPO
+        });
+
+    } catch (error) {
+        console.error('Error receiving inventory item:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Enhanced purchase order receiving with item-level granularity
+app.post('/api/admin/purchase-orders/:id/receive-items', roleMiddleware.requirePermission(roleMiddleware.ADMIN_PERMISSIONS.MANAGE_VENDORS), async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { received_items, notes } = req.body;
+
+        if (!received_items || !Array.isArray(received_items) || received_items.length === 0) {
+            return res.status(400).json({ error: 'received_items array is required' });
+        }
+
+        // Validate all items before processing
+        for (const item of received_items) {
+            if (!item.item_id || !item.receive_now || item.receive_now <= 0) {
+                return res.status(400).json({ error: 'Each item must have item_id and positive receive_now quantity' });
+            }
+        }
+
+        const results = [];
+        const errors = [];
+
+        // Process each item
+        for (const item of received_items) {
+            try {
+                // Get current item details
+                const { data: currentItem, error: fetchError } = await supabase
+                    .from('purchase_order_items')
+                    .select('*, product:product_id(unit)')
+                    .eq('id', item.item_id)
+                    .eq('purchase_order_id', id)
+                    .single();
+
+                if (fetchError) throw fetchError;
+
+                // Check pending quantity
+                const pendingQuantity = currentItem.quantity - (currentItem.received_quantity || 0);
+                if (item.receive_now > pendingQuantity) {
+                    errors.push(`${currentItem.item_name}: Cannot receive ${item.receive_now}, only ${pendingQuantity} pending`);
+                    continue;
+                }
+
+                const newReceivedQuantity = (currentItem.received_quantity || 0) + item.receive_now;
+                const now = new Date().toISOString();
+
+                // Update purchase order item
+                const { error: updateError } = await supabase
+                    .from('purchase_order_items')
+                    .update({
+                        received_quantity: newReceivedQuantity,
+                        last_received_at: now,
+                        first_received_at: currentItem.first_received_at || now,
+                        receiving_notes: notes,
+                        updated_at: now
+                    })
+                    .eq('id', item.item_id);
+
+                if (updateError) throw updateError;
+
+                // Update inventory if product is linked
+                if (currentItem.product_id) {
+                    const { error: stockError } = await supabase
+                        .rpc('adjust_product_stock_with_po', {
+                            p_product_id: currentItem.product_id,
+                            p_quantity_change: item.receive_now,
+                            p_reason: `PO ${id} Item Received - ${currentItem.item_name}`,
+                            p_purchase_order_id: id,
+                            p_purchase_order_item_id: item.item_id,
+                            p_party_id: currentItem.purchase_order?.party_id,
+                            p_created_by: req.user.id
+                        });
+
+                    if (stockError) throw stockError;
+                }
+
+                results.push({
+                    item_id: item.item_id,
+                    item_name: currentItem.item_name,
+                    received_quantity: item.receive_now,
+                    total_received: newReceivedQuantity,
+                    pending_quantity: currentItem.quantity - newReceivedQuantity
+                });
+
+            } catch (itemError) {
+                errors.push(`${item.item_id}: ${itemError.message}`);
+            }
+        }
+
+        // Get updated purchase order
+        const { data: updatedPO, error: poError } = await supabase
+            .from('purchase_orders')
+            .select(`
+                *,
+                party:party_id(name),
+                purchase_order_items(*)
+            `)
+            .eq('id', id)
+            .single();
+
+        if (poError) throw poError;
+
+        res.json({
+            success: true,
+            message: `Processed ${results.length} items${errors.length > 0 ? ` with ${errors.length} errors` : ''}`,
+            results,
+            errors,
+            purchase_order: updatedPO
+        });
+
+    } catch (error) {
+        console.error('Error receiving purchase order items:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get inventory summary with enhanced PO tracking
+app.get('/api/admin/inventory/summary', roleMiddleware.requirePermission(roleMiddleware.ADMIN_PERMISSIONS.VIEW_INVENTORY), async (req, res) => {
+    try {
+        // Get products with their stock levels and related PO information
+        const { data: products, error: productsError } = await supabase
+            .from('products')
+            .select(`
+                id, name, sku, stock_quantity, min_stock_level, price, unit,
+                category:category_id(name)
+            `)
+            .eq('is_active', true)
+            .order('name');
+
+        if (productsError) throw productsError;
+
+        // Get pending PO items for each product
+        const productIds = products.map(p => p.id);
+        const { data: pendingItems, error: pendingError } = await supabase
+            .from('purchase_order_items')
+            .select(`
+                product_id, quantity, received_quantity, pending_quantity,
+                purchase_order:purchase_order_id(po_number, status, order_date, party:party_id(name))
+            `)
+            .in('product_id', productIds)
+            .in('purchase_order.status', ['confirmed', 'partial_received'])
+            .gt('pending_quantity', 0);
+
+        if (pendingError) throw pendingError;
+
+        // Group pending items by product
+        const pendingByProduct = {};
+        pendingItems?.forEach(item => {
+            if (!pendingByProduct[item.product_id]) {
+                pendingByProduct[item.product_id] = [];
+            }
+            pendingByProduct[item.product_id].push(item);
+        });
+
+        // Enhance products with pending PO information
+        const enhancedProducts = products.map(product => ({
+            ...product,
+            pending_orders: pendingByProduct[product.id] || [],
+            total_pending_quantity: (pendingByProduct[product.id] || []).reduce((sum, item) => sum + (item.pending_quantity || 0), 0),
+            expected_stock: product.stock_quantity + (pendingByProduct[product.id] || []).reduce((sum, item) => sum + (item.pending_quantity || 0), 0)
+        }));
+
+        // Calculate summary statistics
+        const summary = {
+            total_products: products.length,
+            low_stock_products: enhancedProducts.filter(p => p.stock_quantity <= p.min_stock_level).length,
+            out_of_stock_products: enhancedProducts.filter(p => p.stock_quantity <= 0).length,
+            total_inventory_value: enhancedProducts.reduce((sum, p) => sum + (p.stock_quantity * p.price), 0),
+            products_with_pending_orders: enhancedProducts.filter(p => p.pending_orders.length > 0).length,
+            total_pending_value: enhancedProducts.reduce((sum, p) => sum + p.total_pending_quantity * p.price, 0)
+        };
+
+        res.json({
+            summary,
+            products: enhancedProducts
+        });
+
+    } catch (error) {
+        console.error('Error fetching inventory summary:', error);
         res.status(500).json({ error: error.message });
     }
 });

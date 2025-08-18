@@ -32,8 +32,7 @@ import { categoriesAPI } from '../../services/api';
 
 const PO_STATUSES = [
   { value: 'draft', label: 'Draft', icon: PencilIcon, color: 'bg-gray-100 text-gray-800' },
-  { value: 'sent', label: 'Sent', icon: ClockIcon, color: 'bg-blue-100 text-blue-800' },
-  { value: 'confirmed', label: 'Confirmed', icon: CheckCircleIcon, color: 'bg-yellow-100 text-yellow-800' },
+  { value: 'confirmed', label: 'Confirmed', icon: CheckCircleIcon, color: 'bg-blue-100 text-blue-800' },
   { value: 'partial_received', label: 'Partial Received', icon: TruckIcon, color: 'bg-orange-100 text-orange-800' },
   { value: 'received', label: 'Received', icon: CheckCircleIcon, color: 'bg-green-100 text-green-800' },
   { value: 'cancelled', label: 'Cancelled', icon: XCircleIcon, color: 'bg-red-100 text-red-800' },
@@ -65,7 +64,7 @@ const PurchaseOrderManagement = () => {
   
   const [formData, setFormData] = useState({
     party_id: '',
-    order_date: new Date().toISOString().split('T')[0],
+    order_date: new Date().toISOString(),
     expected_delivery_date: '',
     payment_terms: '',
     delivery_address: '',
@@ -477,23 +476,50 @@ const PurchaseOrderManagement = () => {
   const handleReceiveItems = async () => {
     try {
       const token = localStorage.getItem('authToken');
+      
+      // Format the received items data to match the new API structure
+      const formattedItems = receiveData.received_items
+        .filter(item => item.receive_now > 0)
+        .map(item => ({
+          item_id: item.item_id,
+          receive_now: item.receive_now
+        }));
+
+      if (formattedItems.length === 0) {
+        showError('Please specify quantities to receive');
+        return;
+      }
+
       const response = await fetch(`${API_BASE_URL}/api/admin/purchase-orders/${showReceiveModal.id}/receive`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(receiveData)
+        body: JSON.stringify({
+          received_items: formattedItems,
+          notes: receiveData.notes
+        })
       });
 
-      if (!response.ok) throw new Error('Failed to receive items');
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to receive items');
+      }
+
+      const result = await response.json();
+      
+      if (result.errors && result.errors.length > 0) {
+        showError(`Received ${result.results?.length || 0} items with ${result.errors.length} errors: ${result.errors.join(', ')}`);
+      } else {
+        showSuccess(`Successfully received ${result.results?.length || 0} items`);
+      }
 
       await fetchPurchaseOrders(currentPage);
       setShowReceiveModal(null);
       setReceiveData({ received_items: [], notes: '' });
-      showSuccess('Items received successfully');
     } catch (err) {
-      showError('Failed to receive items');
+      showError(err.message || 'Failed to receive items');
     }
   };
 
@@ -521,7 +547,7 @@ const PurchaseOrderManagement = () => {
       setEditingPO(po);
       setFormData({
         party_id: po.party_id || '',
-        order_date: po.order_date || new Date().toISOString().split('T')[0],
+        order_date: po.order_date || new Date().toISOString(),
         expected_delivery_date: po.expected_delivery_date || '',
         payment_terms: po.payment_terms || '',
         delivery_address: po.delivery_address || '',
@@ -537,7 +563,7 @@ const PurchaseOrderManagement = () => {
       setEditingPO(null);
       setFormData({
         party_id: '',
-        order_date: new Date().toISOString().split('T')[0],
+        order_date: new Date().toISOString(),
         expected_delivery_date: '',
         payment_terms: '',
         delivery_address: '',
@@ -611,7 +637,7 @@ const PurchaseOrderManagement = () => {
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Pending</p>
                   <p className="text-2xl font-bold text-foreground">
-                    {purchaseOrders.filter(po => ['draft', 'sent', 'confirmed'].includes(po.status)).length}
+                    {purchaseOrders.filter(po => ['draft', 'confirmed'].includes(po.status)).length}
                   </p>
                 </div>
                 <ClockIcon className="w-8 h-8 text-warning" />
@@ -736,16 +762,16 @@ const PurchaseOrderManagement = () => {
                             </div>
                             <PermissionGuard permission={ADMIN_PERMISSIONS.MANAGE_VENDORS}>
                               <div className="hidden sm:flex items-center space-x-2 ml-4">
-                                <Button variant="ghost" size="icon" onClick={() => fetchPODetails(po.id)} className="h-9 w-9 text-muted-foreground hover:text-primary">
+                                <Button variant="ghost" size="icon" onClick={() => fetchPODetails(po.id)} className="h-9 w-9 text-muted-foreground hover:text-primary" title="View Details">
                                   <EyeIcon className="w-4 h-4" />
                                 </Button>
-                                {po.status === 'confirmed' && (
-                                  <Button variant="ghost" size="icon" onClick={() => handleOpenReceiveModal(po)} className="h-9 w-9 text-muted-foreground hover:text-success">
+                                {['confirmed', 'partial_received'].includes(po.status) && (
+                                  <Button variant="ghost" size="icon" onClick={() => handleOpenReceiveModal(po)} className="h-9 w-9 text-muted-foreground hover:text-success" title="Receive Items">
                                     <TruckIcon className="w-4 h-4" />
                                   </Button>
                                 )}
-                                {['draft', 'sent'].includes(po.status) && (
-                                  <Button variant="ghost" size="icon" onClick={() => handleOpenModal(po)} className="h-9 w-9 text-muted-foreground hover:text-primary">
+                                {po.status === 'draft' && (
+                                  <Button variant="ghost" size="icon" onClick={() => handleOpenModal(po)} className="h-9 w-9 text-muted-foreground hover:text-primary" title="Edit PO">
                                     <PencilIcon className="w-4 h-4" />
                                   </Button>
                                 )}
@@ -758,12 +784,12 @@ const PurchaseOrderManagement = () => {
                             <Button variant="outline" size="sm" onClick={() => fetchPODetails(po.id)} className="flex-1">
                               <EyeIcon className="w-4 h-4 mr-2" />View
                             </Button>
-                            {po.status === 'confirmed' && (
+                            {['confirmed', 'partial_received'].includes(po.status) && (
                               <Button variant="outline" size="sm" onClick={() => handleOpenReceiveModal(po)} className="flex-1">
                                 <TruckIcon className="w-4 h-4 mr-2" />Receive
                               </Button>
                             )}
-                            {['draft', 'sent'].includes(po.status) && (
+                            {po.status === 'draft' && (
                               <Button variant="outline" size="sm" onClick={() => handleOpenModal(po)} className="flex-1">
                                 <PencilIcon className="w-4 h-4 mr-2" />Edit
                               </Button>
@@ -805,8 +831,8 @@ const PurchaseOrderManagement = () => {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-muted-foreground mb-1">Order Date *</label>
-                    <input type="date" required className="input-field" value={formData.order_date} onChange={(e) => setFormData({...formData, order_date: e.target.value})} />
+                    <label className="block text-sm font-medium text-muted-foreground mb-1">Order Date & Time *</label>
+                    <input type="datetime-local" required className="input-field" value={formData.order_date.slice(0, 16)} onChange={(e) => setFormData({...formData, order_date: new Date(e.target.value).toISOString()})} />
                   </div>
                 </div>
 
@@ -1495,16 +1521,12 @@ const PurchaseOrderManagement = () => {
                     <CardContent>
                       <div className="flex flex-wrap gap-2">
                         {showPODetails.status === 'draft' && (
-                          <Button onClick={() => handleUpdateStatus(showPODetails.id, 'sent')} size="sm" variant="outline">
-                            Mark as Sent
+                          <Button onClick={() => handleUpdateStatus(showPODetails.id, 'confirmed')} size="sm" className="btn-primary">
+                            <CheckCircleIcon className="w-4 h-4 mr-2" />
+                            Confirm Order
                           </Button>
                         )}
-                        {showPODetails.status === 'sent' && (
-                          <Button onClick={() => handleUpdateStatus(showPODetails.id, 'confirmed')} size="sm" variant="outline">
-                            Mark as Confirmed
-                          </Button>
-                        )}
-                        {showPODetails.status === 'confirmed' && (
+                        {['confirmed', 'partial_received'].includes(showPODetails.status) && (
                           <Button onClick={() => handleOpenReceiveModal(showPODetails)} size="sm" className="btn-primary">
                             <TruckIcon className="w-4 h-4 mr-2" />
                             Receive Items
@@ -1512,6 +1534,7 @@ const PurchaseOrderManagement = () => {
                         )}
                         {!['received', 'cancelled'].includes(showPODetails.status) && (
                           <Button onClick={() => handleUpdateStatus(showPODetails.id, 'cancelled')} size="sm" variant="destructive">
+                            <XCircleIcon className="w-4 h-4 mr-2" />
                             Cancel Order
                           </Button>
                         )}
