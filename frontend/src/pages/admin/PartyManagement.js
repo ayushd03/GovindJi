@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useToast } from '../../hooks/use-toast';
 import { PermissionGuard } from '../../components/PermissionGuard';
 import { ADMIN_PERMISSIONS } from '../../enums/roles';
 import {
@@ -29,8 +30,8 @@ import {
 } from '@heroicons/react/24/outline';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
-import { useToast } from '../../hooks/use-toast';
 import { Toaster } from '../../components/ui/toaster';
+import StaticTransactionTypeSelector from '../../components/StaticTransactionTypeSelector';
 
 const PARTY_CATEGORIES = [
   'Raw Materials',
@@ -97,8 +98,11 @@ const PartyManagement = () => {
     amount: '',
     payment_date: new Date().toISOString().split('T')[0],
     reference_number: '',
-    notes: ''
+    notes: '',
+    transaction_type_id: '',
+    transaction_fields: {}
   });
+  const [paymentFormErrors, setPaymentFormErrors] = useState({});
   
   const [formData, setFormData] = useState({
     name: '',
@@ -409,8 +413,30 @@ const PartyManagement = () => {
     }
   };
 
+  const closePaymentModal = () => {
+    setShowPaymentModal(null);
+    setPaymentFormData({
+      payment_type: 'payment',
+      amount: '',
+      payment_date: new Date().toISOString().split('T')[0],
+      reference_number: '',
+      notes: '',
+      transaction_type_id: '',
+      transaction_fields: {}
+    });
+    setPaymentFormErrors({});
+  };
+
   const handleVendorPayment = async (e) => {
     e.preventDefault();
+    
+    // Validate transaction type is selected
+    if (!paymentFormData.transaction_type_id) {
+      setPaymentFormErrors({ transaction_type_id: 'Please select a transaction type' });
+      showError('Please select a transaction type');
+      return;
+    }
+    
     try {
       const token = localStorage.getItem('authToken');
       const response = await fetch(`${API_BASE_URL}/api/admin/party-payments`, {
@@ -422,28 +448,32 @@ const PartyManagement = () => {
         body: JSON.stringify({
           ...paymentFormData,
           party_id: showPaymentModal.id,
-          amount: parseFloat(paymentFormData.amount)
+          amount: parseFloat(paymentFormData.amount),
+          transaction_type_id: paymentFormData.transaction_type_id,
+          transaction_fields: paymentFormData.transaction_fields || {}
         })
       });
 
-      if (!response.ok) throw new Error('Failed to record payment');
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        throw new Error(errorData.error || 'Failed to record payment');
+      }
 
-      // Refresh vendor details and party list
-      await fetchVendorDetails(showPaymentModal.id);
-      await fetchParties(currentPage);
-      
-      setShowPaymentModal(null);
-      setPaymentFormData({
-        payment_type: 'payment',
-        amount: '',
-        payment_date: new Date().toISOString().split('T')[0],
-        reference_number: '',
-        notes: ''
-      });
-      
+      // Show success message first
       showSuccess('Payment recorded successfully');
+      
+      closePaymentModal();
+      
+      // Refresh vendor details and party list (non-blocking)
+      fetchVendorDetails(showPaymentModal.id).catch(err => 
+        console.error('Failed to refresh vendor details:', err)
+      );
+      fetchParties(currentPage).catch(err => 
+        console.error('Failed to refresh parties list:', err)
+      );
     } catch (err) {
-      showError('Failed to record payment');
+      console.error('Payment error:', err);
+      showError(err.message || 'Failed to record payment');
     }
   };
 
@@ -496,8 +526,8 @@ const PartyManagement = () => {
       });
     });
     
-    // Sort by date (newest first)
-    return transactions.sort((a, b) => new Date(b.date) - new Date(a.date));
+    // Sort by date chronologically (oldest first)
+    return transactions.sort((a, b) => new Date(a.date) - new Date(b.date));
   };
 
   const formatCurrency = (amount) => {
@@ -1310,7 +1340,7 @@ const PartyManagement = () => {
               <div className="p-4 sm:p-6 border-b">
                 <div className="flex items-center justify-between">
                   <h2 className="text-lg font-semibold text-foreground">Add Vendor Payment</h2>
-                  <button onClick={() => setShowPaymentModal(null)} className="p-2 text-muted-foreground hover:text-foreground rounded-lg">
+                  <button onClick={() => closePaymentModal()} className="p-2 text-muted-foreground hover:text-foreground rounded-lg">
                     <XMarkIcon className="w-5 h-5" />
                   </button>
                 </div>
@@ -1356,6 +1386,30 @@ const PartyManagement = () => {
                   />
                 </div>
 
+                <StaticTransactionTypeSelector
+                  selectedType={paymentFormData.transaction_type_id}
+                  onTypeChange={(typeId) => {
+                    setPaymentFormData(prev => ({
+                      ...prev, 
+                      transaction_type_id: typeId,
+                      transaction_fields: {}
+                    }));
+                    setPaymentFormErrors(prev => ({...prev, transaction_type_id: ''}));
+                  }}
+                  fieldValues={paymentFormData.transaction_fields}
+                  onFieldChange={(fieldName, value) => {
+                    setPaymentFormData(prev => ({
+                      ...prev,
+                      transaction_fields: {
+                        ...prev.transaction_fields,
+                        [fieldName]: value
+                      }
+                    }));
+                  }}
+                  errors={paymentFormErrors}
+                  className="mb-4"
+                />
+
                 <div>
                   <label className="block text-sm font-medium text-muted-foreground mb-1">Reference Number</label>
                   <input 
@@ -1379,7 +1433,7 @@ const PartyManagement = () => {
                 </div>
 
                 <div className="flex flex-col sm:flex-row sm:justify-end gap-3 pt-4 border-t">
-                  <Button type="button" variant="outline" onClick={() => setShowPaymentModal(null)}>
+                  <Button type="button" variant="outline" onClick={() => closePaymentModal()}>
                     Cancel
                   </Button>
                   <Button type="submit" className="btn-primary">

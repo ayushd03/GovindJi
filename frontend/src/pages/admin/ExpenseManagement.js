@@ -25,9 +25,9 @@ import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { useToast } from '../../hooks/use-toast';
 import { Toaster } from '../../components/ui/toaster';
+import StaticTransactionTypeSelector from '../../components/StaticTransactionTypeSelector';
 
 const EXPENSE_CATEGORIES = ['Vendor Payment', 'Employee Payout', 'Store Utilities', 'Marketing', 'Maintenance', 'Miscellaneous'];
-const PAYMENT_MODES = ['Cash', 'UPI', 'Bank Transfer', 'Cheque', 'Credit'];
 
 // New color palette for charts
 const CHART_COLORS = [
@@ -60,12 +60,13 @@ const ExpenseManagement = () => {
   const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedVendor, setSelectedVendor] = useState('');
   const [selectedEmployee, setSelectedEmployee] = useState('');
-  const [selectedPaymentMode, setSelectedPaymentMode] = useState('');
+  const [selectedTransactionType, setSelectedTransactionType] = useState('');
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [formErrors, setFormErrors] = useState({});
   
   const [formData, setFormData] = useState({
     amount: '',
@@ -73,7 +74,8 @@ const ExpenseManagement = () => {
     category: '',
     vendor_id: '',
     employee_id: '',
-    payment_mode: '',
+    transaction_type_id: '',
+    transaction_fields: {},
     expense_date: new Date().toISOString().split('T')[0],
     notes: ''
   });
@@ -100,7 +102,7 @@ const ExpenseManagement = () => {
         ...(selectedCategory && { category: selectedCategory }),
         ...(selectedVendor && { vendor_id: selectedVendor }),
         ...(selectedEmployee && { employee_id: selectedEmployee }),
-        ...(selectedPaymentMode && { paymentMode: selectedPaymentMode }),
+        ...(selectedTransactionType && { transactionType: selectedTransactionType }),
         ...(dateRange.start && { startDate: dateRange.start }),
         ...(dateRange.end && { endDate: dateRange.end }),
       });
@@ -142,6 +144,13 @@ const ExpenseManagement = () => {
   const fetchVendors = () => fetchSelectOptions('vendors', setVendors);
   const fetchEmployees = () => fetchSelectOptions('employees', setEmployees);
 
+  // Static transaction types
+  const transactionTypes = [
+    { id: 'cash', name: 'Cash' },
+    { id: 'upi', name: 'UPI' },
+    { id: 'cheque', name: 'Cheque' }
+  ];
+
   const fetchAnalytics = async () => {
     try {
       const token = localStorage.getItem('authToken');
@@ -156,6 +165,14 @@ const ExpenseManagement = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Validate transaction type is selected
+    if (!formData.transaction_type_id) {
+      setFormErrors({ transaction_type_id: 'Please select a transaction type' });
+      showError('Please select a transaction type');
+      return;
+    }
+    
     try {
       const token = localStorage.getItem('authToken');
       const url = editingExpense ? `${API_BASE_URL}/api/admin/expenses/${editingExpense.id}` : `${API_BASE_URL}/api/admin/expenses`;
@@ -164,7 +181,9 @@ const ExpenseManagement = () => {
         ...formData,
         amount: parseFloat(formData.amount),
         vendor_id: formData.vendor_id || null,
-        employee_id: formData.employee_id || null
+        employee_id: formData.employee_id || null,
+        transaction_type_id: formData.transaction_type_id,
+        transaction_fields: formData.transaction_fields || {}
       };
       const response = await fetch(url, {
         method,
@@ -209,16 +228,18 @@ const ExpenseManagement = () => {
         category: expense.category || '',
         vendor_id: expense.vendor_id || '',
         employee_id: expense.employee_id || '',
-        payment_mode: expense.payment_mode || '',
+        transaction_type_id: expense.transaction_type_id || '',
+        transaction_fields: expense.transaction_fields || {},
         expense_date: expense.expense_date ? new Date(expense.expense_date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
         notes: expense.notes || ''
       });
     } else {
       setEditingExpense(null);
       setFormData({
-        amount: '', description: '', category: '', vendor_id: '', employee_id: '', payment_mode: '',
+        amount: '', description: '', category: '', vendor_id: '', employee_id: '', transaction_type_id: '', transaction_fields: {},
         expense_date: new Date().toISOString().split('T')[0], notes: ''
       });
+      setFormErrors({});
     }
     setIsModalOpen(true);
   };
@@ -227,9 +248,10 @@ const ExpenseManagement = () => {
     setIsModalOpen(false);
     setEditingExpense(null);
     setFormData({
-        amount: '', description: '', category: '', vendor_id: '', employee_id: '', payment_mode: '',
+        amount: '', description: '', category: '', vendor_id: '', employee_id: '', transaction_type_id: '', transaction_fields: {},
         expense_date: new Date().toISOString().split('T')[0], notes: ''
     });
+    setFormErrors({});
   };
 
   useEffect(() => {
@@ -238,7 +260,7 @@ const ExpenseManagement = () => {
       else setCurrentPage(1);
     }, 500);
     return () => clearTimeout(timer);
-  }, [searchTerm, selectedCategory, selectedVendor, selectedEmployee, selectedPaymentMode, dateRange]);
+  }, [searchTerm, selectedCategory, selectedVendor, selectedEmployee, selectedTransactionType, dateRange]);
 
   const calculatedTotalPages = totalPages > 0 ? totalPages : Math.ceil(totalExpenses / itemsPerPage);
 
@@ -251,19 +273,18 @@ const ExpenseManagement = () => {
   
   const formatCurrency = (amount) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(amount);
   const formatDate = (dateString) => new Date(dateString).toLocaleDateString('en-IN');
-  const getPaymentModeIcon = (mode) => {
-    switch(mode) {
-        case 'Cash': return BanknotesIcon;
-        case 'UPI': return DevicePhoneMobileIcon;
-        case 'Bank Transfer': return CreditCardIcon;
-        case 'Cheque': return DocumentArrowDownIcon;
-        case 'Credit': return CreditCardIcon;
+  const getTransactionTypeIcon = (iconName) => {
+    switch(iconName) {
+        case 'BanknotesIcon': return BanknotesIcon;
+        case 'DevicePhoneMobileIcon': return DevicePhoneMobileIcon;
+        case 'CreditCardIcon': return CreditCardIcon;
+        case 'DocumentArrowDownIcon': return DocumentArrowDownIcon;
         default: return CurrencyDollarIcon;
     }
   }
 
   const exportToCSV = () => {
-    const headers = ['Date', 'Amount', 'Description', 'Category', 'Payment Mode', 'Vendor/Employee', 'Notes'];
+    const headers = ['Date', 'Amount', 'Description', 'Category', 'Transaction Type', 'Vendor/Employee', 'Notes'];
     const csvData = [
       headers.join(','),
       ...expenses.map(expense => [
@@ -271,7 +292,7 @@ const ExpenseManagement = () => {
         expense.amount,
         `"${expense.description.replace(/"/g, '""')}"`,
         expense.category,
-        expense.payment_mode,
+        expense.transaction_type_name || 'N/A',
         expense.vendor_name || expense.employee_name || '',
         `"${(expense.notes || '').replace(/"/g, '""')}"`
       ].join(','))
@@ -463,9 +484,9 @@ const ExpenseManagement = () => {
                   </select>
                             {selectedCategory === 'Vendor Payment' && <select className="input-field" value={selectedVendor} onChange={e => setSelectedVendor(e.target.value)}><option value="">All Vendors</option>{vendors.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}</select>}
                             {selectedCategory === 'Employee Payout' && <select className="input-field" value={selectedEmployee} onChange={e => setSelectedEmployee(e.target.value)}><option value="">All Employees</option>{employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}</select>}
-                            <select className="input-field" value={selectedPaymentMode} onChange={e => setSelectedPaymentMode(e.target.value)}>
-                    <option value="">All Payment Modes</option>
-                                {PAYMENT_MODES.map(mode => <option key={mode} value={mode}>{mode}</option>)}
+                            <select className="input-field" value={selectedTransactionType} onChange={e => setSelectedTransactionType(e.target.value)}>
+                    <option value="">All Transaction Types</option>
+                                {transactionTypes.map(type => <option key={type.id} value={type.id}>{type.name}</option>)}
                   </select>
                             <input type="date" className="input-field" value={dateRange.start} onChange={e => setDateRange(p => ({ ...p, start: e.target.value }))} />
                             <input type="date" className="input-field" value={dateRange.end} onChange={e => setDateRange(p => ({ ...p, end: e.target.value }))} />
@@ -493,19 +514,19 @@ const ExpenseManagement = () => {
                     <>
                         <div className="divide-y">
                       {expenses.map((expense) => {
-                        const PaymentIcon = getPaymentModeIcon(expense.payment_mode);
+                        const TransactionIcon = getTransactionTypeIcon(expense.transaction_type_icon);
                         return (
                                 <div key={expense.id} className="px-4 py-3 sm:px-6 sm:py-4 hover:bg-muted/50 transition-colors w-full">
                             <div className="flex items-start justify-between w-full space-x-3">
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-start sm:items-center space-x-3 sm:space-x-4 w-full min-w-0">
-                                                <div className="p-2 bg-muted rounded-lg flex-shrink-0"><PaymentIcon className="w-5 h-5 text-muted-foreground" /></div>
+                                                <div className="p-2 bg-muted rounded-lg flex-shrink-0"><TransactionIcon className="w-5 h-5 text-muted-foreground" /></div>
                                   <div className="flex-1 min-w-0">
                                                     <h3 className="text-base sm:text-lg font-medium text-foreground truncate">{expense.description}</h3>
                                                     <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground max-w-full">
                                                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">{expense.category}</span>
                                       <span className="whitespace-nowrap">{formatDate(expense.expense_date)}</span>
-                                      <span className="whitespace-nowrap">{expense.payment_mode}</span>
+                                      <span className="whitespace-nowrap">{expense.transaction_type_name || 'N/A'}</span>
                                                         {(expense.vendor_name || expense.employee_name) && <span className="truncate">• {expense.vendor_name || expense.employee_name}</span>}
                                     </div>
                                   </div>
@@ -559,15 +580,29 @@ const ExpenseManagement = () => {
                 </div>
                 {formData.category === 'Vendor Payment' && <select className="input-field" value={formData.vendor_id} onChange={e => setFormData({...formData, vendor_id: e.target.value})}><option value="">Select Vendor</option>{vendors.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}</select>}
                 {formData.category === 'Employee Payout' && <select className="input-field" value={formData.employee_id} onChange={e => setFormData({...formData, employee_id: e.target.value})}><option value="">Select Employee</option>{employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}</select>}
-                <div>
-                    <label className="block text-sm font-medium text-muted-foreground mb-2">Payment Mode *</label>
-                    <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 mb-3">
-                        {PAYMENT_MODES.map(m => {
-                            const Icon = getPaymentModeIcon(m);
-                            return <button key={m} type="button" onClick={() => setFormData(p => ({...p, payment_mode: m}))} className={`p-2 rounded-lg border text-xs font-medium transition-all flex flex-col items-center space-y-1 ${formData.payment_mode === m ? 'border-primary bg-primary/10 text-primary' : 'border-border hover:border-primary/50 hover:bg-primary/5'}`}><Icon className="w-4 h-4" /><span>{m}</span></button>
-                        })}
-                </div>
-                  </div>
+                <StaticTransactionTypeSelector
+                  selectedType={formData.transaction_type_id}
+                  onTypeChange={(typeId) => {
+                    setFormData(prev => ({
+                      ...prev, 
+                      transaction_type_id: typeId,
+                      transaction_fields: {}
+                    }));
+                    setFormErrors(prev => ({...prev, transaction_type_id: ''}));
+                  }}
+                  fieldValues={formData.transaction_fields}
+                  onFieldChange={(fieldName, value) => {
+                    setFormData(prev => ({
+                      ...prev,
+                      transaction_fields: {
+                        ...prev.transaction_fields,
+                        [fieldName]: value
+                      }
+                    }));
+                  }}
+                  errors={formErrors}
+                  className="mb-4"
+                />
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div><label className="block text-sm font-medium text-muted-foreground mb-1">Date *</label><input type="date" required className="input-field" value={formData.expense_date} onChange={e => setFormData({...formData, expense_date: e.target.value})} /></div>
                   <div><label className="block text-sm font-medium text-muted-foreground mb-1">Notes</label><input type="text" className="input-field" value={formData.notes} onChange={e => setFormData({...formData, notes: e.target.value})} placeholder="Quick notes..." /></div>

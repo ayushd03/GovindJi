@@ -2018,7 +2018,7 @@ app.get('/api/admin/expenses', roleMiddleware.requirePermission(roleMiddleware.A
             limit = 10, 
             search = '', 
             category = '', 
-            paymentMode = '', 
+            transactionType = '', 
             startDate = '', 
             endDate = '',
             vendor_id = '',
@@ -2043,8 +2043,8 @@ app.get('/api/admin/expenses', roleMiddleware.requirePermission(roleMiddleware.A
             query = query.eq('category', category);
         }
         
-        if (paymentMode) {
-            query = query.eq('payment_mode', paymentMode);
+        if (transactionType) {
+            query = query.eq('transaction_type_id', transactionType);
         }
         
         if (vendor_id) {
@@ -2074,12 +2074,17 @@ app.get('/api/admin/expenses', roleMiddleware.requirePermission(roleMiddleware.A
 
         if (error) throw error;
 
-        // Format the response to include vendor/employee names
-        const formattedData = data.map(expense => ({
-            ...expense,
-            vendor_name: expense.vendor?.name || null,
-            employee_name: expense.employee?.name || null
-        }));
+        // Format the response to include vendor/employee names and transaction type info
+        const formattedData = data.map(expense => {
+            const transactionType = getTransactionTypeById(expense.transaction_type_id);
+            return {
+                ...expense,
+                vendor_name: expense.vendor?.name || null,
+                employee_name: expense.employee?.name || null,
+                transaction_type_name: transactionType?.name || null,
+                transaction_type_icon: transactionType?.icon || null
+            };
+        });
 
         // Calculate total amount for filtered results
         let totalAmountQuery = supabase
@@ -2093,8 +2098,8 @@ app.get('/api/admin/expenses', roleMiddleware.requirePermission(roleMiddleware.A
         if (category) {
             totalAmountQuery = totalAmountQuery.eq('category', category);
         }
-        if (paymentMode) {
-            totalAmountQuery = totalAmountQuery.eq('payment_mode', paymentMode);
+        if (transactionType) {
+            totalAmountQuery = totalAmountQuery.eq('transaction_type_id', transactionType);
         }
         if (vendor_id) {
             totalAmountQuery = totalAmountQuery.eq('vendor_id', vendor_id);
@@ -2209,7 +2214,25 @@ app.get('/api/admin/expenses/analytics', roleMiddleware.requirePermission(roleMi
 // Create new expense
 app.post('/api/admin/expenses', roleMiddleware.requirePermission(roleMiddleware.ADMIN_PERMISSIONS.MANAGE_EXPENSES), async (req, res) => {
     try {
-        const { amount, description, category, vendor_id, employee_id, payment_mode, expense_date, notes } = req.body;
+        const { amount, description, category, vendor_id, employee_id, transaction_type_id, transaction_fields, expense_date, notes } = req.body;
+
+        if (!transaction_type_id) {
+            return res.status(400).json({ error: 'transaction_type_id is required' });
+        }
+
+        // Validate transaction type exists
+        if (!validateTransactionTypeId(transaction_type_id)) {
+            return res.status(400).json({ error: 'Invalid transaction type' });
+        }
+
+        // Validate transaction fields
+        const validation = validateTransactionFields(transaction_type_id, transaction_fields || {});
+        if (!validation.isValid) {
+            return res.status(400).json({ error: 'Invalid transaction fields', field_errors: validation.errors });
+        }
+
+        // Get transaction type info for response
+        const transactionType = getTransactionTypeById(transaction_type_id);
 
         const { data, error } = await supabase
             .from('expenses')
@@ -2219,7 +2242,8 @@ app.post('/api/admin/expenses', roleMiddleware.requirePermission(roleMiddleware.
                 category,
                 vendor_id: vendor_id || null,
                 employee_id: employee_id || null,
-                payment_mode,
+                transaction_type_id,
+                transaction_fields: transaction_fields || {},
                 expense_date,
                 notes,
                 created_by: req.user.id
@@ -2236,7 +2260,9 @@ app.post('/api/admin/expenses', roleMiddleware.requirePermission(roleMiddleware.
         const formattedData = {
             ...data,
             vendor_name: data.vendor?.name || null,
-            employee_name: data.employee?.name || null
+            employee_name: data.employee?.name || null,
+            transaction_type_name: transactionType?.name || null,
+            transaction_type_icon: transactionType?.icon || null
         };
 
         res.status(201).json(formattedData);
@@ -2250,7 +2276,7 @@ app.post('/api/admin/expenses', roleMiddleware.requirePermission(roleMiddleware.
 app.put('/api/admin/expenses/:id', roleMiddleware.requirePermission(roleMiddleware.ADMIN_PERMISSIONS.MANAGE_EXPENSES), async (req, res) => {
     try {
         const { id } = req.params;
-        const { amount, description, category, vendor_id, employee_id, payment_mode, expense_date, notes } = req.body;
+        const { amount, description, category, vendor_id, employee_id, transaction_type_id, transaction_fields, expense_date, notes } = req.body;
 
         const { data, error } = await supabase
             .from('expenses')
@@ -2260,7 +2286,8 @@ app.put('/api/admin/expenses/:id', roleMiddleware.requirePermission(roleMiddlewa
                 category,
                 vendor_id: vendor_id || null,
                 employee_id: employee_id || null,
-                payment_mode,
+                transaction_type_id,
+                transaction_fields: transaction_fields || {},
                 expense_date,
                 notes,
                 updated_at: new Date().toISOString()
@@ -2269,7 +2296,8 @@ app.put('/api/admin/expenses/:id', roleMiddleware.requirePermission(roleMiddlewa
             .select(`
                 *,
                 vendor:vendor_id(name),
-                employee:employee_id(name)
+                employee:employee_id(name),
+                transaction_type:transaction_type_id(name, icon)
             `)
             .single();
 
@@ -2278,7 +2306,9 @@ app.put('/api/admin/expenses/:id', roleMiddleware.requirePermission(roleMiddlewa
         const formattedData = {
             ...data,
             vendor_name: data.vendor?.name || null,
-            employee_name: data.employee?.name || null
+            employee_name: data.employee?.name || null,
+            transaction_type_name: data.transaction_type?.name || null,
+            transaction_type_icon: data.transaction_type?.icon || null
         };
 
         res.json(formattedData);
@@ -3375,13 +3405,15 @@ app.post('/api/admin/party-payments', roleMiddleware.requirePermission(roleMiddl
             amount, 
             payment_date, 
             reference_number, 
-            notes 
+            notes,
+            transaction_type_id,
+            transaction_fields
         } = req.body;
 
         // Validate required fields
-        if (!party_id || !payment_type || !amount || !payment_date) {
+        if (!party_id || !payment_type || !amount || !payment_date || !transaction_type_id) {
             return res.status(400).json({ 
-                error: 'Missing required fields: party_id, payment_type, amount, payment_date' 
+                error: 'Missing required fields: party_id, payment_type, amount, payment_date, transaction_type_id' 
             });
         }
 
@@ -3399,6 +3431,17 @@ app.post('/api/admin/party-payments', roleMiddleware.requirePermission(roleMiddl
             });
         }
 
+        // Validate transaction type exists
+        if (!validateTransactionTypeId(transaction_type_id)) {
+            return res.status(400).json({ error: 'Invalid transaction type' });
+        }
+
+        // Validate transaction fields
+        const validation = validateTransactionFields(transaction_type_id, transaction_fields || {});
+        if (!validation.isValid) {
+            return res.status(400).json({ error: 'Invalid transaction fields', field_errors: validation.errors });
+        }
+
         // Create payment record
         const { data: payment, error: paymentError } = await supabase
             .from('party_payments')
@@ -3409,6 +3452,8 @@ app.post('/api/admin/party-payments', roleMiddleware.requirePermission(roleMiddl
                 payment_date,
                 reference_number: reference_number || null,
                 notes: notes || null,
+                transaction_type_id,
+                transaction_fields: transaction_fields || {},
                 created_by: req.user.id
             }])
             .select(`
@@ -3428,6 +3473,71 @@ app.post('/api/admin/party-payments', roleMiddleware.requirePermission(roleMiddl
         });
     } catch (error) {
         console.error('Error creating party payment:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ======================================
+// TRANSACTION TYPES API ROUTES (STATIC)
+// ======================================
+
+const { 
+    getTransactionTypes, 
+    getTransactionTypeById, 
+    getFormSchemaForType, 
+    validateTransactionTypeId,
+    validateTransactionFields 
+} = require('./config/transactionTypes');
+
+// Get all transaction types (static)
+app.get('/api/admin/transaction-types', authenticateAdmin, (req, res) => {
+    try {
+        const transactionTypes = getTransactionTypes();
+        res.json(transactionTypes);
+    } catch (error) {
+        console.error('Error fetching transaction types:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get transaction type by ID (static)
+app.get('/api/admin/transaction-types/:id', authenticateAdmin, (req, res) => {
+    try {
+        const { id } = req.params;
+        const transactionType = getTransactionTypeById(id);
+        
+        if (!transactionType) {
+            return res.status(404).json({ error: 'Transaction type not found' });
+        }
+
+        res.json({
+            transaction_type: {
+                id: transactionType.id,
+                name: transactionType.name,
+                description: transactionType.description,
+                icon: transactionType.icon
+            },
+            fields: transactionType.fields
+        });
+    } catch (error) {
+        console.error('Error fetching transaction type:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get form schema for a transaction type (static)
+app.get('/api/admin/transaction-types/:id/form-schema', authenticateAdmin, (req, res) => {
+    try {
+        const { id } = req.params;
+        const schema = getFormSchemaForType(id);
+        
+        if (!schema) {
+            return res.status(404).json({ error: 'Transaction type not found' });
+        }
+
+        res.json(schema);
+    } catch (error) {
+        console.error('Error fetching form schema:', error);
         res.status(500).json({ error: error.message });
     }
 });
