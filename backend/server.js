@@ -1447,6 +1447,33 @@ app.get('/api/products/category/:category_name', async (req, res) => {
     res.json(productsData);
 });
 
+// Admin Products Routes
+app.get('/api/admin/products', roleMiddleware.requirePermission(roleMiddleware.ADMIN_PERMISSIONS.VIEW_INVENTORY), async (req, res) => {
+    try {
+        const { data: products, error: productsError } = await supabase
+            .from('products')
+            .select(`
+                *,
+                category:category_id(id, name)
+            `)
+            .eq('is_active', true)
+            .order('name');
+        
+        if (productsError) throw productsError;
+
+        // Add category_name for backward compatibility
+        const enhancedProducts = products.map(product => ({
+            ...product,
+            category_name: product.category?.name || null
+        }));
+
+        res.json({ products: enhancedProducts });
+    } catch (error) {
+        console.error('Error fetching admin products:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // Wholesale Prices Routes
 app.get('/api/admin/products/:id/wholesale-prices', authenticateAdmin, async (req, res) => {
     const { id } = req.params;
