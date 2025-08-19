@@ -3060,7 +3060,7 @@ app.get('/api/admin/purchase-bills/:id', roleMiddleware.requirePermission(roleMi
                     price_per_unit, discount_percentage, discount_amount, 
                     tax_percentage, tax_amount, total_amount,
                     product:product_id(name, sku, unit),
-                    purchase_order_item:purchase_order_item_id(id, quantity as po_quantity)
+                    purchase_order_items!fk_stock_movements_purchase_order_item_id(id, quantity as po_quantity)
                 ),
                 party_payments!party_payments_purchase_bill_id_fkey(
                     id, payment_type, amount, payment_date, reference_number
@@ -3613,7 +3613,7 @@ app.get('/api/admin/inventory/movements', roleMiddleware.requirePermission(roleM
                 product:product_id(name, sku, unit),
                 party:party_id(name),
                 purchase_order:purchase_order_id(po_number),
-                purchase_order_item:purchase_order_item_id(item_name, quantity as po_quantity)
+                purchase_order_items!fk_stock_movements_purchase_order_item_id(item_name, quantity as po_quantity)
             `)
             .eq('product_id', product_id)
             .order('created_at', { ascending: false })
