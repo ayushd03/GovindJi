@@ -27,6 +27,8 @@ import {
   DocumentDuplicateIcon,
   ClockIcon,
   CheckCircleIcon,
+  ArchiveBoxIcon,
+  ExclamationTriangleIcon,
 } from '@heroicons/react/24/outline';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
@@ -257,14 +259,52 @@ const PartyManagement = () => {
         headers: { 'Authorization': `Bearer ${token}` }
       });
 
-      if (!response.ok) throw new Error('Failed to delete party');
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to delete party');
+      }
 
       await fetchParties(currentPage);
       setDeleteConfirm(null);
       showSuccess('Party deleted successfully');
     } catch (err) {
+      console.error('Delete error:', err);
       setError(err.message);
-      showError('Failed to delete party');
+      
+      // If the error mentions archiving, show enhanced error
+      if (err.message.includes('archive')) {
+        setDeleteConfirm({ ...deleteConfirm, showArchiveOption: true, deleteError: err.message });
+      } else {
+        showError(err.message);
+        setDeleteConfirm(null);
+      }
+    }
+  };
+
+  const handleArchive = async (partyId) => {
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`${API_BASE_URL}/api/admin/parties/${partyId}/archive`, {
+        method: 'PATCH',
+        headers: { 
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ archive: true })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to archive party');
+      }
+
+      await fetchParties(currentPage);
+      setDeleteConfirm(null);
+      showSuccess('Party archived successfully. You can restore it later if needed.');
+    } catch (err) {
+      console.error('Archive error:', err);
+      setError(err.message);
+      showError('Failed to archive party');
     }
   };
 
@@ -1446,17 +1486,77 @@ const PartyManagement = () => {
           </div>
         )}
 
-        {/* Delete Confirmation Modal */}
+        {/* Enhanced Delete/Archive Confirmation Modal */}
         {deleteConfirm && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-card rounded-xl shadow-xl max-w-md w-full p-4 sm:p-6">
-              <div className="flex items-center justify-center w-12 h-12 bg-destructive/10 rounded-full mx-auto mb-4"><TrashIcon className="w-6 h-6 text-destructive" /></div>
-              <h3 className="text-lg font-medium text-foreground text-center mb-2">Delete Party</h3>
-              <p className="text-muted-foreground text-center mb-6">Are you sure you want to delete "{deleteConfirm.name}"? This action cannot be undone.</p>
-              <div className="flex flex-col sm:flex-row sm:justify-center gap-3">
-                <Button variant="outline" onClick={() => setDeleteConfirm(null)}>Cancel</Button>
-                <Button variant="destructive" onClick={() => handleDelete(deleteConfirm.id)}>Delete</Button>
-              </div>
+            <div className="bg-card rounded-xl shadow-xl max-w-lg w-full p-4 sm:p-6">
+              {deleteConfirm.showArchiveOption ? (
+                <>
+                  {/* Archive Option UI */}
+                  <div className="flex items-center justify-center w-12 h-12 bg-warning/10 rounded-full mx-auto mb-4">
+                    <ExclamationTriangleIcon className="w-6 h-6 text-warning" />
+                  </div>
+                  <h3 className="text-lg font-medium text-foreground text-center mb-2">Cannot Delete Party</h3>
+                  <div className="bg-warning/10 border border-warning/20 rounded-lg p-4 mb-4">
+                    <p className="text-warning-foreground text-sm font-medium mb-2">
+                      {deleteConfirm.deleteError}
+                    </p>
+                  </div>
+                  
+                  <div className="space-y-4 mb-6">
+                    <div className="bg-muted/50 rounded-lg p-4">
+                      <div className="flex items-start gap-3">
+                        <ArchiveBoxIcon className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" />
+                        <div>
+                          <h4 className="font-medium text-foreground mb-1">Archive Party Instead</h4>
+                          <p className="text-sm text-muted-foreground">
+                            Archiving will hide this party from the active list while preserving all transaction history. 
+                            You can restore it later if needed.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="text-sm text-muted-foreground bg-info/10 border border-info/20 rounded-lg p-3">
+                      <strong>What happens when you archive:</strong>
+                      <ul className="mt-2 space-y-1 list-disc list-inside">
+                        <li>Party is hidden from active lists</li>
+                        <li>All purchase orders and payments remain intact</li>
+                        <li>Transaction history is preserved</li>
+                        <li>Can be restored anytime if needed</li>
+                      </ul>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row sm:justify-center gap-3">
+                    <Button variant="outline" onClick={() => setDeleteConfirm(null)}>
+                      Cancel
+                    </Button>
+                    <Button 
+                      onClick={() => handleArchive(deleteConfirm.id)}
+                      className="bg-orange-500 hover:bg-orange-600 text-white"
+                    >
+                      <ArchiveBoxIcon className="w-4 h-4 mr-2" />
+                      Archive Party
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  {/* Standard Delete UI */}
+                  <div className="flex items-center justify-center w-12 h-12 bg-destructive/10 rounded-full mx-auto mb-4">
+                    <TrashIcon className="w-6 h-6 text-destructive" />
+                  </div>
+                  <h3 className="text-lg font-medium text-foreground text-center mb-2">Delete Party</h3>
+                  <p className="text-muted-foreground text-center mb-6">
+                    Are you sure you want to delete "{deleteConfirm.name}"? This action cannot be undone.
+                  </p>
+                  <div className="flex flex-col sm:flex-row sm:justify-center gap-3">
+                    <Button variant="outline" onClick={() => setDeleteConfirm(null)}>Cancel</Button>
+                    <Button variant="destructive" onClick={() => handleDelete(deleteConfirm.id)}>Delete</Button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         )}

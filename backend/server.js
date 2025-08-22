@@ -2574,6 +2574,89 @@ app.put('/api/admin/parties/:id', roleMiddleware.requirePermission(roleMiddlewar
     }
 });
 
+// Delete party
+app.delete('/api/admin/parties/:id', roleMiddleware.requirePermission(roleMiddleware.ADMIN_PERMISSIONS.MANAGE_VENDORS), async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        // First check if party has any associated records that would prevent deletion
+        const { data: relatedData, error: checkError } = await supabase
+            .from('purchase_orders')
+            .select('id')
+            .eq('party_id', id)
+            .limit(1);
+
+        if (checkError) throw checkError;
+
+        // If there are purchase orders, we should not allow deletion
+        if (relatedData && relatedData.length > 0) {
+            return res.status(400).json({
+                error: 'Cannot delete party with existing purchase orders. Please archive the party instead.'
+            });
+        }
+
+        // Check for any payments
+        const { data: paymentsData, error: paymentsError } = await supabase
+            .from('party_payments')
+            .select('id')
+            .eq('party_id', id)
+            .limit(1);
+
+        if (paymentsError) throw paymentsError;
+
+        if (paymentsData && paymentsData.length > 0) {
+            return res.status(400).json({
+                error: 'Cannot delete party with existing payment records. Please archive the party instead.'
+            });
+        }
+
+        // If no related records, proceed with deletion
+        const { error } = await supabase
+            .from('parties')
+            .delete()
+            .eq('id', id);
+
+        if (error) throw error;
+
+        res.json({ message: 'Party deleted successfully' });
+    } catch (error) {
+        console.error('Error deleting party:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Archive/unarchive party
+app.patch('/api/admin/parties/:id/archive', roleMiddleware.requirePermission(roleMiddleware.ADMIN_PERMISSIONS.MANAGE_VENDORS), async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { archive = true } = req.body; // Default to archiving
+
+        const { data, error } = await supabase
+            .from('parties')
+            .update({
+                is_active: !archive,
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', id)
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        if (!data) {
+            return res.status(404).json({ error: 'Party not found' });
+        }
+
+        res.json({ 
+            message: archive ? 'Party archived successfully' : 'Party restored successfully',
+            party: data
+        });
+    } catch (error) {
+        console.error('Error archiving party:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // ======================================
 // PURCHASE ORDER MANAGEMENT ROUTES
 // ======================================
