@@ -54,7 +54,7 @@ const ExpenseManagement = () => {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [activeTab, setActiveTab] = useState('list'); // 'list' or 'add'
+  const [activeTab, setActiveTab] = useState('add'); // 'list' or 'add'
   
   // Form dependencies
   const [dependencies, setDependencies] = useState({
@@ -456,46 +456,39 @@ const ExpenseManagement = () => {
   return (
     <PermissionGuard permission={ADMIN_PERMISSIONS.VIEW_EXPENSES}>
       <div className="space-y-4">
-        {/* Header */}
-        <div className="bg-white rounded-lg shadow-sm border p-4">
-          <div className="flex items-center justify-between">
-            <div>
+        {/* Floating Header */}
+        <div className="sticky top-0 z-40 bg-white rounded-lg shadow-sm border p-4 mb-4">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
+            <div className="flex items-center space-x-3">
               <h1 className="text-xl font-semibold text-gray-900">Expense Management</h1>
-              <p className="text-sm text-gray-600 mt-1">
-                Track and manage all business expenses efficiently
-              </p>
+              <div className="flex items-center space-x-2">
+                <Button
+                  variant={activeTab === 'add' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setActiveTab('add')}
+                  className="flex items-center space-x-1"
+                >
+                  <PlusIcon className="w-4 h-4" />
+                  <span>Add</span>
+                </Button>
+                <Button
+                  variant={activeTab === 'list' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setActiveTab('list')}
+                  className="flex items-center space-x-1"
+                >
+                  <ListBulletIcon className="w-4 h-4" />
+                  <span>View</span>
+                </Button>
+              </div>
             </div>
-            <div className="flex items-center space-x-2">
-              <Button
-                variant={activeTab === 'list' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setActiveTab('list')}
-                className="flex items-center space-x-1"
-              >
-                <ListBulletIcon className="w-4 h-4" />
-                <span>View Expenses</span>
-              </Button>
-              <Button
-                variant={activeTab === 'add' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setActiveTab('add')}
-                className="flex items-center space-x-1"
-              >
-                <PlusIcon className="w-4 h-4" />
-                <span>Add Expense</span>
-              </Button>
-            </div>
-          </div>
-        </div>
-
-        {/* Content based on active tab */}
-        {activeTab === 'list' ? (
-          <div className="space-y-4">
-            {/* Filters and Search */}
-            <div className="bg-white rounded-lg shadow-sm border p-4">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-3 sm:space-y-0">
-                <div className="flex items-center space-x-3 flex-1 max-w-md">
-                  <div className="relative flex-1">
+            
+            {/* Header Actions - Conditional based on active tab */}
+            <div className="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-3">
+              {activeTab === 'list' && (
+                <>
+                  {/* Search */}
+                  <div className="relative flex-1 sm:max-w-xs">
                     <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                     <input
                       type="text"
@@ -505,79 +498,114 @@ const ExpenseManagement = () => {
                       onChange={(e) => setSearchTerm(e.target.value)}
                     />
                   </div>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowFilters(!showFilters)}
-                    className="flex items-center space-x-1"
-                  >
-                    <FunnelIcon className="w-4 h-4" />
-                    <span>Filters</span>
-                  </Button>
-                  <Button
-                    onClick={handleExportExpenses}
-                    size="sm"
-                    className="flex items-center space-x-1"
-                  >
-                    <ArrowDownTrayIcon className="w-4 h-4" />
-                    <span>Export</span>
-                  </Button>
-                </div>
-              </div>
-
-              {/* Expandable Filters */}
-              {showFilters && (
-                <div className="mt-4 pt-4 border-t grid grid-cols-1 md:grid-cols-4 gap-3">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Category</label>
-                    <select
-                      className="w-full text-sm px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-                      value={selectedCategory}
-                      onChange={(e) => setSelectedCategory(e.target.value)}
-                    >
-                      <option value="">All Categories</option>
-                      {EXPENSE_CATEGORIES.map(category => (
-                        <option key={category} value={category}>{category}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Payment Method</label>
-                    <select
-                      className="w-full text-sm px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-                      value={selectedPaymentMethod}
-                      onChange={(e) => setSelectedPaymentMethod(e.target.value)}
-                    >
-                      <option value="">All Methods</option>
-                      {PAYMENT_METHODS.map(method => (
-                        <option key={method.value} value={method.value}>{method.label}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Start Date</label>
-                    <input
-                      type="date"
-                      className="w-full text-sm px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-                      value={dateRange.start_date}
-                      onChange={(e) => setDateRange(prev => ({ ...prev, start_date: e.target.value }))}
-                    />
-                  </div>
-                  <div className="flex items-end">
+                  
+                  <div className="flex items-center space-x-2">
+                    {/* Filters */}
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={clearAllFilters}
-                      className="w-full text-sm"
+                      onClick={() => setShowFilters(!showFilters)}
+                      className="flex items-center space-x-1"
                     >
-                      Clear Filters
+                      <FunnelIcon className="w-4 h-4" />
+                      <span>Filters</span>
+                    </Button>
+                    
+                    {/* Export */}
+                    <Button
+                      onClick={handleExportExpenses}
+                      size="sm"
+                      variant="outline"
+                      className="flex items-center space-x-1"
+                    >
+                      <ArrowDownTrayIcon className="w-4 h-4" />
+                      <span>Export</span>
                     </Button>
                   </div>
+                </>
+              )}
+              
+              {activeTab === 'add' && (
+                <div className="flex items-center space-x-2">
+                  {/* Submit Expense (shown when in add mode) */}
+                  <Button
+                    onClick={handleSubmitExpense}
+                    disabled={!isComplete || hasErrors || isSubmitting}
+                    className="flex items-center space-x-1"
+                    size="sm"
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <ArrowPathIcon className="w-4 h-4 animate-spin" />
+                        <span>Submitting</span>
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircleIcon className="w-4 h-4" />
+                        <span>Submit</span>
+                      </>
+                    )}
+                  </Button>
                 </div>
               )}
             </div>
+          </div>
+          
+          {/* Expandable Filters - Only show when in list view */}
+          {showFilters && activeTab === 'list' && (
+            <div className="mt-4 pt-4 border-t grid grid-cols-1 md:grid-cols-4 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Category</label>
+                <select
+                  className="w-full text-sm px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                  value={selectedCategory}
+                  onChange={(e) => setSelectedCategory(e.target.value)}
+                >
+                  <option value="">All Categories</option>
+                  {EXPENSE_CATEGORIES.map(category => (
+                    <option key={category} value={category}>{category}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Payment Method</label>
+                <select
+                  className="w-full text-sm px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                  value={selectedPaymentMethod}
+                  onChange={(e) => setSelectedPaymentMethod(e.target.value)}
+                >
+                  <option value="">All Methods</option>
+                  {PAYMENT_METHODS.map(method => (
+                    <option key={method.value} value={method.value}>{method.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Start Date</label>
+                <input
+                  type="date"
+                  className="w-full text-sm px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                  value={dateRange.start_date}
+                  onChange={(e) => setDateRange(prev => ({ ...prev, start_date: e.target.value }))}
+                />
+              </div>
+              <div className="flex items-end">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={clearAllFilters}
+                  className="w-full text-sm"
+                >
+                  Clear Filters
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Content based on active tab */}
+        {activeTab === 'list' ? (
+          <div className="space-y-4">
 
             {/* Summary Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -708,29 +736,6 @@ const ExpenseManagement = () => {
         ) : (
           /* Add Expense Form */
           <div className="bg-white rounded-lg shadow-sm border p-6">
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center space-x-2">
-                <CurrencyDollarIcon className="w-5 h-5 text-primary" />
-                <h2 className="text-lg font-semibold text-gray-900">Add New Expense</h2>
-              </div>
-              <Button
-                onClick={handleSubmitExpense}
-                disabled={!isComplete || hasErrors || isSubmitting}
-                className="px-6"
-              >
-                {isSubmitting ? (
-                  <>
-                    <ArrowPathIcon className="w-4 h-4 mr-2 animate-spin" />
-                    Submitting...
-                  </>
-                ) : (
-                  <>
-                    <CheckCircleIcon className="w-4 h-4 mr-2" />
-                    Submit Expense
-                  </>
-                )}
-              </Button>
-            </div>
             <ExpenseForm
               transactionData={expenseForm}
               updateTransactionData={updateExpenseForm}
