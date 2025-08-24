@@ -18,7 +18,6 @@ export const ADMIN_PERMISSIONS = {
   MANAGE_INVENTORY: 'manage_inventory',
   VIEW_CUSTOMERS: 'view_customers',
   MANAGE_CUSTOMERS: 'manage_customers',
-  VIEW_ANALYTICS: 'view_analytics',
   VIEW_VENDORS: 'view_vendors',
   MANAGE_VENDORS: 'manage_vendors',
   VIEW_EMPLOYEES: 'view_employees',
@@ -71,12 +70,6 @@ export const ADMIN_TABS = {
     icon: 'UsersIcon',
     permissions: [ADMIN_PERMISSIONS.VIEW_CUSTOMERS]
   },
-  ANALYTICS: {
-    path: '/admin/analytics',
-    label: 'Analytics',
-    icon: 'ChartPieIcon',
-    permissions: [ADMIN_PERMISSIONS.VIEW_ANALYTICS]
-  },
   PARTIES: {
     path: '/admin/parties',
     label: 'Party Management',
@@ -111,7 +104,6 @@ export const ROLE_PERMISSIONS = {
     ADMIN_PERMISSIONS.MANAGE_INVENTORY,
     ADMIN_PERMISSIONS.VIEW_CUSTOMERS,
     ADMIN_PERMISSIONS.MANAGE_CUSTOMERS,
-    ADMIN_PERMISSIONS.VIEW_ANALYTICS,
     ADMIN_PERMISSIONS.VIEW_VENDORS,
     ADMIN_PERMISSIONS.MANAGE_VENDORS,
     ADMIN_PERMISSIONS.VIEW_EMPLOYEES,

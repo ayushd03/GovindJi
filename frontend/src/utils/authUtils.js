@@ -70,12 +70,7 @@ export const getStoredUserData = () => {
  * @param {object} user - User data object
  */
 export const storeAuthData = (session, user) => {
-  console.log('Storing auth data:', {
-    hasAccessToken: !!session.access_token,
-    hasRefreshToken: !!session.refresh_token,
-    expiresIn: session.expires_in,
-    expiresAt: session.expires_at
-  });
+  // Store authentication data
   
   localStorage.setItem('authToken', session.access_token);
   localStorage.setItem('refreshToken', session.refresh_token);
@@ -90,5 +85,5 @@ export const storeAuthData = (session, user) => {
   }
   
   localStorage.setItem('tokenExpiry', expiryTime.toString());
-  console.log('Token expires at:', new Date(expiryTime).toISOString());
+  // Token expiry set
 };

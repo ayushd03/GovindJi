@@ -116,6 +116,65 @@ class StorageInterface {
     
     return `${prefix}${prefix ? '_' : ''}${timestamp}_${uuid}${ext}`;
   }
+
+  /**
+   * List files in storage (optional implementation)
+   * @param {string} prefix - Optional prefix to filter files
+   * @param {Object} options - Additional options
+   * @returns {Promise<Array>} - Array of file objects
+   */
+  async listFiles(prefix = '', options = {}) {
+    // Default implementation returns empty array
+    // Providers can override this method
+    return [];
+  }
+
+  /**
+   * Create bucket if it doesn't exist (cloud storage specific)
+   * @returns {Promise<boolean>} - Success status
+   */
+  async createBucketIfNotExists() {
+    // Default implementation does nothing
+    // Cloud providers can override this method
+    return true;
+  }
+
+  /**
+   * Get storage statistics (optional implementation)
+   * @returns {Promise<Object>} - Storage statistics
+   */
+  async getStorageStats() {
+    // Default implementation returns basic stats
+    return {
+      provider: 'unknown',
+      totalFiles: 0,
+      totalSize: 0
+    };
+  }
+
+  /**
+   * Get MIME type from file extension (utility method)
+   * @param {string} fileName - File name with extension
+   * @returns {string} - MIME type
+   */
+  getMimeTypeFromExtension(fileName) {
+    const path = require('path');
+    const ext = path.extname(fileName).toLowerCase();
+    
+    const mimeTypes = {
+      '.jpg': 'image/jpeg',
+      '.jpeg': 'image/jpeg',
+      '.png': 'image/png',
+      '.gif': 'image/gif',
+      '.webp': 'image/webp',
+      '.svg': 'image/svg+xml',
+      '.pdf': 'application/pdf',
+      '.txt': 'text/plain',
+      '.json': 'application/json'
+    };
+    
+    return mimeTypes[ext] || 'application/octet-stream';
+  }
 }
 
 module.exports = StorageInterface;

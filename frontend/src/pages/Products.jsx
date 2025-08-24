@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useSearchParams, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { MagnifyingGlassIcon, XMarkIcon, ViewColumnsIcon, ListBulletIcon, FunnelIcon } from '@heroicons/react/24/outline';
-import ProductCardGrid from '../components/ProductCardGrid';
+import ProductCard from '../components/ProductCard';
 import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
@@ -587,7 +587,7 @@ const Products = () => {
                           animate={{ opacity: 1, y: 0 }}
                           transition={{ duration: 0.4, delay: index * 0.05 }}
                         >
-                          <ProductCardGrid product={product} viewMode="list" />
+                          <ProductCard product={product} viewMode="list" />
                         </motion.div>
                       ))}
                     </div>
@@ -600,7 +600,7 @@ const Products = () => {
                           animate={{ opacity: 1, y: 0 }}
                           transition={{ duration: 0.4, delay: index * 0.05 }}
                         >
-                          <ProductCardGrid product={product} viewMode="grid" />
+                          <ProductCard product={product} viewMode="grid" />
                         </motion.div>
                       ))}
                     </div>

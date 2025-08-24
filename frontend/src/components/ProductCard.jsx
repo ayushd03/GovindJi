@@ -11,7 +11,7 @@ import { handleImageError } from '../utils/imageUtils';
 import { cn } from '../lib/utils';
 import SizeSelectionDialog from './SizeSelectionDialog';
 
-const ProductCardNew = ({ product, className }) => {
+const ProductCard = ({ product, className, viewMode = "grid" }) => {
   const { getProductCartInfo } = useCart();
   const { primaryImage, loading: imageLoading } = useProductImage(product.id, product.image_url);
   const [isHovered, setIsHovered] = useState(false);
@@ -49,18 +49,27 @@ const ProductCardNew = ({ product, className }) => {
   const rating = 4.5;
   const discount = product.discount || 0;
 
+  // Handle different view modes
+  const cardClasses = viewMode === "list" 
+    ? "group relative w-full flex items-center p-4 border rounded-lg hover:shadow-md transition-shadow" 
+    : "group relative w-full";
+
+  const cardLayoutClasses = viewMode === "list"
+    ? "overflow-hidden border-0 bg-white relative flex flex-row rounded-xl"
+    : "overflow-hidden border-0 bg-white relative h-full flex flex-col rounded-xl";
+
   return (
     <>
       <motion.div
-        className={cn("group relative w-full", className)}
-        whileHover={{ y: -8 }}
+        className={cn(cardClasses, className)}
+        whileHover={{ y: viewMode === "list" ? 0 : -8 }}
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6, ease: "easeOut" }}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
       >
-        <Card className="overflow-hidden border-0 bg-white relative h-full flex flex-col rounded-xl">
+        <Card className={cardLayoutClasses}>
           {/* Premium card shadow and border effects */}
           <div className="absolute inset-0 bg-gradient-to-br from-slate-50/30 via-white to-gray-50/30 rounded-xl" />
           <div 
@@ -277,4 +286,4 @@ const ProductCardNew = ({ product, className }) => {
   );
 };
 
-export default ProductCardNew;
+export default ProductCard;

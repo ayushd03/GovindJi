@@ -257,7 +257,7 @@ const PartySelector = ({
                 className="w-full text-left px-3 py-2 text-sm text-primary hover:bg-primary/10 rounded-lg transition-colors"
                 onClick={() => {
                   // This could trigger a modal to add a new party
-                  console.log('Add new party:', searchTerm);
+                  // Add new party functionality
                   setIsOpen(false);
                 }}
               >

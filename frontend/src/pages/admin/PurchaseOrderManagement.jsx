@@ -26,7 +26,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
-import { useToast } from '../../hooks/use-toast';
+import { useToast } from '../../hooks/useToast';
 import { Toaster } from '../../components/ui/toaster';
 import { categoriesAPI } from '../../services/api';
 
@@ -312,7 +312,7 @@ const PurchaseOrderManagement = () => {
 
   // Handle product selection from autocomplete
   const handleProductFromAutocomplete = (index, product) => {
-    console.log('Autocomplete selection:', product.name, 'for item index:', index);
+    // Autocomplete selection made
     
     // Update all fields in a single batch
     const newItems = [...formData.items];
@@ -350,7 +350,7 @@ const PurchaseOrderManagement = () => {
       highlightedIndex: -1
     });
     
-    console.log('Autocomplete selection completed');
+    // Selection completed successfully
   };
 
   // Handle category change to filter products

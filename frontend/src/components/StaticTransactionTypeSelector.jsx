@@ -82,7 +82,7 @@ const StaticTransactionTypeSelector = ({
         switch (field.field_type) {
             case 'date':
                 return (
-                    <div key={field.field_name} className="mb-4">
+                    <div key={field.field_name}>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                             {field.field_label}
                             {field.is_required && <span className="text-red-500 ml-1">*</span>}
@@ -102,7 +102,7 @@ const StaticTransactionTypeSelector = ({
 
             default: // text
                 return (
-                    <div key={field.field_name} className="mb-4">
+                    <div key={field.field_name}>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                             {field.field_label}
                             {field.is_required && <span className="text-red-500 ml-1">*</span>}
@@ -170,7 +170,7 @@ const StaticTransactionTypeSelector = ({
                     )}
                     
                     {selectedTypeData.fields.length > 0 ? (
-                        <div className="space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {selectedTypeData.fields.map(renderField)}
                         </div>
                     ) : (

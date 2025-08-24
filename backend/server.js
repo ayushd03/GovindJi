@@ -13,7 +13,6 @@ const { errorHandler, notFoundHandler, requestId, asyncHandler, logger, sendSucc
 
 // Import expense routes
 const expenseRoutes = require('./routes/expenseRoutes');
-const analyticsRoutes = require('./routes/analyticsRoutes');
 
 const app = express();
 const port = process.env.PORT || 3001;
@@ -142,11 +141,8 @@ const authenticateAdmin = asyncHandler(async (req, res, next) => {
 // Use expense routes
 app.use('/api/admin/expenses', expenseRoutes);
 
-// Use analytics routes
-app.use('/api/admin/analytics', analyticsRoutes);
-
 // Admin Routes
-// Admin Dashboard Analytics
+// Admin Dashboard
 app.get('/api/admin/dashboard', authenticateAdmin, asyncHandler(async (req, res) => {
     // Get order statistics
     const { data: orders, error: ordersError } = await supabase
@@ -3027,7 +3023,7 @@ app.post('/api/admin/purchase-orders/:id/receive', roleMiddleware.requirePermiss
     }
 });
 
-// Get purchase order summary/analytics
+// Get purchase order summary
 app.get('/api/admin/purchase-orders/summary', roleMiddleware.requirePermission(roleMiddleware.ADMIN_PERMISSIONS.VIEW_VENDORS), async (req, res) => {
     try {
         const { party_id, start_date, end_date } = req.query;

@@ -415,6 +415,196 @@ router.post('/validate',
     sendSuccess(res, validation, 'Transaction validation completed');
   }));
 
+// Get expense history with filters and pagination
+router.get('/history',
+  roleMiddleware.requirePermission(roleMiddleware.ADMIN_PERMISSIONS.VIEW_EXPENSES),
+  asyncHandler(async (req, res) => {
+    const {
+      page = 1,
+      limit = 20,
+      search = '',
+      category = '',
+      payment_method = '',
+      start_date,
+      end_date,
+      min_amount,
+      max_amount
+    } = req.query;
+
+    const offset = (parseInt(page) - 1) * parseInt(limit);
+
+    // Build query
+    let query = supabase
+      .from('unified_transactions')
+      .select('*', { count: 'exact' })
+      .eq('transaction_type', 'expense')
+      .order('transaction_date', { ascending: false })
+      .order('created_at', { ascending: false });
+
+    // Apply filters
+    if (search) {
+      query = query.or(`description.ilike.%${search}%,reference_number.ilike.%${search}%,notes.ilike.%${search}%`);
+    }
+
+    if (category) {
+      query = query.eq('expense_category', category);
+    }
+
+    if (payment_method) {
+      query = query.contains('payment_method', { type: payment_method });
+    }
+
+    if (start_date) {
+      query = query.gte('transaction_date', start_date);
+    }
+
+    if (end_date) {
+      query = query.lte('transaction_date', end_date);
+    }
+
+    if (min_amount) {
+      query = query.gte('total_amount', parseFloat(min_amount));
+    }
+
+    if (max_amount) {
+      query = query.lte('total_amount', parseFloat(max_amount));
+    }
+
+    // Apply pagination
+    query = query.range(offset, offset + parseInt(limit) - 1);
+
+    const { data: expenses, error, count } = await query;
+
+    if (error) throw error;
+
+    logger.info('Expense history retrieved', {
+      user_id: req.user?.id,
+      page: parseInt(page),
+      total_count: count,
+      filters: { search, category, payment_method, start_date, end_date, min_amount, max_amount }
+    });
+
+    sendSuccess(res, {
+      expenses: expenses || [],
+      total: count || 0,
+      page: parseInt(page),
+      limit: parseInt(limit),
+      totalPages: Math.ceil((count || 0) / parseInt(limit))
+    }, 'Expense history retrieved successfully');
+  }));
+
+// Export expenses to Excel
+router.get('/export',
+  roleMiddleware.requirePermission(roleMiddleware.ADMIN_PERMISSIONS.VIEW_EXPENSES),
+  asyncHandler(async (req, res) => {
+    const {
+      search = '',
+      category = '',
+      payment_method = '',
+      start_date,
+      end_date,
+      min_amount,
+      max_amount
+    } = req.query;
+
+    // Build query (without pagination for export)
+    let query = supabase
+      .from('unified_transactions')
+      .select('*')
+      .eq('transaction_type', 'expense')
+      .order('transaction_date', { ascending: false })
+      .order('created_at', { ascending: false });
+
+    // Apply same filters as history endpoint
+    if (search) {
+      query = query.or(`description.ilike.%${search}%,reference_number.ilike.%${search}%,notes.ilike.%${search}%`);
+    }
+
+    if (category) {
+      query = query.eq('expense_category', category);
+    }
+
+    if (payment_method) {
+      query = query.contains('payment_method', { type: payment_method });
+    }
+
+    if (start_date) {
+      query = query.gte('transaction_date', start_date);
+    }
+
+    if (end_date) {
+      query = query.lte('transaction_date', end_date);
+    }
+
+    if (min_amount) {
+      query = query.gte('total_amount', parseFloat(min_amount));
+    }
+
+    if (max_amount) {
+      query = query.lte('total_amount', parseFloat(max_amount));
+    }
+
+    const { data: expenses, error } = await query;
+
+    if (error) throw error;
+
+    // Create Excel workbook
+    const ExcelJS = require('exceljs');
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Expenses');
+
+    // Define columns
+    worksheet.columns = [
+      { header: 'Date', key: 'transaction_date', width: 12 },
+      { header: 'Reference', key: 'reference_number', width: 20 },
+      { header: 'Description', key: 'description', width: 40 },
+      { header: 'Category', key: 'expense_category', width: 20 },
+      { header: 'Amount', key: 'total_amount', width: 15 },
+      { header: 'Payment Method', key: 'payment_method', width: 15 },
+      { header: 'Status', key: 'status', width: 12 },
+      { header: 'Notes', key: 'notes', width: 30 },
+      { header: 'Created At', key: 'created_at', width: 20 }
+    ];
+
+    // Add data rows
+    expenses.forEach(expense => {
+      worksheet.addRow({
+        transaction_date: expense.transaction_date,
+        reference_number: expense.reference_number || '',
+        description: expense.description,
+        expense_category: expense.expense_category,
+        total_amount: parseFloat(expense.total_amount) || 0,
+        payment_method: expense.payment_method?.type || 'Unknown',
+        status: expense.status || 'completed',
+        notes: expense.notes || '',
+        created_at: new Date(expense.created_at).toLocaleString()
+      });
+    });
+
+    // Style header row
+    worksheet.getRow(1).font = { bold: true };
+    worksheet.getRow(1).fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FFE6F3FF' }
+    };
+
+    // Set response headers
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename=expenses-${start_date || 'all'}-${end_date || new Date().toISOString().split('T')[0]}.xlsx`);
+
+    // Write to response
+    await workbook.xlsx.write(res);
+
+    logger.info('Expenses exported', {
+      user_id: req.user?.id,
+      record_count: expenses.length,
+      filters: { search, category, payment_method, start_date, end_date }
+    });
+
+    res.end();
+  }));
+
 // Get transaction by ID
 router.get('/:id', 
   roleMiddleware.requirePermission(roleMiddleware.ADMIN_PERMISSIONS.VIEW_EXPENSES),
@@ -435,9 +625,7 @@ router.get('/:id',
       .select(`
         *,
         expense:expenses(*),
-        purchase_order:purchase_orders(*),
-        party_payment:party_payments(*),
-        attachments:transaction_attachments(*)
+        purchase_order:purchase_orders(*)
       `)
       .eq('id', id)
       .single();
@@ -456,6 +644,45 @@ router.get('/:id',
         user_id: req.user?.id
       });
       return sendError(res, 'Transaction not found', 404);
+    }
+
+    // Manually fetch party information if party_id exists
+    if (transaction.party_id) {
+      try {
+        const { data: partyData, error: partyError } = await supabase
+          .from('parties')
+          .select('*')
+          .eq('id', transaction.party_id)
+          .single();
+          
+        if (!partyError && partyData) {
+          transaction.party = partyData;
+        }
+      } catch (partyFetchError) {
+        logger.warn('Failed to fetch party information', partyFetchError, {
+          transaction_id: id,
+          party_id: transaction.party_id
+        });
+      }
+    }
+
+    // Manually fetch attachments for this transaction
+    try {
+      const { data: attachmentsData, error: attachmentsError } = await supabase
+        .from('transaction_attachments')
+        .select('*')
+        .eq('unified_transaction_id', id);
+        
+      if (!attachmentsError && attachmentsData) {
+        transaction.attachments = attachmentsData;
+      } else {
+        transaction.attachments = [];
+      }
+    } catch (attachmentsFetchError) {
+      logger.warn('Failed to fetch attachments', attachmentsFetchError, {
+        transaction_id: id
+      });
+      transaction.attachments = [];
     }
 
     logger.info('Transaction retrieved successfully', {
@@ -978,195 +1205,5 @@ async function validateSimplifiedExpenseTransaction(data) {
 
   return { isValid, errors };
 }
-
-// Get expense history with filters and pagination
-router.get('/history',
-  roleMiddleware.requirePermission(roleMiddleware.ADMIN_PERMISSIONS.VIEW_EXPENSES),
-  asyncHandler(async (req, res) => {
-    const {
-      page = 1,
-      limit = 20,
-      search = '',
-      category = '',
-      payment_method = '',
-      start_date,
-      end_date,
-      min_amount,
-      max_amount
-    } = req.query;
-
-    const offset = (parseInt(page) - 1) * parseInt(limit);
-
-    // Build query
-    let query = supabase
-      .from('unified_transactions')
-      .select('*', { count: 'exact' })
-      .eq('transaction_type', 'expense')
-      .order('transaction_date', { ascending: false })
-      .order('created_at', { ascending: false });
-
-    // Apply filters
-    if (search) {
-      query = query.or(`description.ilike.%${search}%,reference_number.ilike.%${search}%,notes.ilike.%${search}%`);
-    }
-
-    if (category) {
-      query = query.eq('expense_category', category);
-    }
-
-    if (payment_method) {
-      query = query.contains('payment_method', { type: payment_method });
-    }
-
-    if (start_date) {
-      query = query.gte('transaction_date', start_date);
-    }
-
-    if (end_date) {
-      query = query.lte('transaction_date', end_date);
-    }
-
-    if (min_amount) {
-      query = query.gte('total_amount', parseFloat(min_amount));
-    }
-
-    if (max_amount) {
-      query = query.lte('total_amount', parseFloat(max_amount));
-    }
-
-    // Apply pagination
-    query = query.range(offset, offset + parseInt(limit) - 1);
-
-    const { data: expenses, error, count } = await query;
-
-    if (error) throw error;
-
-    logger.info('Expense history retrieved', {
-      user_id: req.user?.id,
-      page: parseInt(page),
-      total_count: count,
-      filters: { search, category, payment_method, start_date, end_date, min_amount, max_amount }
-    });
-
-    sendSuccess(res, {
-      expenses: expenses || [],
-      total: count || 0,
-      page: parseInt(page),
-      limit: parseInt(limit),
-      totalPages: Math.ceil((count || 0) / parseInt(limit))
-    }, 'Expense history retrieved successfully');
-  }));
-
-// Export expenses to Excel
-router.get('/export',
-  roleMiddleware.requirePermission(roleMiddleware.ADMIN_PERMISSIONS.VIEW_EXPENSES),
-  asyncHandler(async (req, res) => {
-    const {
-      search = '',
-      category = '',
-      payment_method = '',
-      start_date,
-      end_date,
-      min_amount,
-      max_amount
-    } = req.query;
-
-    // Build query (without pagination for export)
-    let query = supabase
-      .from('unified_transactions')
-      .select('*')
-      .eq('transaction_type', 'expense')
-      .order('transaction_date', { ascending: false })
-      .order('created_at', { ascending: false });
-
-    // Apply same filters as history endpoint
-    if (search) {
-      query = query.or(`description.ilike.%${search}%,reference_number.ilike.%${search}%,notes.ilike.%${search}%`);
-    }
-
-    if (category) {
-      query = query.eq('expense_category', category);
-    }
-
-    if (payment_method) {
-      query = query.contains('payment_method', { type: payment_method });
-    }
-
-    if (start_date) {
-      query = query.gte('transaction_date', start_date);
-    }
-
-    if (end_date) {
-      query = query.lte('transaction_date', end_date);
-    }
-
-    if (min_amount) {
-      query = query.gte('total_amount', parseFloat(min_amount));
-    }
-
-    if (max_amount) {
-      query = query.lte('total_amount', parseFloat(max_amount));
-    }
-
-    const { data: expenses, error } = await query;
-
-    if (error) throw error;
-
-    // Create Excel workbook
-    const ExcelJS = require('exceljs');
-    const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet('Expenses');
-
-    // Define columns
-    worksheet.columns = [
-      { header: 'Date', key: 'transaction_date', width: 12 },
-      { header: 'Reference', key: 'reference_number', width: 20 },
-      { header: 'Description', key: 'description', width: 40 },
-      { header: 'Category', key: 'expense_category', width: 20 },
-      { header: 'Amount', key: 'total_amount', width: 15 },
-      { header: 'Payment Method', key: 'payment_method', width: 15 },
-      { header: 'Status', key: 'status', width: 12 },
-      { header: 'Notes', key: 'notes', width: 30 },
-      { header: 'Created At', key: 'created_at', width: 20 }
-    ];
-
-    // Add data rows
-    expenses.forEach(expense => {
-      worksheet.addRow({
-        transaction_date: expense.transaction_date,
-        reference_number: expense.reference_number || '',
-        description: expense.description,
-        expense_category: expense.expense_category,
-        total_amount: parseFloat(expense.total_amount) || 0,
-        payment_method: expense.payment_method?.type || 'Unknown',
-        status: expense.status || 'completed',
-        notes: expense.notes || '',
-        created_at: new Date(expense.created_at).toLocaleString()
-      });
-    });
-
-    // Style header row
-    worksheet.getRow(1).font = { bold: true };
-    worksheet.getRow(1).fill = {
-      type: 'pattern',
-      pattern: 'solid',
-      fgColor: { argb: 'FFE6F3FF' }
-    };
-
-    // Set response headers
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', `attachment; filename=expenses-${start_date || 'all'}-${end_date || new Date().toISOString().split('T')[0]}.xlsx`);
-
-    // Write to response
-    await workbook.xlsx.write(res);
-
-    logger.info('Expenses exported', {
-      user_id: req.user?.id,
-      record_count: expenses.length,
-      filters: { search, category, payment_method, start_date, end_date }
-    });
-
-    res.end();
-  }));
 
 module.exports = router;

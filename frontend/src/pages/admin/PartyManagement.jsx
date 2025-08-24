@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useToast } from '../../hooks/use-toast';
+import { useToast } from '../../hooks/useToast';
 import { PermissionGuard } from '../../components/PermissionGuard';
 import { ADMIN_PERMISSIONS } from '../../enums/roles';
 import {

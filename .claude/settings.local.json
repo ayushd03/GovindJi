@@ -8,7 +8,24 @@
       "Bash(find:*)",
       "Bash(cp:*)",
       "Bash(rm:*)",
-      "Bash(npm run build:*)"
+      "Bash(npm run build:*)",
+      "Bash(python:*)",
+      "Bash(pip install:*)",
+      "Bash(grep:*)",
+      "Bash(npm start)",
+      "Bash(curl:*)",
+      "Read(/D:\\/**)",
+      "Bash(npm run dev:*)",
+      "Bash(git add:*)",
+      "Bash(git rm:*)",
+      "Bash(git commit:*)",
+      "Bash(for file in frontend/src/pages/admin/*.js)",
+      "Bash(do mv \"$file\" \"$file%.js.jsx\")",
+      "Bash(done)",
+      "Bash(for file in frontend/src/pages/admin/components/*.js)",
+      "Bash(mv:*)",
+      "Bash(npm run lint:*)",
+      "WebSearch"
     ],
     "deny": []
   }

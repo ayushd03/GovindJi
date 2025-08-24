@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, useAnimation } from 'framer-motion';
 import { ArrowRight, Star, Shield, Truck, Heart, Award, Leaf, CheckCircle } from 'lucide-react';
-import ProductCardNew from '../components/ProductCardNew';
+import ProductCard from '../components/ProductCard';
 import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
@@ -465,7 +465,7 @@ const Home = () => {
                         damping: 20
                       }}
                     >
-                      <ProductCardNew product={product} />
+                      <ProductCard product={product} />
                     </motion.div>
                   ))}
                 </motion.div>

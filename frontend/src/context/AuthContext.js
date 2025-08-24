@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { authAPI } from '../services/api';
 import { isTokenValid, shouldRefreshToken, clearAuthData, getStoredUserData, storeAuthData } from '../utils/authUtils';
-import '../utils/debugAuth'; // Initialize debug utilities
 
 const AuthContext = createContext();
 
