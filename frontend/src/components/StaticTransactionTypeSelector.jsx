@@ -59,7 +59,8 @@ const StaticTransactionTypeSelector = ({
     fieldValues = {}, 
     onFieldChange,
     errors = {},
-    className = ""
+    className = "",
+    required = true
 }) => {
     const [selectedTypeData, setSelectedTypeData] = useState(null);
 
@@ -128,9 +129,25 @@ const StaticTransactionTypeSelector = ({
             {/* Transaction Type Selector */}
             <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Transaction Type *
+                    Transaction Type {required && "*"}
                 </label>
-                <div className="grid grid-cols-3 gap-2">
+                <div className={`grid ${!required ? 'grid-cols-4' : 'grid-cols-3'} gap-2`}>
+                    {!required && (
+                        <button
+                            type="button"
+                            onClick={() => onTypeChange(null)}
+                            className={`flex flex-col items-center justify-center p-3 rounded-lg border-2 transition-all duration-200 ${
+                                !selectedType 
+                                    ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-md' 
+                                    : 'border-gray-300 bg-white text-gray-600 hover:border-gray-400 hover:bg-gray-50'
+                            }`}
+                        >
+                            <div className="w-6 h-6 mb-1 flex items-center justify-center">
+                                <span className="text-sm">—</span>
+                            </div>
+                            <span className="text-xs font-medium">None</span>
+                        </button>
+                    )}
                     {Object.values(TRANSACTION_TYPES).map(type => {
                         const IconComponent = type.icon;
                         const isSelected = selectedType === type.id;

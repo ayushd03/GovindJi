@@ -80,6 +80,19 @@ router.post('/',
           created_by: req.user.id
         });
         status = 'processing'; // Vendor orders start as processing
+      } else if (expense_category === 'Vendor Payment') {
+        // Handle vendor payment
+        createdRecords = await processVendorPayment({
+          description,
+          total_amount,
+          transaction_date,
+          payment_method,
+          party: parties[0], // Required party for vendor payments
+          notes,
+          reference_number,
+          created_by: req.user.id
+        });
+        status = 'completed'; // Vendor payments are completed immediately
       } else {
         // Handle regular expense
         createdRecords = await processRegularExpense({
@@ -250,8 +263,8 @@ router.get('/dependencies',
       categories,
       transaction_types: ['cash', 'upi', 'cheque'],
       expense_categories: [
-        'Vendor Payment', 'Employee Payout', 'Store Utilities', 
-        'Marketing', 'Maintenance', 'Miscellaneous'
+        'Store Utilities', 'Office Supplies', 'Marketing', 'Maintenance', 
+        'Transportation', 'Miscellaneous', 'Vendor Order', 'Vendor Payment', 'Employee Payout'
       ]
     };
 
@@ -886,20 +899,41 @@ async function processVendorPayment(data) {
     .from('party_payments')
     .insert({
       party_id: data.party.party_id,
-      payment_type: 'payment',
+      payment_type: 'payment', // This is a debit transaction for the vendor
       amount: data.total_amount,
       payment_date: data.transaction_date,
       transaction_type_id: data.payment_method.type,
       transaction_fields: data.payment_method.details || {},
       description: data.description,
       notes: data.notes,
+      reference_number: data.reference_number,
       created_by: data.created_by
     })
     .select()
     .single();
 
   if (error) throw error;
-  return { party_payment_id: payment.id };
+
+  // Update party balance using database function
+  try {
+    const { data: newBalance, error: balanceError } = await supabase
+      .rpc('calculate_party_current_balance', { party_id: data.party.party_id });
+
+    if (!balanceError && newBalance !== null) {
+      await supabase
+        .from('parties')
+        .update({ current_balance: newBalance })
+        .eq('id', data.party.party_id);
+    }
+  } catch (balanceUpdateError) {
+    console.warn('Vendor balance update warning:', balanceUpdateError.message);
+    // Don't fail the transaction for balance update issues
+  }
+
+  return { 
+    party_payment_id: payment.id,
+    party_id: data.party.party_id
+  };
 }
 
 // Helper function: Process other expense
@@ -1168,10 +1202,7 @@ async function validateSimplifiedExpenseTransaction(data) {
     isValid = false;
   }
 
-  if (!data.payment_method || !data.payment_method.type) {
-    errors.payment_method = 'Payment method is required';
-    isValid = false;
-  }
+  // Payment method validation will be handled per category below
 
   // Validate vendor order specific requirements
   if (data.expense_category === 'Vendor Order') {
@@ -1195,10 +1226,52 @@ async function validateSimplifiedExpenseTransaction(data) {
         }
       });
     }
+    
+    // For vendor orders, payment method is optional
+    if (data.payment_method && data.payment_method.type) {
+      // Validate payment method only if provided
+      const paymentValidation = validateTxnFields(
+        data.payment_method.type, 
+        data.payment_method.details || {}
+      );
+      if (!paymentValidation.isValid) {
+        errors.payment_method = paymentValidation.errors;
+        isValid = false;
+      }
+    }
+  } else if (data.expense_category === 'Vendor Payment') {
+    // Vendor payment specific validations
+    if (!data.parties || !data.parties[0] || !data.parties[0].party_id) {
+      errors.parties = 'Vendor selection is required for vendor payments';
+      isValid = false;
+    }
+    
+    if (!data.total_amount || data.total_amount <= 0) {
+      errors.total_amount = 'Payment amount must be greater than 0';
+      isValid = false;
+    }
+    
+    // Payment method is required for vendor payments
+    if (!data.payment_method || !data.payment_method.type) {
+      errors.payment_method = 'Payment method is required for vendor payments';
+      isValid = false;
+    }
   } else {
     // Regular expense - amount is required
     if (!data.total_amount || data.total_amount <= 0) {
       errors.total_amount = 'Valid amount is required';
+      isValid = false;
+    }
+  }
+  
+  // Validate payment method for non-vendor-order transactions
+  if (data.expense_category !== 'Vendor Order' && data.payment_method && data.payment_method.type) {
+    const paymentValidation = validateTxnFields(
+      data.payment_method.type, 
+      data.payment_method.details || {}
+    );
+    if (!paymentValidation.isValid) {
+      errors.payment_method = paymentValidation.errors;
       isValid = false;
     }
   }

@@ -5,7 +5,8 @@ const PaymentMethodSelector = ({
   paymentMethod, 
   onPaymentMethodChange, 
   errors = {},
-  className = "" 
+  className = "",
+  required = true 
 }) => {
   const handleTypeChange = (typeId) => {
     onPaymentMethodChange({
@@ -27,11 +28,12 @@ const PaymentMethodSelector = ({
   return (
     <div className={className}>
       <StaticTransactionTypeSelector
-        selectedType={paymentMethod.type}
+        selectedType={paymentMethod?.type}
         onTypeChange={handleTypeChange}
-        fieldValues={paymentMethod.details || {}}
+        fieldValues={paymentMethod?.details || {}}
         onFieldChange={handleFieldChange}
         errors={errors}
+        required={required}
       />
     </div>
   );
