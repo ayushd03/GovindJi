@@ -1,4 +1,5 @@
 const { createClient } = require('@supabase/supabase-js');
+const { logger, asyncHandler } = require('./errorHandler');
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_ANON_KEY;
@@ -79,28 +80,60 @@ const hasAnyPermission = (userRole, permissions) => {
 };
 
 // Base authentication middleware
-const authenticateToken = async (req, res, next) => {
+const authenticateToken = asyncHandler(async (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
 
-  if (token == null) return res.sendStatus(401);
+  if (token == null) {
+    logger.warn('Authentication attempt without token', {
+      ip: req.ip,
+      userAgent: req.get('User-Agent'),
+      path: req.originalUrl
+    });
+    return res.sendStatus(401);
+  }
 
   const { data: { user }, error } = await supabase.auth.getUser(token);
-  if (error) return res.sendStatus(403);
+  
+  if (error) {
+    logger.warn('Authentication attempt with invalid token', {
+      error: error.message,
+      ip: req.ip,
+      userAgent: req.get('User-Agent'),
+      path: req.originalUrl
+    });
+    return res.sendStatus(403);
+  }
 
   req.user = user;
   next();
-};
+});
 
 // Enhanced admin authentication with role checking
-const authenticateAdmin = async (req, res, next) => {
+const authenticateAdmin = asyncHandler(async (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
 
-  if (token == null) return res.sendStatus(401);
+  if (token == null) {
+    logger.warn('Admin authentication attempt without token', {
+      ip: req.ip,
+      userAgent: req.get('User-Agent'),
+      path: req.originalUrl
+    });
+    return res.sendStatus(401);
+  }
 
   const { data: { user }, error } = await supabase.auth.getUser(token);
-  if (error) return res.sendStatus(403);
+  
+  if (error) {
+    logger.warn('Admin authentication attempt with invalid token', {
+      error: error.message,
+      ip: req.ip,
+      userAgent: req.get('User-Agent'),
+      path: req.originalUrl
+    });
+    return res.sendStatus(403);
+  }
 
   // Check if user has admin role
   const { data: userData, error: userError } = await supabase
@@ -109,7 +142,14 @@ const authenticateAdmin = async (req, res, next) => {
     .eq('id', user.id)
     .single();
 
-  if (userError || !userData) {
+  if (userError) throw userError;
+
+  if (!userData) {
+    logger.warn('User not found in database during admin authentication', {
+      userId: user.id,
+      userEmail: user.email,
+      path: req.originalUrl
+    });
     return res.status(403).json({ message: 'User not found' });
   }
 
@@ -117,6 +157,13 @@ const authenticateAdmin = async (req, res, next) => {
   const canAccessAdmin = userData.role === USER_ROLES.ADMIN || userData.role === USER_ROLES.MANAGER;
   
   if (!canAccessAdmin) {
+    logger.warn('Non-admin user attempted to access admin route', {
+      userId: user.id,
+      userEmail: user.email,
+      userRole: userData.role,
+      path: req.originalUrl,
+      ip: req.ip
+    });
     return res.status(403).json({ message: 'Admin access required' });
   }
 
@@ -124,15 +171,22 @@ const authenticateAdmin = async (req, res, next) => {
   req.userRole = userData.role;
   req.userData = userData;
   next();
-};
+});
 
 // Permission-based middleware factory
 const requirePermission = (permission) => {
-  return async (req, res, next) => {
+  return asyncHandler(async (req, res, next) => {
     // First authenticate as admin
     await authenticateAdmin(req, res, () => {
       // Then check specific permission
       if (!hasPermission(req.userRole, permission)) {
+        logger.warn('User denied access due to insufficient permissions', {
+          userId: req.user?.id,
+          userRole: req.userRole,
+          requiredPermission: permission,
+          path: req.originalUrl,
+          ip: req.ip
+        });
         return res.status(403).json({ 
           message: `Permission denied. Required: ${permission}`,
           userRole: req.userRole 
@@ -140,16 +194,23 @@ const requirePermission = (permission) => {
       }
       next();
     });
-  };
+  });
 };
 
 // Multiple permissions middleware factory
 const requireAnyPermission = (permissions) => {
-  return async (req, res, next) => {
+  return asyncHandler(async (req, res, next) => {
     // First authenticate as admin
     await authenticateAdmin(req, res, () => {
       // Then check if user has any of the required permissions
       if (!hasAnyPermission(req.userRole, permissions)) {
+        logger.warn('User denied access due to insufficient permissions (any)', {
+          userId: req.user?.id,
+          userRole: req.userRole,
+          requiredPermissions: permissions,
+          path: req.originalUrl,
+          ip: req.ip
+        });
         return res.status(403).json({ 
           message: `Permission denied. Required one of: ${permissions.join(', ')}`,
           userRole: req.userRole 
@@ -157,27 +218,39 @@ const requireAnyPermission = (permissions) => {
       }
       next();
     });
-  };
+  });
 };
 
 // Role-specific middleware
-const requireAdminRole = async (req, res, next) => {
+const requireAdminRole = asyncHandler(async (req, res, next) => {
   await authenticateAdmin(req, res, () => {
     if (req.userRole !== USER_ROLES.ADMIN) {
+      logger.warn('Non-admin user attempted to access admin-only route', {
+        userId: req.user?.id,
+        userRole: req.userRole,
+        path: req.originalUrl,
+        ip: req.ip
+      });
       return res.status(403).json({ message: 'Admin role required' });
     }
     next();
   });
-};
+});
 
-const requireManagerRole = async (req, res, next) => {
+const requireManagerRole = asyncHandler(async (req, res, next) => {
   await authenticateAdmin(req, res, () => {
     if (req.userRole !== USER_ROLES.MANAGER && req.userRole !== USER_ROLES.ADMIN) {
+      logger.warn('Insufficient role for manager route access', {
+        userId: req.user?.id,
+        userRole: req.userRole,
+        path: req.originalUrl,
+        ip: req.ip
+      });
       return res.status(403).json({ message: 'Manager or Admin role required' });
     }
     next();
   });
-};
+});
 
 module.exports = {
   USER_ROLES,

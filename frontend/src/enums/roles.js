@@ -43,7 +43,7 @@ export const ADMIN_TABS = {
   },
   EXPENSES: {
     path: '/admin/expenses',
-    label: 'Expenses',
+    label: 'Expense Management',
     icon: 'CurrencyDollarIcon',
     permissions: [ADMIN_PERMISSIONS.VIEW_EXPENSES]
   },
@@ -87,12 +87,6 @@ export const ADMIN_TABS = {
     path: '/admin/purchase-orders',
     label: 'Purchase Orders',
     icon: 'ClipboardDocumentListIcon',
-    permissions: [ADMIN_PERMISSIONS.VIEW_VENDORS]
-  },
-  PURCHASE_BILLS: {
-    path: '/admin/purchase-bills',
-    label: 'Purchase Bills',
-    icon: 'DocumentTextIcon',
     permissions: [ADMIN_PERMISSIONS.VIEW_VENDORS]
   },
   EMPLOYEES: {

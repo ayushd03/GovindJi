@@ -33,7 +33,6 @@ import {
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Toaster } from '../../components/ui/toaster';
-import StaticTransactionTypeSelector from '../../components/StaticTransactionTypeSelector';
 
 const PARTY_CATEGORIES = [
   'Raw Materials',
@@ -90,21 +89,10 @@ const PartyManagement = () => {
   const [showPartyDetails, setShowPartyDetails] = useState(null);
   const [showVendorDetailsModal, setShowVendorDetailsModal] = useState(null);
   const [vendorDetailsTab, setVendorDetailsTab] = useState('orders');
-  const [showPaymentModal, setShowPaymentModal] = useState(null);
   const [vendorOrders, setVendorOrders] = useState([]);
   const [vendorOrderItems, setVendorOrderItems] = useState([]);
   const [vendorPayments, setVendorPayments] = useState([]);
   const [hoveredPO, setHoveredPO] = useState(null);
-  const [paymentFormData, setPaymentFormData] = useState({
-    payment_type: 'payment',
-    amount: '',
-    payment_date: new Date().toISOString(),
-    reference_number: '',
-    notes: '',
-    transaction_type_id: '',
-    transaction_fields: {}
-  });
-  const [paymentFormErrors, setPaymentFormErrors] = useState({});
   
   const [formData, setFormData] = useState({
     name: '',
@@ -453,69 +441,6 @@ const PartyManagement = () => {
     }
   };
 
-  const closePaymentModal = () => {
-    setShowPaymentModal(null);
-    setPaymentFormData({
-      payment_type: 'payment',
-      amount: '',
-      payment_date: new Date().toISOString(),
-      reference_number: '',
-      notes: '',
-      transaction_type_id: '',
-      transaction_fields: {}
-    });
-    setPaymentFormErrors({});
-  };
-
-  const handleVendorPayment = async (e) => {
-    e.preventDefault();
-    
-    // Validate transaction type is selected
-    if (!paymentFormData.transaction_type_id) {
-      setPaymentFormErrors({ transaction_type_id: 'Please select a transaction type' });
-      showError('Please select a transaction type');
-      return;
-    }
-    
-    try {
-      const token = localStorage.getItem('authToken');
-      const response = await fetch(`${API_BASE_URL}/api/admin/party-payments`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          ...paymentFormData,
-          party_id: showPaymentModal.id,
-          amount: parseFloat(paymentFormData.amount),
-          transaction_type_id: paymentFormData.transaction_type_id,
-          transaction_fields: paymentFormData.transaction_fields || {}
-        })
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-        throw new Error(errorData.error || 'Failed to record payment');
-      }
-
-      // Show success message first
-      showSuccess('Payment recorded successfully');
-      
-      closePaymentModal();
-      
-      // Refresh vendor details and party list (non-blocking)
-      fetchVendorDetails(showPaymentModal.id).catch(err => 
-        console.error('Failed to refresh vendor details:', err)
-      );
-      fetchParties(currentPage).catch(err => 
-        console.error('Failed to refresh parties list:', err)
-      );
-    } catch (err) {
-      console.error('Payment error:', err);
-      showError(err.message || 'Failed to record payment');
-    }
-  };
 
   const calculateVendorBalance = (vendor, orders, payments) => {
     const totalOrderAmount = orders
@@ -1057,21 +982,9 @@ const PartyManagement = () => {
                       </span>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <PermissionGuard permission={ADMIN_PERMISSIONS.MANAGE_VENDORS}>
-                      <Button 
-                        onClick={() => setShowPaymentModal(showVendorDetailsModal)} 
-                        size="sm" 
-                        className="btn-primary"
-                      >
-                        <BanknotesIcon className="w-4 h-4 mr-2" />
-                        Add Payment
-                      </Button>
-                    </PermissionGuard>
-                    <button onClick={() => setShowVendorDetailsModal(null)} className="p-2 text-muted-foreground hover:text-foreground rounded-lg">
-                      <XMarkIcon className="w-5 h-5" />
-                    </button>
-                  </div>
+                  <button onClick={() => setShowVendorDetailsModal(null)} className="p-2 text-muted-foreground hover:text-foreground rounded-lg">
+                    <XMarkIcon className="w-5 h-5" />
+                  </button>
                 </div>
                 
                 {/* Tabs */}
@@ -1373,118 +1286,6 @@ const PartyManagement = () => {
           </div>
         )}
 
-        {/* Vendor Payment Modal */}
-        {showPaymentModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-2 sm:p-4 z-50">
-            <div className="bg-card rounded-xl shadow-xl w-full max-w-md">
-              <div className="p-4 sm:p-6 border-b">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-lg font-semibold text-foreground">Add Vendor Payment</h2>
-                  <button onClick={() => closePaymentModal()} className="p-2 text-muted-foreground hover:text-foreground rounded-lg">
-                    <XMarkIcon className="w-5 h-5" />
-                  </button>
-                </div>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Recording payment for: <span className="font-medium">{showPaymentModal.name}</span>
-                </p>
-              </div>
-              
-              <form onSubmit={handleVendorPayment} className="p-4 sm:p-6 space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-muted-foreground mb-1">Payment Type</label>
-                  <select 
-                    className="input-field" 
-                    value={paymentFormData.payment_type} 
-                    onChange={(e) => setPaymentFormData({...paymentFormData, payment_type: e.target.value})}
-                  >
-                    <option value="payment">Payment</option>
-                    <option value="adjustment">Adjustment</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-muted-foreground mb-1">Amount *</label>
-                  <input 
-                    type="number" 
-                    step="0.01" 
-                    required 
-                    className="input-field" 
-                    placeholder="0.00"
-                    value={paymentFormData.amount} 
-                    onChange={(e) => setPaymentFormData({...paymentFormData, amount: e.target.value})} 
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-muted-foreground mb-1">Payment Date & Time *</label>
-                  <input 
-                    type="datetime-local" 
-                    required 
-                    className="input-field" 
-                    value={paymentFormData.payment_date.slice(0, 16)} 
-                    onChange={(e) => setPaymentFormData({...paymentFormData, payment_date: new Date(e.target.value).toISOString()})} 
-                  />
-                </div>
-
-                <StaticTransactionTypeSelector
-                  selectedType={paymentFormData.transaction_type_id}
-                  onTypeChange={(typeId) => {
-                    setPaymentFormData(prev => ({
-                      ...prev, 
-                      transaction_type_id: typeId,
-                      transaction_fields: {}
-                    }));
-                    setPaymentFormErrors(prev => ({...prev, transaction_type_id: ''}));
-                  }}
-                  fieldValues={paymentFormData.transaction_fields}
-                  onFieldChange={(fieldName, value) => {
-                    setPaymentFormData(prev => ({
-                      ...prev,
-                      transaction_fields: {
-                        ...prev.transaction_fields,
-                        [fieldName]: value
-                      }
-                    }));
-                  }}
-                  errors={paymentFormErrors}
-                  className="mb-4"
-                />
-
-                <div>
-                  <label className="block text-sm font-medium text-muted-foreground mb-1">Reference Number</label>
-                  <input 
-                    type="text" 
-                    className="input-field" 
-                    placeholder="Transaction ID, Check number, etc."
-                    value={paymentFormData.reference_number} 
-                    onChange={(e) => setPaymentFormData({...paymentFormData, reference_number: e.target.value})} 
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-muted-foreground mb-1">Notes</label>
-                  <textarea 
-                    rows={3} 
-                    className="input-field" 
-                    placeholder="Payment details or notes"
-                    value={paymentFormData.notes} 
-                    onChange={(e) => setPaymentFormData({...paymentFormData, notes: e.target.value})} 
-                  />
-                </div>
-
-                <div className="flex flex-col sm:flex-row sm:justify-end gap-3 pt-4 border-t">
-                  <Button type="button" variant="outline" onClick={() => closePaymentModal()}>
-                    Cancel
-                  </Button>
-                  <Button type="submit" className="btn-primary">
-                    <BanknotesIcon className="w-4 h-4 mr-2" />
-                    Record Payment
-                  </Button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
 
         {/* Enhanced Delete/Archive Confirmation Modal */}
         {deleteConfirm && (

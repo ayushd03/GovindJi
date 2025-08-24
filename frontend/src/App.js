@@ -23,11 +23,12 @@ import CategoryManagement from './pages/admin/CategoryManagement';
 import InventoryManagement from './pages/admin/InventoryManagement';
 import CustomerManagement from './pages/admin/CustomerManagement';
 import AnalyticsManagement from './pages/admin/AnalyticsManagement';
+import EnhancedAnalyticsManagement from './pages/admin/EnhancedAnalyticsManagement';
 import PartyManagement from './pages/admin/PartyManagement';
 import PurchaseOrderManagement from './pages/admin/PurchaseOrderManagement';
-import PurchaseBillManagement from './pages/admin/PurchaseBillManagement';
 import EmployeeManagement from './pages/admin/EmployeeManagement';
 import ExpenseManagement from './pages/admin/ExpenseManagement';
+import ExpenseHistory from './pages/admin/ExpenseHistory';
 import './App.css';
 
 const ProtectedRoute = ({ children }) => {
@@ -74,12 +75,12 @@ const AppContent = () => {
                 <Route path="/categories" element={<CategoryManagement />} />
                 <Route path="/inventory" element={<InventoryManagement />} />
                 <Route path="/customers" element={<CustomerManagement />} />
-                <Route path="/analytics" element={<AnalyticsManagement />} />
+                <Route path="/analytics" element={<EnhancedAnalyticsManagement />} />
                 <Route path="/parties" element={<PartyManagement />} />
                 <Route path="/purchase-orders" element={<PurchaseOrderManagement />} />
-                <Route path="/purchase-bills" element={<PurchaseBillManagement />} />
                 <Route path="/employees" element={<EmployeeManagement />} />
                 <Route path="/expenses" element={<ExpenseManagement />} />
+                <Route path="/expenses/history" element={<ExpenseHistory />} />
               </Routes>
             </AdminLayout>
           </AdminRoute>
