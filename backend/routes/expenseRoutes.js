@@ -904,8 +904,7 @@ async function processVendorPayment(data) {
       payment_date: data.transaction_date,
       transaction_type_id: data.payment_method.type,
       transaction_fields: data.payment_method.details || {},
-      description: data.description,
-      notes: data.notes,
+      notes: `${data.description}${data.notes ? ' | ' + data.notes : ''}`,
       reference_number: data.reference_number,
       created_by: data.created_by
     })
@@ -1111,6 +1110,67 @@ async function processVendorOrderExpense(data) {
     .insert(itemsToInsert);
 
   if (itemsError) throw itemsError;
+
+  // Create party payment entry to track the debt to vendor (only if no payment made immediately)
+  if (!data.payment_method || !data.payment_method.type) {
+    // No immediate payment - create credit entry for vendor (money owed to vendor)
+    const { data: partyPayment, error: paymentError } = await supabase
+      .from('party_payments')
+      .insert({
+        party_id: primaryVendorId,
+        payment_type: 'adjustment', // This creates a credit adjustment for the vendor (we owe them money)
+        amount: finalAmount,
+        payment_date: data.transaction_date,
+        transaction_type_id: 'vendor_order',
+        transaction_fields: {},
+        notes: `Purchase Order: ${data.description}${data.notes ? ' | ' + data.notes : ''}`,
+        reference_number: poNumber,
+        created_by: data.created_by
+      })
+      .select()
+      .single();
+
+    if (paymentError) throw paymentError;
+  } else {
+    // Immediate payment made - create both credit (purchase) and debit (payment) entries
+    // First create the purchase credit
+    const { data: purchaseCredit, error: creditError } = await supabase
+      .from('party_payments')
+      .insert({
+        party_id: primaryVendorId,
+        payment_type: 'adjustment',
+        amount: finalAmount,
+        payment_date: data.transaction_date,
+        transaction_type_id: 'vendor_order',
+        transaction_fields: {},
+        notes: `Purchase Order: ${data.description}${data.notes ? ' | ' + data.notes : ''}`,
+        reference_number: poNumber,
+        created_by: data.created_by
+      })
+      .select()
+      .single();
+
+    if (creditError) throw creditError;
+
+    // Then create the payment debit
+    const { data: paymentDebit, error: debitError } = await supabase
+      .from('party_payments')
+      .insert({
+        party_id: primaryVendorId,
+        payment_type: 'payment',
+        amount: finalAmount,
+        payment_date: data.transaction_date,
+        transaction_type_id: data.payment_method.type,
+        transaction_fields: data.payment_method.details || {},
+        notes: `Payment for PO: ${poNumber} - ${data.description}`,
+        reference_number: data.payment_method.details?.reference_number || poNumber,
+        created_by: data.created_by
+      })
+      .select()
+      .single();
+
+    if (debitError) throw debitError;
+  }
 
   // Update party current balance using database function
   try {

@@ -6,22 +6,17 @@ import {
   PlusIcon,
   ListBulletIcon,
   MagnifyingGlassIcon,
-  FunnelIcon,
   ArrowDownTrayIcon,
   EyeIcon,
   CalendarIcon,
-  TagIcon,
-  BuildingOfficeIcon,
   DocumentTextIcon,
   ArrowPathIcon,
   CheckCircleIcon,
-  ExclamationTriangleIcon,
   XMarkIcon,
   ChevronLeftIcon,
   ChevronRightIcon
 } from '@heroicons/react/24/outline';
-import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
-import { Button } from '../../components/ui/button';
+// Removed unused UI components
 import { useToast } from '../../hooks/useToast';
 import { Toaster } from '../../components/ui/toaster';
 
@@ -41,12 +36,7 @@ const EXPENSE_CATEGORIES = [
   'Employee Payout'
 ];
 
-const PAYMENT_METHODS = [
-  { value: 'cash', label: 'Cash' },
-  { value: 'upi', label: 'UPI' },
-  { value: 'cheque', label: 'Cheque' },
-  { value: 'bank_transfer', label: 'Bank Transfer' }
-];
+// Removed unused PAYMENT_METHODS constant
 
 const ITEMS_PER_PAGE = 10;
 
@@ -92,7 +82,7 @@ const ExpenseManagement = () => {
     start_date: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
     end_date: new Date().toISOString().split('T')[0]
   });
-  const [showFilters, setShowFilters] = useState(false);
+  // Removed showFilters state as filters are now inline
   
   const [validationErrors, setValidationErrors] = useState({});
 
@@ -435,11 +425,20 @@ const ExpenseManagement = () => {
 
   // Form validation helper
   const hasErrors = Object.keys(validationErrors).length > 0;
+  
+  // Check if payment method is required based on expense category
+  const isVendorOrder = expenseForm.expense_category === 'Vendor Order';
+  const paymentMethodRequired = !isVendorOrder; // Payment method is optional for vendor orders
+  
   const isComplete = expenseForm.description && 
-                    expenseForm.total_amount > 0 && 
-                    expenseForm.payment_method?.type &&
                     expenseForm.transaction_date &&
-                    expenseForm.expense_category;
+                    expenseForm.expense_category &&
+                    // For vendor orders, total_amount comes from items; for others, it's required directly
+                    (isVendorOrder ? 
+                      (expenseForm.items && expenseForm.items.length > 0) : 
+                      expenseForm.total_amount > 0) &&
+                    // Payment method is optional for vendor orders
+                    (paymentMethodRequired ? expenseForm.payment_method?.type : true);
 
   // Loading state
   if (isLoading) {
@@ -456,243 +455,225 @@ const ExpenseManagement = () => {
   return (
     <PermissionGuard permission={ADMIN_PERMISSIONS.VIEW_EXPENSES}>
       <div className="space-y-4">
-        {/* Floating Header */}
-        <div className="sticky top-0 z-40 bg-white rounded-lg shadow-sm border p-4 mb-4">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
-            <div className="flex items-center space-x-3">
-              <h1 className="text-xl font-semibold text-gray-900">Expense Management</h1>
-              <div className="flex items-center space-x-2">
-                <Button
-                  variant={activeTab === 'add' ? 'default' : 'outline'}
-                  size="sm"
+        {/* Compact Header */}
+        <div className="sticky top-0 z-40 bg-white rounded-lg shadow-sm border px-4 py-2 mb-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <h1 className="text-lg font-semibold text-gray-900">Expense Management</h1>
+              {/* Compact pill-style tab switcher */}
+              <div className="bg-gray-100 rounded-lg p-1 flex items-center">
+                <button
                   onClick={() => setActiveTab('add')}
-                  className="flex items-center space-x-1"
+                  className={`px-3 py-1 text-sm font-medium rounded-md transition-all ${
+                    activeTab === 'add'
+                      ? 'bg-white text-gray-900 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
                 >
-                  <PlusIcon className="w-4 h-4" />
-                  <span>Add</span>
-                </Button>
-                <Button
-                  variant={activeTab === 'list' ? 'default' : 'outline'}
-                  size="sm"
+                  <PlusIcon className="w-4 h-4 inline mr-1" />
+                  Add
+                </button>
+                <button
                   onClick={() => setActiveTab('list')}
-                  className="flex items-center space-x-1"
+                  className={`px-3 py-1 text-sm font-medium rounded-md transition-all ${
+                    activeTab === 'list'
+                      ? 'bg-white text-gray-900 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
                 >
-                  <ListBulletIcon className="w-4 h-4" />
-                  <span>View</span>
-                </Button>
+                  <ListBulletIcon className="w-4 h-4 inline mr-1" />
+                  List
+                </button>
               </div>
             </div>
             
-            {/* Header Actions - Conditional based on active tab */}
-            <div className="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-3">
-              {activeTab === 'list' && (
+            {/* Inline Actions based on active tab */}
+            <div className="flex items-center space-x-2">
+              {activeTab === 'list' ? (
                 <>
-                  {/* Search */}
-                  <div className="relative flex-1 sm:max-w-xs">
-                    <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  {/* Inline Search */}
+                  <div className="relative">
+                    <MagnifyingGlassIcon className="absolute left-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                     <input
                       type="text"
-                      placeholder="Search expenses..."
-                      className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-sm"
+                      placeholder="Search..."
+                      className="w-40 pl-8 pr-2 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                     />
                   </div>
                   
-                  <div className="flex items-center space-x-2">
-                    {/* Filters */}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setShowFilters(!showFilters)}
-                      className="flex items-center space-x-1"
-                    >
-                      <FunnelIcon className="w-4 h-4" />
-                      <span>Filters</span>
-                    </Button>
-                    
-                    {/* Export */}
-                    <Button
-                      onClick={handleExportExpenses}
-                      size="sm"
-                      variant="outline"
-                      className="flex items-center space-x-1"
-                    >
-                      <ArrowDownTrayIcon className="w-4 h-4" />
-                      <span>Export</span>
-                    </Button>
-                  </div>
-                </>
-              )}
-              
-              {activeTab === 'add' && (
-                <div className="flex items-center space-x-2">
-                  {/* Submit Expense (shown when in add mode) */}
-                  <Button
-                    onClick={handleSubmitExpense}
-                    disabled={!isComplete || hasErrors || isSubmitting}
-                    className="flex items-center space-x-1"
-                    size="sm"
+                  {/* Inline Category Filter */}
+                  <select
+                    className="text-sm px-2 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
+                    value={selectedCategory}
+                    onChange={(e) => setSelectedCategory(e.target.value)}
                   >
-                    {isSubmitting ? (
-                      <>
-                        <ArrowPathIcon className="w-4 h-4 animate-spin" />
-                        <span>Submitting</span>
-                      </>
-                    ) : (
-                      <>
-                        <CheckCircleIcon className="w-4 h-4" />
-                        <span>Submit</span>
-                      </>
-                    )}
-                  </Button>
-                </div>
+                    <option value="">All Categories</option>
+                    {EXPENSE_CATEGORIES.map(category => (
+                      <option key={category} value={category}>{category}</option>
+                    ))}
+                  </select>
+                  
+                  {/* Inline Date Range */}
+                  <input
+                    type="date"
+                    className="text-sm px-2 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
+                    value={dateRange.start_date}
+                    onChange={(e) => setDateRange(prev => ({ ...prev, start_date: e.target.value }))}
+                  />
+                  <input
+                    type="date"
+                    className="text-sm px-2 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
+                    value={dateRange.end_date}
+                    onChange={(e) => setDateRange(prev => ({ ...prev, end_date: e.target.value }))}
+                  />
+                  
+                  {/* Clear Filters Button */}
+                  <button
+                    onClick={clearAllFilters}
+                    className="px-2 py-1 text-xs text-gray-600 hover:text-gray-900 border border-gray-300 rounded-md transition-colors"
+                    title="Clear All Filters"
+                  >
+                    Clear
+                  </button>
+                  
+                  {/* Export Button */}
+                  <button
+                    onClick={handleExportExpenses}
+                    className="p-1 text-gray-600 hover:text-gray-900 transition-colors"
+                    title="Export"
+                  >
+                    <ArrowDownTrayIcon className="w-4 h-4" />
+                  </button>
+                </>
+              ) : (
+                /* Submit Button for Add mode */
+                <button
+                  onClick={handleSubmitExpense}
+                  disabled={!isComplete || hasErrors || isSubmitting}
+                  className={`px-3 py-1 text-sm font-medium rounded-md transition-all flex items-center space-x-1 ${
+                    !isComplete || hasErrors || isSubmitting
+                      ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                      : 'bg-primary text-white hover:bg-primary/90'
+                  }`}
+                >
+                  {isSubmitting ? (
+                    <>
+                      <ArrowPathIcon className="w-4 h-4 animate-spin" />
+                      <span>Submitting</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircleIcon className="w-4 h-4" />
+                      <span>Submit</span>
+                    </>
+                  )}
+                </button>
               )}
             </div>
           </div>
-          
-          {/* Expandable Filters - Only show when in list view */}
-          {showFilters && activeTab === 'list' && (
-            <div className="mt-4 pt-4 border-t grid grid-cols-1 md:grid-cols-4 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Category</label>
-                <select
-                  className="w-full text-sm px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-                  value={selectedCategory}
-                  onChange={(e) => setSelectedCategory(e.target.value)}
-                >
-                  <option value="">All Categories</option>
-                  {EXPENSE_CATEGORIES.map(category => (
-                    <option key={category} value={category}>{category}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Payment Method</label>
-                <select
-                  className="w-full text-sm px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-                  value={selectedPaymentMethod}
-                  onChange={(e) => setSelectedPaymentMethod(e.target.value)}
-                >
-                  <option value="">All Methods</option>
-                  {PAYMENT_METHODS.map(method => (
-                    <option key={method.value} value={method.value}>{method.label}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Start Date</label>
-                <input
-                  type="date"
-                  className="w-full text-sm px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-                  value={dateRange.start_date}
-                  onChange={(e) => setDateRange(prev => ({ ...prev, start_date: e.target.value }))}
-                />
-              </div>
-              <div className="flex items-end">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={clearAllFilters}
-                  className="w-full text-sm"
-                >
-                  Clear Filters
-                </Button>
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Content based on active tab */}
         {activeTab === 'list' ? (
-          <div className="space-y-4">
-
-            {/* Summary Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-white rounded-lg shadow-sm border p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs font-medium text-gray-600">Total Expenses</p>
-                    <p className="text-lg font-semibold text-gray-900">{totalExpenses}</p>
+          <div className="space-y-3">
+            {/* Inline Summary Bar */}
+            <div className="bg-white rounded-lg shadow-sm border px-4 py-2">
+              <div className="flex items-center justify-between text-sm">
+                <div className="flex items-center space-x-6">
+                  <div className="flex items-center space-x-2">
+                    <DocumentTextIcon className="w-4 h-4 text-blue-600" />
+                    <span className="text-gray-600">Total: <span className="font-semibold text-gray-900">{totalExpenses}</span></span>
                   </div>
-                  <DocumentTextIcon className="w-6 h-6 text-blue-600" />
-                </div>
-              </div>
-              <div className="bg-white rounded-lg shadow-sm border p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs font-medium text-gray-600">Current Page</p>
-                    <p className="text-lg font-semibold text-gray-900">{expenses.length} items</p>
+                  <div className="flex items-center space-x-2">
+                    <ListBulletIcon className="w-4 h-4 text-green-600" />
+                    <span className="text-gray-600">Showing: <span className="font-semibold text-gray-900">{expenses.length}</span></span>
                   </div>
-                  <ListBulletIcon className="w-6 h-6 text-green-600" />
-                </div>
-              </div>
-              <div className="bg-white rounded-lg shadow-sm border p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs font-medium text-gray-600">Page</p>
-                    <p className="text-lg font-semibold text-gray-900">{currentPage} of {totalPages}</p>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-gray-600">Page: <span className="font-semibold text-gray-900">{currentPage} of {totalPages}</span></span>
                   </div>
-                  <DocumentTextIcon className="w-6 h-6 text-purple-600" />
                 </div>
+                {/* Inline Pagination Controls */}
+                {totalPages > 1 && (
+                  <div className="flex items-center space-x-1">
+                    <button
+                      onClick={() => fetchExpenses(Math.max(1, currentPage - 1))}
+                      disabled={currentPage === 1}
+                      className="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <ChevronLeftIcon className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => fetchExpenses(Math.min(totalPages, currentPage + 1))}
+                      disabled={currentPage === totalPages}
+                      className="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <ChevronRightIcon className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
 
-            {/* Expenses List */}
+            {/* Compact Expenses Table */}
             <div className="bg-white rounded-lg shadow-sm border">
               {expenses.length === 0 ? (
-                <div className="p-8 text-center">
-                  <DocumentTextIcon className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                <div className="p-6 text-center">
+                  <DocumentTextIcon className="w-8 h-8 text-gray-400 mx-auto mb-2" />
                   <h3 className="text-sm font-medium text-gray-900 mb-1">No expenses found</h3>
-                  <p className="text-sm text-gray-500">Try adjusting your search criteria</p>
+                  <p className="text-xs text-gray-500">Try adjusting your search criteria</p>
                 </div>
               ) : (
                 <div className="divide-y">
                   {expenses.map((expense) => (
-                    <div key={expense.id} className="p-4 hover:bg-gray-50 transition-colors">
+                    <div key={expense.id} className="px-4 py-2 hover:bg-gray-50 transition-colors" style={{minHeight: '40px'}}>
                       <div className="flex items-center justify-between">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center space-x-2 mb-1">
-                            <h3 className="text-sm font-medium text-gray-900 truncate">
-                              {expense.description}
-                            </h3>
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getCategoryColor(expense.expense_category)}`}>
-                              {expense.expense_category}
-                            </span>
-                            {expense.reference_number && (
-                              <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
-                                {expense.reference_number}
+                        <div className="flex-1 min-w-0 flex items-center space-x-4">
+                          {/* Description and Category */}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center space-x-2">
+                              <h3 className="text-sm font-medium text-gray-900 truncate max-w-xs">
+                                {expense.description}
+                              </h3>
+                              <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium ${getCategoryColor(expense.expense_category)}`}>
+                                {expense.expense_category}
                               </span>
-                            )}
+                            </div>
                           </div>
-                          <div className="flex items-center space-x-4 text-xs text-gray-500">
-                            <div className="flex items-center space-x-1">
-                              <CalendarIcon className="w-3 h-3" />
-                              <span>{formatDate(expense.transaction_date)}</span>
-                            </div>
-                            <div className="flex items-center space-x-1">
-                              <CurrencyDollarIcon className="w-3 h-3" />
-                              <span>{getPaymentMethodDisplay(expense.payment_method)}</span>
-                            </div>
+                          
+                          {/* Date */}
+                          <div className="text-xs text-gray-500 min-w-0 flex items-center space-x-1">
+                            <CalendarIcon className="w-3 h-3" />
+                            <span>{formatDate(expense.transaction_date)}</span>
+                          </div>
+                          
+                          {/* Payment Method */}
+                          <div className="text-xs text-gray-500 min-w-0 flex items-center space-x-1">
+                            <CurrencyDollarIcon className="w-3 h-3" />
+                            <span className="truncate max-w-24">{getPaymentMethodDisplay(expense.payment_method)}</span>
                           </div>
                         </div>
-                        <div className="flex items-center space-x-3">
+                        
+                        {/* Amount and Actions */}
+                        <div className="flex items-center space-x-3 ml-4">
                           <div className="text-right">
                             <p className="text-sm font-semibold text-gray-900">
                               {formatCurrency(expense.total_amount)}
                             </p>
-                            <p className="text-xs text-gray-500">
-                              {formatDateTime(expense.created_at)}
-                            </p>
+                            {expense.reference_number && (
+                              <p className="text-xs text-gray-500 truncate max-w-20">
+                                {expense.reference_number}
+                              </p>
+                            )}
                           </div>
-                          <Button
-                            variant="ghost"
-                            size="sm"
+                          <button
                             onClick={() => setSelectedExpense(expense)}
-                            className="text-gray-400 hover:text-gray-600"
+                            className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
+                            title="View Details"
                           >
                             <EyeIcon className="w-4 h-4" />
-                          </Button>
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -701,41 +682,10 @@ const ExpenseManagement = () => {
               )}
             </div>
 
-            {/* Pagination */}
-            {totalPages > 1 && (
-              <div className="bg-white rounded-lg shadow-sm border p-4">
-                <div className="flex items-center justify-between">
-                  <div className="text-sm text-gray-700">
-                    Showing {((currentPage - 1) * ITEMS_PER_PAGE) + 1} to {Math.min(currentPage * ITEMS_PER_PAGE, totalExpenses)} of {totalExpenses} expenses
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => fetchExpenses(Math.max(1, currentPage - 1))}
-                      disabled={currentPage === 1}
-                    >
-                      <ChevronLeftIcon className="w-4 h-4" />
-                    </Button>
-                    <span className="text-sm text-gray-700">
-                      {currentPage} of {totalPages}
-                    </span>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => fetchExpenses(Math.min(totalPages, currentPage + 1))}
-                      disabled={currentPage === totalPages}
-                    >
-                      <ChevronRightIcon className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
         ) : (
           /* Add Expense Form */
-          <div className="bg-white rounded-lg shadow-sm border p-6">
+          <div className="bg-white rounded-lg shadow-sm border p-4">
             <ExpenseForm
               transactionData={expenseForm}
               updateTransactionData={updateExpenseForm}

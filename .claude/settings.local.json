@@ -25,7 +25,8 @@
       "Bash(for file in frontend/src/pages/admin/components/*.js)",
       "Bash(mv:*)",
       "Bash(npm run lint:*)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(npm run:*)"
     ],
     "deny": []
   }

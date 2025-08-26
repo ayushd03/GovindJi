@@ -470,6 +470,7 @@ const PartyManagement = () => {
         transactions.push({
           type: 'po_created',
           date: order.order_date,
+          created_at: order.created_at || order.order_date,
           amount: order.final_amount,
           description: `Amount due for ${order.po_number}`,
           po_number: order.po_number,
@@ -483,6 +484,7 @@ const PartyManagement = () => {
       transactions.push({
         type: 'payment',
         date: payment.payment_date,
+        created_at: payment.created_at || payment.payment_date,
         amount: payment.amount,
         description: payment.payment_type === 'payment' ? 'Payment' : 'Adjustment',
         reference_number: payment.reference_number,
@@ -491,8 +493,18 @@ const PartyManagement = () => {
       });
     });
     
-    // Sort by date with latest entries first
-    return transactions.sort((a, b) => new Date(b.date) - new Date(a.date));
+    // Sort by created_at timestamp first, then by date (chronologically - oldest first)
+    return transactions.sort((a, b) => {
+      const dateA = new Date(a.created_at || a.date);
+      const dateB = new Date(b.created_at || b.date);
+      
+      // If created_at timestamps are the same, use date as secondary sort
+      if (dateA.getTime() === dateB.getTime()) {
+        return new Date(a.date) - new Date(b.date);
+      }
+      
+      return dateA - dateB;
+    });
   };
 
   const formatCurrency = (amount) => {
@@ -1013,7 +1025,7 @@ const PartyManagement = () => {
                 {vendorDetailsTab === 'orders' && (
                   <div className="space-y-6">
                     {/* Summary Cards */}
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <Card>
                         <CardContent className="p-4">
                           <div className="flex items-center justify-between">
@@ -1040,19 +1052,6 @@ const PartyManagement = () => {
                         </CardContent>
                       </Card>
                       
-                      <Card>
-                        <CardContent className="p-4">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <p className="text-sm font-medium text-muted-foreground">Unique Products</p>
-                              <p className="text-2xl font-bold text-foreground">
-                                {new Set(vendorOrderItems.map(item => item.item_name)).size}
-                              </p>
-                            </div>
-                            <CheckCircleIcon className="w-8 h-8 text-success" />
-                          </div>
-                        </CardContent>
-                      </Card>
                       
                       <Card>
                         <CardContent className="p-4">
@@ -1212,7 +1211,7 @@ const PartyManagement = () => {
                                   </div>
                                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                     <CalendarIcon className="w-4 h-4" />
-                                    <span>{new Date(transaction.date).toLocaleDateString()} {new Date(transaction.date).toLocaleTimeString()}</span>
+                                    <span>{new Date(transaction.created_at || transaction.date).toLocaleDateString('en-IN')} {new Date(transaction.created_at || transaction.date).toLocaleTimeString('en-IN', { hour12: true })}</span>
                                     {transaction.notes && (
                                       <>
                                         <span>•</span>

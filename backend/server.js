@@ -3119,6 +3119,7 @@ app.get('/api/admin/party-payments', roleMiddleware.requirePermission(roleMiddle
         const offset = (parseInt(page) - 1) * parseInt(limit);
         query = query
             .order('payment_date', { ascending: false })
+            .order('created_at', { ascending: false })
             .range(offset, offset + parseInt(limit) - 1);
 
         const { data, error, count } = await query;

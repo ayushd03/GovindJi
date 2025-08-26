@@ -1,11 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  CalendarIcon, 
-  CurrencyDollarIcon, 
-  DocumentTextIcon, 
-  TruckIcon,
   CubeIcon,
-  UserIcon,
   BuildingOfficeIcon
 } from '@heroicons/react/24/outline';
 import PaymentMethodSelector from './PaymentMethodSelector';
@@ -131,32 +126,32 @@ const UnifiedExpenseForm = ({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       {/* Category Selection First - Most Important */}
       <div>
-        <label className="block text-sm font-medium text-foreground mb-3">
-          What type of expense is this? *
+        <label className="block text-sm font-medium text-foreground mb-2">
+          Expense Category *
         </label>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+        <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
           {EXPENSE_CATEGORIES.map((cat) => (
             <button
               key={cat}
               type="button"
               onClick={() => handleCategoryChange(cat)}
-              className={`p-4 rounded-lg border text-sm font-medium transition-all hover:shadow-sm ${
+              className={`p-2 rounded-lg border text-xs font-medium transition-all hover:shadow-sm ${
                 transactionData.expense_category === cat
                   ? 'border-primary bg-primary/10 text-primary shadow-sm'
                   : 'border-border hover:border-primary/50 hover:bg-primary/5 text-muted-foreground hover:text-foreground'
               }`}
             >
               {cat === 'Vendor Order' ? (
-                <div className="flex flex-col items-center space-y-1">
-                  <CubeIcon className="w-5 h-5" />
+                <div className="flex flex-col items-center space-y-0.5">
+                  <CubeIcon className="w-4 h-4" />
                   <span>Vendor Order</span>
                 </div>
               ) : cat === 'Vendor Payment' ? (
-                <div className="flex flex-col items-center space-y-1">
-                  <BuildingOfficeIcon className="w-5 h-5" />
+                <div className="flex flex-col items-center space-y-0.5">
+                  <BuildingOfficeIcon className="w-4 h-4" />
                   <span>Vendor Payment</span>
                 </div>
               ) : (
@@ -166,20 +161,20 @@ const UnifiedExpenseForm = ({
           ))}
         </div>
         {validationErrors.expense_category && (
-          <p className="text-red-500 text-sm mt-1">{validationErrors.expense_category}</p>
+          <p className="text-red-500 text-xs mt-1">{validationErrors.expense_category}</p>
         )}
       </div>
 
       {/* Vendor Selection for Vendor Payment */}
       {isVendorPayment && (
         <div>
-          <label className="block text-sm font-medium text-foreground mb-2">
+          <label className="block text-sm font-medium text-foreground mb-1">
             Select Vendor to Pay *
           </label>
           <div className="relative vendor-dropdown-container">
             <input
               type="text"
-              className={`w-full px-3 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-base ${
+              className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-sm ${
                 validationErrors.parties ? 'border-red-500' : 'border-border'
               }`}
               value={vendorSearch}
@@ -192,19 +187,19 @@ const UnifiedExpenseForm = ({
             />
             
             {showVendorDropdown && filteredVendors.length > 0 && (
-              <div className="absolute z-10 w-full mt-1 bg-white border border-border rounded-lg shadow-lg max-h-60 overflow-y-auto">
+              <div className="absolute z-10 w-full mt-1 bg-white border border-border rounded-lg shadow-lg max-h-48 overflow-y-auto">
                 {filteredVendors.map(vendor => (
                   <div
                     key={vendor.id}
-                    className="p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0"
+                    className="p-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0"
                     onClick={() => handleVendorSelect(vendor)}
                   >
-                    <div className="font-medium text-gray-900">{vendor.name}</div>
+                    <div className="font-medium text-sm text-gray-900">{vendor.name}</div>
                     {vendor.contact_person && (
-                      <div className="text-sm text-gray-500">Contact: {vendor.contact_person}</div>
+                      <div className="text-xs text-gray-500">Contact: {vendor.contact_person}</div>
                     )}
                     {vendor.current_balance && vendor.current_balance !== 0 && (
-                      <div className={`text-sm font-medium ${vendor.current_balance > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                      <div className={`text-xs font-medium ${vendor.current_balance > 0 ? 'text-red-600' : 'text-green-600'}`}>
                         Balance: ₹{Math.abs(vendor.current_balance).toFixed(2)} {vendor.current_balance > 0 ? 'Due' : 'Advance'}
                       </div>
                     )}
@@ -214,16 +209,16 @@ const UnifiedExpenseForm = ({
             )}
           </div>
           {validationErrors.parties && (
-            <p className="text-red-500 text-sm mt-1">{validationErrors.parties}</p>
+            <p className="text-red-500 text-xs mt-1">{validationErrors.parties}</p>
           )}
         </div>
       )}
 
-      {/* Amount and Date - Compact Row */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {/* Amount, Date, and Payment Method - Horizontal Row */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         {!isVendorOrder && (
           <div>
-            <label className="block text-sm font-medium text-foreground mb-2">
+            <label className="block text-sm font-medium text-foreground mb-1">
               {isVendorPayment ? 'Payment Amount *' : 'Amount *'}
             </label>
             <div className="relative">
@@ -233,7 +228,7 @@ const UnifiedExpenseForm = ({
                 step="0.01"
                 min="0"
                 required
-                className={`w-full pl-8 pr-3 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-base ${
+                className={`w-full pl-8 pr-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-sm ${
                   validationErrors.total_amount ? 'border-red-500' : 'border-border'
                 }`}
                 value={transactionData.total_amount || ''}
@@ -257,65 +252,68 @@ const UnifiedExpenseForm = ({
               />
             </div>
             {validationErrors.total_amount && (
-              <p className="text-red-500 text-sm mt-1">{validationErrors.total_amount}</p>
+              <p className="text-red-500 text-xs mt-1">{validationErrors.total_amount}</p>
             )}
           </div>
         )}
 
         <div>
-          <label className="block text-sm font-medium text-foreground mb-2">
+          <label className="block text-sm font-medium text-foreground mb-1">
             Date *
           </label>
           <input
             type="date"
             required
-            className={`w-full px-3 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-base ${
+            className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-sm ${
               validationErrors.transaction_date ? 'border-red-500' : 'border-border'
             }`}
             value={transactionData.transaction_date}
             onChange={(e) => handleFieldChange('transaction_date', e.target.value)}
           />
           {validationErrors.transaction_date && (
-            <p className="text-red-500 text-sm mt-1">{validationErrors.transaction_date}</p>
+            <p className="text-red-500 text-xs mt-1">{validationErrors.transaction_date}</p>
           )}
         </div>
 
-        {isVendorOrder && (
+        {/* Payment Method moved here for better layout */}
+        {!isVendorOrder && (
           <div>
-            <label className="block text-sm font-medium text-foreground mb-2">
-              Expected Delivery
+            <label className="block text-sm font-medium text-foreground mb-1">
+              Payment Method *
             </label>
-            <input
-              type="date"
-              className="w-full px-3 py-2.5 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-base"
-              value={transactionData.expected_delivery_date || ''}
-              onChange={(e) => handleFieldChange('expected_delivery_date', e.target.value)}
-            />
+            <div className="text-sm">
+              <PaymentMethodSelector
+                paymentMethod={transactionData.payment_method}
+                onPaymentMethodChange={handlePaymentMethodChange}
+                errors={validationErrors.payment_method || {}}
+                required={!isVendorOrder}
+              />
+            </div>
           </div>
         )}
       </div>
 
       {/* Description with Notes - Combined */}
       <div>
-        <label className="block text-sm font-medium text-foreground mb-2">
+        <label className="block text-sm font-medium text-foreground mb-1">
           {isVendorOrder ? 'Order Description & Notes' : 
            isVendorPayment ? 'Payment Description & Notes' : 
            'Description & Notes'} *
         </label>
         <textarea
           required
-          rows={3}
-          className={`w-full px-3 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary resize-none text-base ${
+          rows={2}
+          className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary resize-none text-sm ${
             validationErrors.description ? 'border-red-500' : 'border-border'
           }`}
           value={transactionData.description}
           onChange={(e) => handleFieldChange('description', e.target.value)}
-          placeholder={isVendorOrder ? 'Describe the order purpose, special instructions, delivery requirements...' : 
-                      isVendorPayment ? 'Payment for which invoice/order? Include invoice numbers, payment terms, etc...' : 
-                      'What was this expense for? Any additional notes...'}
+          placeholder={isVendorOrder ? 'Describe the order purpose...' : 
+                      isVendorPayment ? 'Payment for which invoice/order?' : 
+                      'What was this expense for?'}
         />
         {validationErrors.description && (
-          <p className="text-red-500 text-sm mt-1">{validationErrors.description}</p>
+          <p className="text-red-500 text-xs mt-1">{validationErrors.description}</p>
         )}
       </div>
 
@@ -343,34 +341,34 @@ const UnifiedExpenseForm = ({
       )}
 
 
-      {/* Payment Method - Simplified */}
-      <div>
-        <label className="block text-sm font-medium text-foreground mb-2">
-          {isVendorOrder ? 'Payment Method (Optional - only if paying now)' : 'How did you pay? *'}
-        </label>
-        {isVendorOrder && (
-          <p className="text-sm text-muted-foreground mb-3">
-            You can place the order without payment now and make payment later using "Vendor Payment" category.
+      {/* Payment Method for Vendor Order */}
+      {isVendorOrder && (
+        <div>
+          <label className="block text-sm font-medium text-foreground mb-1">
+            Payment Method (Optional)
+          </label>
+          <p className="text-xs text-muted-foreground mb-2">
+            Leave empty to pay later using "Vendor Payment" category.
           </p>
-        )}
-        <PaymentMethodSelector
-          paymentMethod={transactionData.payment_method}
-          onPaymentMethodChange={handlePaymentMethodChange}
-          errors={validationErrors.payment_method || {}}
-          required={!isVendorOrder}
-        />
-      </div>
+          <PaymentMethodSelector
+            paymentMethod={transactionData.payment_method}
+            onPaymentMethodChange={handlePaymentMethodChange}
+            errors={validationErrors.payment_method || {}}
+            required={false}
+          />
+        </div>
+      )}
 
 
       {/* Additional Details */}
       {!isVendorOrder && (
         <div>
-          <label className="block text-sm font-medium text-foreground mb-2">
+          <label className="block text-sm font-medium text-foreground mb-1">
             Receipt/Reference (optional)
           </label>
           <input
             type="text"
-            className="w-full px-3 py-2.5 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-base"
+            className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-sm"
             value={transactionData.reference_number || ''}
             onChange={(e) => handleFieldChange('reference_number', e.target.value)}
             placeholder="Receipt number..."
