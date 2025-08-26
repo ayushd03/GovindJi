@@ -42,7 +42,7 @@ export const ADMIN_TABS = {
   },
   EXPENSES: {
     path: '/admin/expenses',
-    label: 'Expense Management',
+    label: 'Expenses',
     icon: 'CurrencyDollarIcon',
     permissions: [ADMIN_PERMISSIONS.VIEW_EXPENSES]
   },
