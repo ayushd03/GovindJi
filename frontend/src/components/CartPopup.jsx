@@ -93,9 +93,9 @@ const CartPopup = ({ isOpen, onClose }) => {
                         className="cart-item-popup"
                       >
                         <div className="cart-item-image">
-                          {getImageUrl(item.image_url, 'product') ? (
-                            <img 
-                              src={getImageUrl(item.image_url, 'product')} 
+                          {item.image_url ? (
+                            <img
+                              src={getImageUrl(item.image_url, 'product')}
                               alt={item.name}
                               onError={(e) => handleImageError(e, 'product')}
                             />

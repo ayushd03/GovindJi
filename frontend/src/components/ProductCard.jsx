@@ -97,7 +97,7 @@ const ProductCard = ({ product, className, viewMode = "grid" }) => {
               initial={{ scale: 0, rotate: -12 }}
               animate={{ scale: 1, rotate: -12 }}
               transition={{ delay: 0.2, type: "spring", stiffness: 300 }}
-              className="absolute top-3 left-3 z-20"
+              className="absolute top-3 left-3 z-50"
             >
               <Badge 
                 className="text-xs font-bold shadow-lg bg-gradient-to-r from-red-500 to-red-600 text-white border-0 px-2.5 py-1 rounded-md"
@@ -113,7 +113,7 @@ const ProductCard = ({ product, className, viewMode = "grid" }) => {
               initial={{ scale: 0, y: -10 }}
               animate={{ scale: 1, y: 0 }}
               transition={{ type: "spring", stiffness: 300 }}
-              className="absolute top-3 left-1/2 transform -translate-x-1/2 z-20"
+              className="absolute top-3 left-1/2 transform -translate-x-1/2 z-50"
             >
               <Badge 
                 className="bg-emerald-500 text-white shadow-md border-0 px-2.5 py-1 text-xs font-semibold rounded-md"
@@ -127,7 +127,7 @@ const ProductCard = ({ product, className, viewMode = "grid" }) => {
           <motion.div
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.9 }}
-            className="absolute top-3 right-3 z-20"
+            className="absolute top-3 right-3 z-50"
           >
             <Button
               variant="ghost"

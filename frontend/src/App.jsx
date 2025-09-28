@@ -1,5 +1,5 @@
-import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { PermissionProvider } from './context/PermissionContext';
 import { CartProvider, useCart } from './context/CartContext';
@@ -55,6 +55,29 @@ const AdminRoute = ({ children }) => {
 
 const AppContent = () => {
   const { isCartPopupOpen, closeCartPopup } = useCart();
+  const location = useLocation();
+
+  // Close cart when route changes
+  useEffect(() => {
+    closeCartPopup();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname]);
+
+  // Close cart when clicking anywhere outside the popup or the cart button
+  useEffect(() => {
+    if (!isCartPopupOpen) return;
+    const handleGlobalClick = (event) => {
+      const target = event.target;
+      const isInsideCart = target.closest('.cart-popup');
+      const isCartButton = target.closest('.premium-cart-btn');
+      if (isInsideCart || isCartButton) return;
+      closeCartPopup();
+    };
+    document.addEventListener('pointerdown', handleGlobalClick, true);
+    return () => {
+      document.removeEventListener('pointerdown', handleGlobalClick, true);
+    };
+  }, [isCartPopupOpen, closeCartPopup]);
 
   return (
     <div className="App">

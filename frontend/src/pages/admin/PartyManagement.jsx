@@ -69,12 +69,16 @@ const INDIAN_STATES = [
 const PartyManagement = () => {
   const { toast } = useToast();
   const [parties, setParties] = useState([]);
+  const [archivedParties, setArchivedParties] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadingArchived, setLoadingArchived] = useState(false);
   const [error, setError] = useState(null);
-  
+  const [viewMode, setViewMode] = useState('active'); // 'active' or 'archived'
+
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
   const [totalParties, setTotalParties] = useState(0);
+  const [totalArchivedParties, setTotalArchivedParties] = useState(0);
   
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
@@ -134,10 +138,12 @@ const PartyManagement = () => {
   };
 
   useEffect(() => {
+    // Only fetch initial active parties data on component mount
     fetchParties(1);
   }, []);
 
   const fetchParties = async (page = 1, limit = itemsPerPage) => {
+    if (page === 1) setLoading(true);
     try {
       const token = localStorage.getItem('authToken');
       const queryParams = new URLSearchParams({
@@ -170,10 +176,48 @@ const PartyManagement = () => {
     }
   };
 
+  const fetchArchivedParties = async (page = 1, limit = itemsPerPage) => {
+    if (page === 1) setLoadingArchived(true);
+    try {
+      const token = localStorage.getItem('authToken');
+      const queryParams = new URLSearchParams({
+        page: page.toString(),
+        limit: limit.toString(),
+        party_type: 'vendor',
+        ...(searchTerm && { search: searchTerm }),
+        ...(selectedCategory && { category: selectedCategory }),
+        ...(selectedGstType && { gst_type: selectedGstType }),
+        ...(selectedState && { state: selectedState }),
+      });
+
+      const response = await fetch(`${API_BASE_URL}/api/admin/parties/archived?${queryParams}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) throw new Error('Failed to fetch archived parties');
+
+      const data = await response.json();
+      setArchivedParties(data.parties || data);
+      setTotalArchivedParties(data.total || data.length || 0);
+    } catch (err) {
+      setError(err.message);
+      showError('Failed to load archived parties');
+    } finally {
+      setLoadingArchived(false);
+    }
+  };
+
   useEffect(() => {
     const timer = setTimeout(() => {
       if (currentPage === 1) {
-        fetchParties(1);
+        if (viewMode === 'active') {
+          fetchParties(1);
+        } else if (viewMode === 'archived') {
+          fetchArchivedParties(1);
+        }
       } else {
         setCurrentPage(1);
       }
@@ -182,14 +226,20 @@ const PartyManagement = () => {
     return () => clearTimeout(timer);
   }, [searchTerm, selectedCategory, selectedGstType, selectedState]);
 
-  const totalPages = Math.ceil(totalParties / itemsPerPage);
+  const currentTotal = viewMode === 'active' ? totalParties : totalArchivedParties;
+  const currentPartiesList = viewMode === 'active' ? parties : archivedParties;
+  const totalPages = Math.ceil(currentTotal / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = Math.min(startIndex + itemsPerPage, totalParties);
+  const endIndex = Math.min(startIndex + itemsPerPage, currentTotal);
 
   const handlePageChange = (page) => {
     if (page >= 1 && page <= totalPages) {
       setCurrentPage(page);
-      fetchParties(page);
+      if (viewMode === 'active') {
+        fetchParties(page);
+      } else {
+        fetchArchivedParties(page);
+      }
     }
   };
 
@@ -249,6 +299,13 @@ const PartyManagement = () => {
 
       if (!response.ok) {
         const errorData = await response.json();
+
+        // If the error mentions archiving, directly show archive option without error popup
+        if (errorData.error && errorData.error.includes('archive')) {
+          setDeleteConfirm({ ...deleteConfirm, showArchiveOption: true, deleteError: errorData.error });
+          return; // Don't throw error, just show archive option
+        }
+
         throw new Error(errorData.error || 'Failed to delete party');
       }
 
@@ -258,14 +315,8 @@ const PartyManagement = () => {
     } catch (err) {
       console.error('Delete error:', err);
       setError(err.message);
-      
-      // If the error mentions archiving, show enhanced error
-      if (err.message.includes('archive')) {
-        setDeleteConfirm({ ...deleteConfirm, showArchiveOption: true, deleteError: err.message });
-      } else {
-        showError(err.message);
-        setDeleteConfirm(null);
-      }
+      showError(err.message);
+      setDeleteConfirm(null);
     }
   };
 
@@ -274,7 +325,7 @@ const PartyManagement = () => {
       const token = localStorage.getItem('authToken');
       const response = await fetch(`${API_BASE_URL}/api/admin/parties/${partyId}/archive`, {
         method: 'PATCH',
-        headers: { 
+        headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
@@ -286,6 +337,7 @@ const PartyManagement = () => {
         throw new Error(errorData.error || 'Failed to archive party');
       }
 
+      // Only refresh the current active view
       await fetchParties(currentPage);
       setDeleteConfirm(null);
       showSuccess('Party archived successfully. You can restore it later if needed.');
@@ -293,6 +345,33 @@ const PartyManagement = () => {
       console.error('Archive error:', err);
       setError(err.message);
       showError('Failed to archive party');
+    }
+  };
+
+  const handleUnarchive = async (partyId) => {
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`${API_BASE_URL}/api/admin/parties/${partyId}/archive`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ archive: false })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to unarchive party');
+      }
+
+      // Only refresh the current archived view
+      await fetchArchivedParties(currentPage);
+      showSuccess('Party unarchived successfully and restored to active list.');
+    } catch (err) {
+      console.error('Unarchive error:', err);
+      setError(err.message);
+      showError('Failed to unarchive party');
     }
   };
 
@@ -515,11 +594,15 @@ const PartyManagement = () => {
     }).format(amount || 0);
   };
 
-  if (loading) {
+  const isLoading = viewMode === 'active' ? loading : loadingArchived;
+
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-96">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-        <span className="ml-3 text-lg text-muted-foreground">Loading parties...</span>
+        <span className="ml-3 text-lg text-muted-foreground">
+          Loading {viewMode === 'active' ? 'active' : 'archived'} parties...
+        </span>
       </div>
     );
   }
@@ -593,11 +676,44 @@ const PartyManagement = () => {
                 </Button>
               </div>
               <PermissionGuard permission={ADMIN_PERMISSIONS.MANAGE_VENDORS}>
-                <Button onClick={() => handleOpenModal()} className="btn-primary">
+                <Button onClick={() => handleOpenModal()} className="btn-primary" disabled={viewMode === 'archived'}>
                   <PlusIcon className="w-4 h-4 mr-2" />
                   Add Party
                 </Button>
               </PermissionGuard>
+            </div>
+
+            {/* View Mode Tabs */}
+            <div className="mt-4 border-b">
+              <nav className="flex space-x-8">
+                <button
+                  className={`py-2 px-1 border-b-2 font-medium text-sm ${viewMode === 'active' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
+                  onClick={() => {
+                    if (viewMode !== 'active') {
+                      setViewMode('active');
+                      setCurrentPage(1);
+                      setLoading(true);
+                      fetchParties(1);
+                    }
+                  }}
+                >
+                  Active Parties
+                </button>
+                <button
+                  className={`py-2 px-1 border-b-2 font-medium text-sm ${viewMode === 'archived' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
+                  onClick={() => {
+                    if (viewMode !== 'archived') {
+                      setViewMode('archived');
+                      setCurrentPage(1);
+                      setLoadingArchived(true);
+                      fetchArchivedParties(1);
+                    }
+                  }}
+                >
+                  <ArchiveBoxIcon className="w-4 h-4 mr-2 inline" />
+                  Archived Parties
+                </button>
+              </nav>
             </div>
           </CardHeader>
           <CardContent className="pt-0">
@@ -636,21 +752,33 @@ const PartyManagement = () => {
         <Card>
           <CardHeader className="pb-4">
             <div className="flex items-center justify-between">
-              <CardTitle>Parties ({totalParties})</CardTitle>
-              <div className="text-sm text-muted-foreground">Showing {startIndex + 1}-{endIndex} of {totalParties}</div>
+              <CardTitle>{viewMode === 'active' ? 'Active' : 'Archived'} Parties ({currentTotal})</CardTitle>
+              <div className="text-sm text-muted-foreground">Showing {startIndex + 1}-{endIndex} of {currentTotal}</div>
             </div>
           </CardHeader>
           <CardContent className="p-0">
-            {parties.length === 0 ? (
+            {currentPartiesList.length === 0 ? (
               <div className="p-12 text-center">
-                <BuildingOfficeIcon className="w-16 h-16 text-muted-foreground/50 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-foreground mb-2">No parties found</h3>
-                <p className="text-muted-foreground">{searchTerm || selectedCategory || selectedGstType || selectedState ? "Try adjusting your search criteria" : "Get started by adding your first party"}</p>
+                {viewMode === 'archived' ? (
+                  <ArchiveBoxIcon className="w-16 h-16 text-muted-foreground/50 mx-auto mb-4" />
+                ) : (
+                  <BuildingOfficeIcon className="w-16 h-16 text-muted-foreground/50 mx-auto mb-4" />
+                )}
+                <h3 className="text-lg font-medium text-foreground mb-2">
+                  {viewMode === 'archived' ? 'No archived parties found' : 'No parties found'}
+                </h3>
+                <p className="text-muted-foreground">
+                  {searchTerm || selectedCategory || selectedGstType || selectedState
+                    ? "Try adjusting your search criteria"
+                    : viewMode === 'archived'
+                    ? "No parties have been archived yet"
+                    : "Get started by adding your first party"}
+                </p>
               </div>
             ) : (
               <>
                 <div className="divide-y">
-                  {parties.map((party) => (
+                  {currentPartiesList.map((party) => (
                     <div key={party.id} className="p-4 sm:p-6 hover:bg-muted/50 transition-colors">
                       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
                         <div className="flex-1 mb-3 sm:mb-0">
@@ -687,12 +815,20 @@ const PartyManagement = () => {
                                 <Button variant="ghost" size="icon" onClick={() => fetchVendorDetails(party.id)} className="h-9 w-9 text-muted-foreground hover:text-primary">
                                   <EyeIcon className="w-4 h-4" />
                                 </Button>
-                                <Button variant="ghost" size="icon" onClick={() => handleOpenModal(party)} className="h-9 w-9 text-muted-foreground hover:text-primary">
-                                  <PencilIcon className="w-4 h-4" />
-                                </Button>
-                                <Button variant="ghost" size="icon" onClick={() => setDeleteConfirm(party)} className="h-9 w-9 text-muted-foreground hover:text-destructive">
-                                  <TrashIcon className="w-4 h-4" />
-                                </Button>
+                                {viewMode === 'active' ? (
+                                  <>
+                                    <Button variant="ghost" size="icon" onClick={() => handleOpenModal(party)} className="h-9 w-9 text-muted-foreground hover:text-primary">
+                                      <PencilIcon className="w-4 h-4" />
+                                    </Button>
+                                    <Button variant="ghost" size="icon" onClick={() => setDeleteConfirm(party)} className="h-9 w-9 text-muted-foreground hover:text-destructive">
+                                      <TrashIcon className="w-4 h-4" />
+                                    </Button>
+                                  </>
+                                ) : (
+                                  <Button variant="ghost" size="icon" onClick={() => handleUnarchive(party.id)} className="h-9 w-9 text-muted-foreground hover:text-success" title="Unarchive Party">
+                                    <ArchiveBoxIcon className="w-4 h-4" />
+                                  </Button>
+                                )}
                               </div>
                             </PermissionGuard>
                           </div>
@@ -702,12 +838,20 @@ const PartyManagement = () => {
                             <Button variant="outline" size="sm" onClick={() => fetchVendorDetails(party.id)} className="flex-1">
                               <EyeIcon className="w-4 h-4 mr-2" />View
                             </Button>
-                            <Button variant="outline" size="sm" onClick={() => handleOpenModal(party)} className="flex-1">
-                              <PencilIcon className="w-4 h-4 mr-2" />Edit
-                            </Button>
-                            <Button variant="destructive" size="sm" onClick={() => setDeleteConfirm(party)} className="flex-1">
-                              <TrashIcon className="w-4 h-4 mr-2" />Delete
-                            </Button>
+                            {viewMode === 'active' ? (
+                              <>
+                                <Button variant="outline" size="sm" onClick={() => handleOpenModal(party)} className="flex-1">
+                                  <PencilIcon className="w-4 h-4 mr-2" />Edit
+                                </Button>
+                                <Button variant="destructive" size="sm" onClick={() => setDeleteConfirm(party)} className="flex-1">
+                                  <TrashIcon className="w-4 h-4 mr-2" />Delete
+                                </Button>
+                              </>
+                            ) : (
+                              <Button variant="outline" size="sm" onClick={() => handleUnarchive(party.id)} className="flex-1">
+                                <ArchiveBoxIcon className="w-4 h-4 mr-2" />Unarchive
+                              </Button>
+                            )}
                           </div>
                         </PermissionGuard>
                       </div>
@@ -717,7 +861,7 @@ const PartyManagement = () => {
                 {totalPages > 1 && (
                   <div className="p-4 sm:p-6 border-t">
                     <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-                      <div className="text-sm text-muted-foreground">Showing <span className="font-medium">{startIndex + 1}</span> to <span className="font-medium">{endIndex}</span> of <span className="font-medium">{totalParties}</span> results</div>
+                      <div className="text-sm text-muted-foreground">Showing <span className="font-medium">{startIndex + 1}</span> to <span className="font-medium">{endIndex}</span> of <span className="font-medium">{currentTotal}</span> results</div>
                       <div className="flex items-center space-x-2">
                         <Button variant="outline" size="sm" onClick={() => handlePageChange(currentPage - 1)} disabled={currentPage === 1} className="h-8 w-8 p-0"><ChevronLeftIcon className="w-4 h-4" /></Button>
                         <div className="hidden sm:flex items-center space-x-1">

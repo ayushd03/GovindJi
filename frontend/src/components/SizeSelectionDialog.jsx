@@ -11,6 +11,7 @@ import {
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { useCart } from '../context/CartContext';
+import { useProductImage } from '../hooks/useProductImage';
 import { cn } from '../lib/utils';
 
 const SizeSelectionDialog = ({ isOpen, onClose, product, onAddToCart }) => {
@@ -18,6 +19,7 @@ const SizeSelectionDialog = ({ isOpen, onClose, product, onAddToCart }) => {
   const [quantity, setQuantity] = useState(1);
   const [isAdding, setIsAdding] = useState(false);
   const { addToCart } = useCart();
+  const { primaryImage } = useProductImage(product?.id, product?.image_url);
 
   const sizes = [
     { id: '250g', label: '250g', price: product?.price || 0, popular: false },
@@ -47,7 +49,8 @@ const SizeSelectionDialog = ({ isOpen, onClose, product, onAddToCart }) => {
       size: selectedSize,
       price: selectedSizeData.price,
       originalId: product.id,
-      id: `${product.id}-${selectedSize}`
+      id: `${product.id}-${selectedSize}`,
+      image_url: primaryImage || product.image_url
     };
 
     try {
@@ -81,9 +84,9 @@ const SizeSelectionDialog = ({ isOpen, onClose, product, onAddToCart }) => {
 
         {/* Product Info - Compact */}
         <div className="flex items-center gap-3 px-4 pb-3">
-          {product?.image_url ? (
+          {primaryImage || product?.image_url ? (
             <img
-              src={product.image_url}
+              src={primaryImage || product.image_url}
               alt={product?.name}
               className="w-12 h-12 object-cover rounded-md"
               onError={(e) => e.target.style.display = 'none'}

@@ -14,17 +14,28 @@ export const CartProvider = ({ children }) => {
   const [cartItems, setCartItems] = useState([]);
   const [cartNotification, setCartNotification] = useState(null);
   const [isCartPopupOpen, setIsCartPopupOpen] = useState(false);
+  const [isHydrated, setIsHydrated] = useState(false);
 
   useEffect(() => {
-    const savedCart = localStorage.getItem('cartItems');
-    if (savedCart) {
-      setCartItems(JSON.parse(savedCart));
+    try {
+      const savedCart = localStorage.getItem('cartItems');
+      if (savedCart) {
+        const parsed = JSON.parse(savedCart);
+        if (Array.isArray(parsed)) {
+          setCartItems(parsed);
+        }
+      }
+    } catch (_) {
+      // ignore invalid JSON and start fresh
+    } finally {
+      setIsHydrated(true);
     }
   }, []);
 
   useEffect(() => {
+    if (!isHydrated) return;
     localStorage.setItem('cartItems', JSON.stringify(cartItems));
-  }, [cartItems]);
+  }, [cartItems, isHydrated]);
 
   const addToCart = (product, quantity = 1) => {
     setCartItems(prevItems => {
@@ -99,6 +110,7 @@ export const CartProvider = ({ children }) => {
 
   const openCartPopup = () => setIsCartPopupOpen(true);
   const closeCartPopup = () => setIsCartPopupOpen(false);
+  const toggleCartPopup = () => setIsCartPopupOpen(prev => !prev);
 
   const value = {
     cartItems,
@@ -113,6 +125,7 @@ export const CartProvider = ({ children }) => {
     isCartPopupOpen,
     openCartPopup,
     closeCartPopup,
+    toggleCartPopup,
   };
 
   return (

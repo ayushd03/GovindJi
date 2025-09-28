@@ -8,7 +8,7 @@ import AuthModal from './AuthModal';
 
 const Header = () => {
   const { user, logout, isAuthenticated } = useAuth();
-  const { getCartItemsCount, openCartPopup } = useCart();
+  const { getCartItemsCount, toggleCartPopup } = useCart();
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -153,16 +153,16 @@ const Header = () => {
                 <span className="relative z-10">Sign In</span>
               </motion.button>
             )}
-            
-            <div className="relative">
+
+            <div className="relative p-2">
               <motion.button
-                whileHover={{ 
+                whileHover={{
                   scale: 1.05,
                   boxShadow: "0 20px 40px rgba(44, 85, 48, 0.35)"
                 }}
                 whileTap={{ scale: 0.95 }}
-                onClick={openCartPopup}
-                className="premium-cart-btn flex items-center space-x-2 px-4 py-2 rounded-full font-medium text-white shadow-lg transition-all duration-300 relative overflow-hidden group"
+                onClick={toggleCartPopup}
+                className="premium-cart-btn flex items-center space-x-2 px-4 py-2 rounded-full font-medium text-white shadow-lg transition-all duration-300 relative overflow-visible group"
                 style={{
                   background: 'linear-gradient(135deg, #2c5530 0%, #4a7856 100%)',
                   boxShadow: '0 10px 25px rgba(44, 85, 48, 0.25)'
@@ -175,7 +175,7 @@ const Header = () => {
                   <motion.span
                     initial={{ scale: 0 }}
                     animate={{ scale: 1 }}
-                    className="absolute -top-2 -right-2 bg-gradient-to-br from-red-500 to-red-600 text-white text-xs rounded-full w-7 h-7 flex items-center justify-center font-bold shadow-lg border-2 border-white"
+                    className="absolute -top-2 -right-2 z-20 bg-gradient-to-br from-red-500 to-red-600 text-white text-xs rounded-full w-7 h-7 flex items-center justify-center font-bold shadow-lg border-2 border-white"
                     style={{
                       boxShadow: '0 4px 12px rgba(239, 68, 68, 0.4)'
                     }}
@@ -284,7 +284,7 @@ const Header = () => {
               <button 
                 onClick={() => {
                   setIsMenuOpen(false);
-                  openCartPopup();
+                  toggleCartPopup();
                 }}
                 className="premium-cart-btn flex items-center justify-center space-x-2 w-full px-4 py-3 rounded-full font-medium text-white shadow-lg transition-all duration-300 relative overflow-hidden group"
                 style={{

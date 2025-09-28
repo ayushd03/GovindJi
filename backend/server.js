@@ -2380,6 +2380,80 @@ app.get('/api/admin/parties', roleMiddleware.requirePermission(roleMiddleware.AD
     });
 }));
 
+// Get archived parties with filtering (MUST be before /:id route)
+app.get('/api/admin/parties/archived', roleMiddleware.requirePermission(roleMiddleware.ADMIN_PERMISSIONS.VIEW_VENDORS), asyncHandler(async (req, res) => {
+    const {
+        page = 1,
+        limit = 10,
+        search = '',
+        category = '',
+        party_type = 'vendor',
+        gst_type = '',
+        state = ''
+    } = req.query;
+
+    // Build query for filtering archived parties
+    let query = supabase
+        .from('parties')
+        .select('*', { count: 'exact' });
+
+    // Apply filters
+    if (search) {
+        query = query.or(`name.ilike.%${search}%,contact_person.ilike.%${search}%,email.ilike.%${search}%,phone_number.ilike.%${search}%`);
+    }
+
+    if (category) {
+        query = query.eq('category', category);
+    }
+
+    if (party_type) {
+        query = query.eq('party_type', party_type);
+    }
+
+    if (gst_type) {
+        query = query.eq('gst_type', gst_type);
+    }
+
+    if (state) {
+        query = query.eq('state', state);
+    }
+
+    // Only get archived parties (is_active = false)
+    query = query.eq('is_active', false);
+
+    // Apply pagination and ordering
+    const offset = (parseInt(page) - 1) * parseInt(limit);
+    query = query
+        .order('name')
+        .range(offset, offset + parseInt(limit) - 1);
+
+    const { data, error, count } = await query;
+
+    if (error) {
+        logger.error('Failed to fetch archived parties', error, {
+            adminId: req.user?.id,
+            filters: { search, category, party_type, gst_type, state }
+        });
+        throw error;
+    }
+
+    logger.info('Archived parties retrieved successfully', {
+        adminId: req.user?.id,
+        archivedPartyCount: data?.length || 0,
+        totalArchivedCount: count,
+        page: parseInt(page),
+        limit: parseInt(limit)
+    });
+
+    res.json({
+        parties: data,
+        total: count || 0,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        totalPages: Math.ceil((count || 0) / parseInt(limit))
+    });
+}));
+
 // Get party by ID with transaction history
 app.get('/api/admin/parties/:id', roleMiddleware.requirePermission(roleMiddleware.ADMIN_PERMISSIONS.VIEW_VENDORS), asyncHandler(async (req, res) => {
     const { id } = req.params;
@@ -2674,7 +2748,7 @@ app.patch('/api/admin/parties/:id/archive', roleMiddleware.requirePermission(rol
         isActive: data?.is_active
     });
 
-    res.json({ 
+    res.json({
         message: archive ? 'Party archived successfully' : 'Party restored successfully',
         party: data
     });
