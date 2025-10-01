@@ -33,6 +33,7 @@ import {
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Toaster } from '../../components/ui/toaster';
+import AddVendorModal from './components/AddVendorModal';
 
 const PARTY_CATEGORIES = [
   'Raw Materials',
@@ -89,7 +90,6 @@ const PartyManagement = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingParty, setEditingParty] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
-  const [activeTab, setActiveTab] = useState('basic');
   const [showPartyDetails, setShowPartyDetails] = useState(null);
   const [showVendorDetailsModal, setShowVendorDetailsModal] = useState(null);
   const [vendorDetailsTab, setVendorDetailsTab] = useState('orders');
@@ -98,24 +98,7 @@ const PartyManagement = () => {
   const [vendorPayments, setVendorPayments] = useState([]);
   const [hoveredPO, setHoveredPO] = useState(null);
   
-  const [formData, setFormData] = useState({
-    name: '',
-    contact_person: '',
-    phone_number: '',
-    email: '',
-    address: '',
-    shipping_address: '',
-    gstin: '',
-    gst_type: 'Unregistered/Consumer',
-    state: '',
-    party_type: 'vendor',
-    category: '',
-    opening_balance: 0,
-    balance_as_of_date: new Date().toISOString().split('T')[0],
-    credit_limit: 0,
-    credit_limit_type: 'no_limit',
-    notes: ''
-  });
+  // Removed formData state - now handled by AddVendorModal component
 
   const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
@@ -260,34 +243,6 @@ const PartyManagement = () => {
     return pages;
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      const token = localStorage.getItem('authToken');
-      const url = editingParty 
-        ? `${API_BASE_URL}/api/admin/parties/${editingParty.id}`
-        : `${API_BASE_URL}/api/admin/parties`;
-      const method = editingParty ? 'PUT' : 'POST';
-      
-      const response = await fetch(url, {
-        method,
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(formData)
-      });
-
-      if (!response.ok) throw new Error(`Failed to ${editingParty ? 'update' : 'create'} party`);
-
-      await fetchParties(currentPage);
-      handleCloseModal();
-      showSuccess(editingParty ? 'Party updated successfully' : 'Party added successfully');
-    } catch (err) {
-      setError(err.message);
-      showError(editingParty ? 'Failed to update party' : 'Failed to add party');
-    }
-  };
 
   const handleDelete = async (partyId) => {
     try {
@@ -376,73 +331,18 @@ const PartyManagement = () => {
   };
 
   const handleOpenModal = (party = null) => {
-    if (party) {
-      setEditingParty(party);
-      setFormData({
-        name: party.name || '',
-        contact_person: party.contact_person || '',
-        phone_number: party.phone_number || '',
-        email: party.email || '',
-        address: party.address || '',
-        shipping_address: party.shipping_address || '',
-        gstin: party.gstin || '',
-        gst_type: party.gst_type || 'Unregistered/Consumer',
-        state: party.state || '',
-        party_type: party.party_type || 'vendor',
-        category: party.category || '',
-        opening_balance: party.opening_balance || 0,
-        balance_as_of_date: party.balance_as_of_date || new Date().toISOString().split('T')[0],
-        credit_limit: party.credit_limit || 0,
-        credit_limit_type: party.credit_limit_type || 'no_limit',
-        notes: party.notes || ''
-      });
-    } else {
-      setEditingParty(null);
-      setFormData({
-        name: '',
-        contact_person: '',
-        phone_number: '',
-        email: '',
-        address: '',
-        shipping_address: '',
-        gstin: '',
-        gst_type: 'Unregistered/Consumer',
-        state: '',
-        party_type: 'vendor',
-        category: '',
-        opening_balance: 0,
-        balance_as_of_date: new Date().toISOString().split('T')[0],
-        credit_limit: 0,
-        credit_limit_type: 'no_limit',
-        notes: ''
-      });
-    }
-    setActiveTab('basic');
+    setEditingParty(party);
     setIsModalOpen(true);
   };
 
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setEditingParty(null);
-    setActiveTab('basic');
-    setFormData({
-      name: '',
-      contact_person: '',
-      phone_number: '',
-      email: '',
-      address: '',
-      shipping_address: '',
-      gstin: '',
-      gst_type: 'Unregistered/Consumer',
-      state: '',
-      party_type: 'vendor',
-      category: '',
-      opening_balance: 0,
-      balance_as_of_date: new Date().toISOString().split('T')[0],
-      credit_limit: 0,
-      credit_limit_type: 'no_limit',
-      notes: ''
-    });
+  };
+
+  const handleVendorAdded = (vendor) => {
+    // Refresh the parties list when a vendor is added/updated
+    fetchParties();
   };
 
   const fetchPartyDetails = async (partyId) => {
@@ -541,8 +441,8 @@ const PartyManagement = () => {
 
   const getCombinedTransactionHistory = (orders, payments) => {
     const transactions = [];
-    
-    // Add PO entries (amounts due)
+
+    // Add PO entries (amounts due) - these represent debt to vendor
     orders
       .filter(order => order.status !== 'cancelled')
       .forEach(order => {
@@ -551,37 +451,40 @@ const PartyManagement = () => {
           date: order.order_date,
           created_at: order.created_at || order.order_date,
           amount: order.final_amount,
-          description: `Amount due for ${order.po_number}`,
+          description: `Purchase Order: ${order.po_number}`,
           po_number: order.po_number,
           po_items: order.purchase_order_items || [],
           id: `po_${order.id}`
         });
       });
-    
-    // Add payment entries
-    payments.forEach(payment => {
-      transactions.push({
-        type: 'payment',
-        date: payment.payment_date,
-        created_at: payment.created_at || payment.payment_date,
-        amount: payment.amount,
-        description: payment.payment_type === 'payment' ? 'Payment' : 'Adjustment',
-        reference_number: payment.reference_number,
-        notes: payment.notes,
-        id: `payment_${payment.id}`
+
+    // Add payment entries (only actual payments, not adjustments)
+    // Note: Adjustment entries are legacy/deprecated and should not appear in balance sheet
+    payments
+      .filter(payment => payment.payment_type === 'payment')
+      .forEach(payment => {
+        transactions.push({
+          type: 'payment',
+          date: payment.payment_date,
+          created_at: payment.created_at || payment.payment_date,
+          amount: payment.amount,
+          description: 'Payment',
+          reference_number: payment.reference_number,
+          notes: payment.notes,
+          id: `payment_${payment.id}`
+        });
       });
-    });
-    
+
     // Sort by created_at timestamp first, then by date (chronologically - oldest first)
     return transactions.sort((a, b) => {
       const dateA = new Date(a.created_at || a.date);
       const dateB = new Date(b.created_at || b.date);
-      
+
       // If created_at timestamps are the same, use date as secondary sort
       if (dateA.getTime() === dateB.getTime()) {
         return new Date(a.date) - new Date(b.date);
       }
-      
+
       return dateA - dateB;
     });
   };
@@ -878,150 +781,16 @@ const PartyManagement = () => {
           </CardContent>
         </Card>
 
-        {/* Enhanced Party Form Modal */}
-        {isModalOpen && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-2 sm:p-4 z-50">
-            <div className="bg-card rounded-xl shadow-xl w-full max-w-4xl max-h-[95vh] sm:max-h-[90vh] overflow-y-auto">
-              <div className="p-4 sm:p-6 border-b">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-lg sm:text-xl font-semibold text-foreground">{editingParty ? 'Edit Party' : 'Add New Party'}</h2>
-                  <button onClick={handleCloseModal} className="p-2 text-muted-foreground hover:text-foreground rounded-lg"><XMarkIcon className="w-5 h-5" /></button>
-                </div>
-                
-                {/* Tabs */}
-                <div className="mt-4 border-b">
-                  <nav className="flex space-x-8">
-                    <button 
-                      className={`py-2 px-1 border-b-2 font-medium text-sm ${activeTab === 'basic' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
-                      onClick={() => setActiveTab('basic')}
-                    >
-                      Basic Details
-                    </button>
-                    <button 
-                      className={`py-2 px-1 border-b-2 font-medium text-sm ${activeTab === 'gst' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
-                      onClick={() => setActiveTab('gst')}
-                    >
-                      GST & Address
-                    </button>
-                    <button 
-                      className={`py-2 px-1 border-b-2 font-medium text-sm ${activeTab === 'financial' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
-                      onClick={() => setActiveTab('financial')}
-                    >
-                      Financial Details
-                    </button>
-                  </nav>
-                </div>
-              </div>
-              
-              <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-6">
-                {/* Basic Details Tab */}
-                {activeTab === 'basic' && (
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-muted-foreground mb-1">Party Name *</label>
-                        <input type="text" required className="input-field" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-muted-foreground mb-1">Category *</label>
-                        <select required className="input-field" value={formData.category} onChange={(e) => setFormData({...formData, category: e.target.value})}>
-                          <option value="">Select Category</option>
-                          {PARTY_CATEGORIES.map(category => (<option key={category} value={category}>{category}</option>))}
-                        </select>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-muted-foreground mb-1">Contact Person</label>
-                        <input type="text" className="input-field" value={formData.contact_person} onChange={(e) => setFormData({...formData, contact_person: e.target.value})} />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-muted-foreground mb-1">Phone Number</label>
-                        <input type="tel" className="input-field" value={formData.phone_number} onChange={(e) => setFormData({...formData, phone_number: e.target.value})} />
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-muted-foreground mb-1">Email</label>
-                      <input type="email" className="input-field" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} />
-                    </div>
-                  </div>
-                )}
+        {/* Reusable AddVendorModal Component */}
+        <AddVendorModal
+          isOpen={isModalOpen}
+          onClose={handleCloseModal}
+          onVendorAdded={handleVendorAdded}
+          editingVendor={editingParty}
+          mode={editingParty ? 'edit' : 'add'}
+          apiBaseUrl={API_BASE_URL}
+        />
 
-                {/* GST & Address Tab */}
-                {activeTab === 'gst' && (
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-muted-foreground mb-1">GST Type</label>
-                        <select className="input-field" value={formData.gst_type} onChange={(e) => setFormData({...formData, gst_type: e.target.value})}>
-                          {GST_TYPES.map(type => (<option key={type} value={type}>{type}</option>))}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-muted-foreground mb-1">GSTIN</label>
-                        <input type="text" className="input-field" placeholder="e.g., 22AAAAA0000A1Z5" value={formData.gstin} onChange={(e) => setFormData({...formData, gstin: e.target.value})} />
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-muted-foreground mb-1">State</label>
-                      <select className="input-field" value={formData.state} onChange={(e) => setFormData({...formData, state: e.target.value})}>
-                        <option value="">Select State</option>
-                        {INDIAN_STATES.map(state => (<option key={state} value={state}>{state}</option>))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-muted-foreground mb-1">Billing Address</label>
-                      <textarea rows={3} className="input-field" value={formData.address} onChange={(e) => setFormData({...formData, address: e.target.value})} />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-muted-foreground mb-1">Shipping Address</label>
-                      <textarea rows={3} className="input-field" placeholder="Leave blank if same as billing address" value={formData.shipping_address} onChange={(e) => setFormData({...formData, shipping_address: e.target.value})} />
-                    </div>
-                  </div>
-                )}
-
-                {/* Financial Details Tab */}
-                {activeTab === 'financial' && (
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-muted-foreground mb-1">Opening Balance</label>
-                        <input type="number" step="0.01" className="input-field" value={formData.opening_balance} onChange={(e) => setFormData({...formData, opening_balance: parseFloat(e.target.value) || 0})} />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-muted-foreground mb-1">As of Date</label>
-                        <input type="date" className="input-field" value={formData.balance_as_of_date} onChange={(e) => setFormData({...formData, balance_as_of_date: e.target.value})} />
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-muted-foreground mb-1">Credit Limit Type</label>
-                        <select className="input-field" value={formData.credit_limit_type} onChange={(e) => setFormData({...formData, credit_limit_type: e.target.value})}>
-                          {CREDIT_LIMIT_TYPES.map(type => (<option key={type.value} value={type.value}>{type.label}</option>))}
-                        </select>
-                      </div>
-                      {formData.credit_limit_type === 'custom_limit' && (
-                        <div>
-                          <label className="block text-sm font-medium text-muted-foreground mb-1">Credit Limit Amount</label>
-                          <input type="number" step="0.01" className="input-field" value={formData.credit_limit} onChange={(e) => setFormData({...formData, credit_limit: parseFloat(e.target.value) || 0})} />
-                        </div>
-                      )}
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-muted-foreground mb-1">Notes</label>
-                      <textarea rows={3} className="input-field" value={formData.notes} onChange={(e) => setFormData({...formData, notes: e.target.value})} />
-                    </div>
-                  </div>
-                )}
-
-                <div className="flex flex-col sm:flex-row sm:justify-end gap-3 pt-4 border-t">
-                  <Button type="button" variant="outline" onClick={handleCloseModal}>Cancel</Button>
-                  <Button type="submit" className="btn-primary">{editingParty ? 'Update Party' : 'Add Party'}</Button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
 
         {/* Party Details Modal */}
         {showPartyDetails && (

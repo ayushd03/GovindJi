@@ -12,19 +12,27 @@ import { cn } from '../lib/utils';
 import SizeSelectionDialog from './SizeSelectionDialog';
 
 const ProductCard = ({ product, className, viewMode = "grid" }) => {
-  const { getProductCartInfo } = useCart();
+  const { getProductCartInfo, addToCart } = useCart();
   const { primaryImage, loading: imageLoading } = useProductImage(product.id, product.image_url);
   const [isHovered, setIsHovered] = useState(false);
   const [isFavorited, setIsFavorited] = useState(false);
   const [showSizeDialog, setShowSizeDialog] = useState(false);
-  
+
   const productCartInfo = getProductCartInfo(product.id);
   const currentQuantity = productCartInfo.totalQuantity;
 
   const handleAddToCart = (e) => {
     e.preventDefault();
     e.stopPropagation();
-    setShowSizeDialog(true);
+
+    // Check if product has variants configured
+    if (product.variants && product.variants.length > 0) {
+      // Show size selection dialog for products with variants
+      setShowSizeDialog(true);
+    } else {
+      // Add directly to cart for products without variants
+      addToCart(product, 1);
+    }
   };
 
   const handleFavoriteToggle = (e) => {
@@ -35,11 +43,11 @@ const ProductCard = ({ product, className, viewMode = "grid" }) => {
 
   const getCartLabel = () => {
     if (currentQuantity === 0) return null;
-    
+
     const items = productCartInfo.items;
     if (items.length === 1) {
       const item = items[0];
-      return `${item.quantity}x of ${item.size || '250g'}`;
+      return item.size ? `${item.quantity}x of ${item.size}` : `${item.quantity}x in cart`;
     } else if (items.length > 1) {
       return `${currentQuantity}x in cart`;
     }

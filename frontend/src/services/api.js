@@ -124,6 +124,11 @@ export const productsAPI = {
   getReviews: (productId) => api.get(`/api/products/${productId}/reviews`),
   addReview: (productId, reviewData) => api.post(`/api/products/${productId}/reviews`, reviewData),
   getImages: (productId) => api.get(`/api/products/${productId}/images`),
+  // Variant endpoints
+  getVariants: (productId) => api.get(`/api/admin/products/${productId}/variants`),
+  saveVariants: (productId, variants) => api.post(`/api/admin/products/${productId}/variants`, { variants }),
+  updateVariant: (productId, variantId, updates) => api.put(`/api/admin/products/${productId}/variants/${variantId}`, updates),
+  deleteVariant: (productId, variantId) => api.delete(`/api/admin/products/${productId}/variants/${variantId}`),
 };
 
 export const categoriesAPI = {

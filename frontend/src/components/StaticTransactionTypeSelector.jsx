@@ -22,9 +22,9 @@ const TRANSACTION_TYPES = {
         fields: [
             {
                 field_name: 'reference_number',
-                field_label: 'Reference Number',
+                field_label: 'Reference Number (Optional)',
                 field_type: 'text',
-                is_required: true,
+                is_required: false,
                 placeholder: 'Enter UPI reference number'
             }
         ]

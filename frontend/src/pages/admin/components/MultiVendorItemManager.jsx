@@ -165,7 +165,7 @@ const MultiVendorItemManager = ({
       ? `${uniqueVendorCount} vendor${uniqueVendorCount > 1 ? 's' : ''}`
       : 'no vendors assigned';
     
-    return `${items.length}/10 items, ${vendorText}`;
+    return `${items.length} items, ${vendorText}`;
   };
 
   return (
@@ -321,7 +321,7 @@ const MultiVendorItemManager = ({
         )}
 
         {/* Add Item Button */}
-        {items.length < 10 && (
+        {
           <Button 
             onClick={addItem} 
             variant="outline" 
@@ -329,9 +329,9 @@ const MultiVendorItemManager = ({
             size="sm"
           >
             <PlusIcon className="w-4 h-4 mr-2" />
-            Add Item {items.length > 0 && `(${items.length}/10)`}
+            Add Item {items.length > 0 && `(${items.length})`}
           </Button>
-        )}
+        }
 
         {/* Total - Simple and Clean */}
         {items.length > 0 && (

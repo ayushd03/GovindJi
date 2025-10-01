@@ -7,6 +7,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { cn } from '../../../lib/utils';
 import { useApiSearch } from '../../../hooks/useApiSearch';
+import AddProductModal from './AddProductModal';
 
 const ProductSelector = ({ 
   selectedProduct, 
@@ -18,8 +19,11 @@ const ProductSelector = ({
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const dropdownRef = useRef(null);
   const searchInputRef = useRef(null);
+
+  const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
   // Use API search for products
   const { 
@@ -66,6 +70,28 @@ const ProductSelector = ({
   const handleClearSelection = () => {
     onProductChange(null);
     setSearchTerm('');
+  };
+
+  const handleOpenModal = () => {
+    setIsModalOpen(true);
+    setIsOpen(false); // Close the dropdown
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+  };
+
+  const handleProductAdded = (product) => {
+    // Refresh search results by clearing and re-setting search term
+    // This will trigger the useApiSearch hook to refetch data
+    const currentSearch = searchTerm;
+    setSearchTerm('');
+    setTimeout(() => setSearchTerm(currentSearch), 100);
+
+    // Auto-select the newly added product if it matches the search
+    if (product && product.name.toLowerCase().includes(searchTerm.toLowerCase())) {
+      handleProductSelect(product);
+    }
   };
 
   const formatCurrency = (amount) => {
@@ -221,11 +247,7 @@ const ProductSelector = ({
               <button
                 type="button"
                 className="w-full text-left px-3 py-2 text-sm text-primary hover:bg-primary/10 rounded-lg transition-colors"
-                onClick={() => {
-                  // This could trigger a modal to add a new product
-                  // Add new product functionality
-                  setIsOpen(false);
-                }}
+                onClick={handleOpenModal}
               >
                 + Add new product "{searchTerm}"
               </button>
@@ -233,6 +255,16 @@ const ProductSelector = ({
           )}
         </div>
       )}
+
+      {/* AddProductModal for adding new products */}
+      <AddProductModal
+        isOpen={isModalOpen}
+        onClose={handleCloseModal}
+        onProductAdded={handleProductAdded}
+        defaultName={searchTerm}
+        mode="add"
+        apiBaseUrl={API_BASE_URL}
+      />
     </div>
   );
 };

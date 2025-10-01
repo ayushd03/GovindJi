@@ -23,19 +23,12 @@ const ProductDetail = () => {
     fetchProduct();
   }, [id]);
 
-  // Set default size when product loads
+  // Set default size when product loads (only if variants are configured)
   useEffect(() => {
-    if (product && !selectedSize) {
-      const sizes = [
-        { id: '250g', label: '250g', price: product?.price || 0, popular: false },
-        { id: '500g', label: '500g', price: product?.price ? product.price * 1.8 : 0, popular: true },
-        { id: '1kg', label: '1kg', price: product?.price ? product.price * 3.5 : 0, popular: false },
-        { id: '2kg', label: '2kg', price: product?.price ? product.price * 6.8 : 0, popular: false },
-        { id: '5kg', label: '5kg', price: product?.price ? product.price * 16 : 0, popular: false }
-      ];
-      // Set the popular size (500g) as default
-      const defaultSize = sizes.find(size => size.popular) || sizes[0];
-      setSelectedSize(defaultSize.id);
+    if (product && !selectedSize && product.variants && product.variants.length > 0) {
+      // Set the default variant or first variant
+      const defaultVariant = product.variants.find(v => v.is_default) || product.variants[0];
+      setSelectedSize(defaultVariant.id);
     }
   }, [product]);
 
@@ -65,39 +58,59 @@ const ProductDetail = () => {
   };
 
   const handleAddToCart = () => {
-    if (!selectedSize) {
+    // If product has variants and none selected, show dialog
+    if (product.variants && product.variants.length > 0 && !selectedSize) {
       setPendingAction('addToCart');
       setShowSizeDialog(true);
       return;
     }
-    
-    const productWithSize = {
-      ...product,
-      size: selectedSize,
-      price: getSizePrice(selectedSize),
-      originalId: product.id,
-      id: `${product.id}-${selectedSize}`
-    };
-    
-    addToCart(productWithSize, quantity);
+
+    // If product has variants, add with variant details
+    if (product.variants && product.variants.length > 0 && selectedSize) {
+      const selectedVariant = product.variants.find(v => v.id === selectedSize);
+      const productWithSize = {
+        ...product,
+        size: selectedVariant.variant_name,
+        size_value: selectedVariant.size_value,
+        size_unit: selectedVariant.size_unit,
+        variant_id: selectedVariant.id,
+        price: parseFloat(selectedVariant.price),
+        originalId: product.id,
+        id: `${product.id}-${selectedSize}`
+      };
+      addToCart(productWithSize, quantity);
+    } else {
+      // Product without variants - add directly
+      addToCart(product, quantity);
+    }
   };
 
   const handleBuyNow = () => {
-    if (!selectedSize) {
+    // If product has variants and none selected, show dialog
+    if (product.variants && product.variants.length > 0 && !selectedSize) {
       setPendingAction('buyNow');
       setShowSizeDialog(true);
       return;
     }
-    
-    const productWithSize = {
-      ...product,
-      size: selectedSize,
-      price: getSizePrice(selectedSize),
-      originalId: product.id,
-      id: `${product.id}-${selectedSize}`
-    };
-    
-    addToCart(productWithSize, quantity);
+
+    // If product has variants, add with variant details
+    if (product.variants && product.variants.length > 0 && selectedSize) {
+      const selectedVariant = product.variants.find(v => v.id === selectedSize);
+      const productWithSize = {
+        ...product,
+        size: selectedVariant.variant_name,
+        size_value: selectedVariant.size_value,
+        size_unit: selectedVariant.size_unit,
+        variant_id: selectedVariant.id,
+        price: parseFloat(selectedVariant.price),
+        originalId: product.id,
+        id: `${product.id}-${selectedSize}`
+      };
+      addToCart(productWithSize, quantity);
+    } else {
+      // Product without variants - add directly
+      addToCart(product, quantity);
+    }
     openCartPopup();
   };
 
@@ -145,22 +158,19 @@ const ProductDetail = () => {
 
   const isOutOfStock = product.stock_quantity <= 0;
   const isLowStock = product.stock_quantity <= product.min_stock_level && product.stock_quantity > 0;
-  
-  const sizes = [
-    { id: '250g', label: '250g', price: product?.price || 0, popular: false },
-    { id: '500g', label: '500g', price: product?.price ? product.price * 1.8 : 0, popular: true },
-    { id: '1kg', label: '1kg', price: product?.price ? product.price * 3.5 : 0, popular: false },
-    { id: '2kg', label: '2kg', price: product?.price ? product.price * 6.8 : 0, popular: false },
-    { id: '5kg', label: '5kg', price: product?.price ? product.price * 16 : 0, popular: false }
-  ];
-  
-  const getSizePrice = (sizeId) => {
-    const size = sizes.find(s => s.id === sizeId);
-    return size ? size.price : product?.price || 0;
+
+  // Use product variants if available
+  const hasVariants = product.variants && product.variants.length > 0;
+  const variants = hasVariants ? product.variants : [];
+
+  const getVariantPrice = (variantId) => {
+    if (!hasVariants) return product?.price || 0;
+    const variant = variants.find(v => v.id === variantId);
+    return variant ? parseFloat(variant.price) : product?.price || 0;
   };
-  
-  const handleSizeSelect = (size) => {
-    setSelectedSize(size);
+
+  const handleSizeSelect = (variantId) => {
+    setSelectedSize(variantId);
   };
 
   return (
@@ -192,10 +202,12 @@ const ProductDetail = () => {
             </div>
 
             <div className="product-price">
-              {selectedSize ? (
+              {hasVariants && selectedSize ? (
                 <>
-                  <span className="price">₹{getSizePrice(selectedSize).toFixed(2)}</span>
-                  <span className="unit">for {selectedSize}</span>
+                  <span className="price">₹{getVariantPrice(selectedSize).toFixed(2)}</span>
+                  <span className="unit">
+                    for {variants.find(v => v.id === selectedSize)?.variant_name}
+                  </span>
                 </>
               ) : (
                 <>
@@ -242,39 +254,41 @@ const ProductDetail = () => {
 
             {!isOutOfStock && (
               <div className="purchase-section">
-                {/* Size Selection */}
-                <div className="size-selection">
-                  <label>Choose Size:</label>
-                  <div className="size-options">
-                    {sizes.slice(0, 3).map((size) => (
-                      <button
-                        key={size.id}
-                        onClick={() => handleSizeSelect(size.id)}
-                        className={`size-option ${
-                          selectedSize === size.id ? 'selected' : ''
-                        } ${size.popular ? 'popular' : ''}`}
-                      >
-                        {size.popular && <span className="popular-badge">Popular</span>}
-                        <span className="size-label">{size.label}</span>
-                        <span className="size-price">₹{size.price.toFixed(0)}</span>
-                      </button>
-                    ))}
-                  </div>
-                  {sizes.length > 3 && (
-                    <div className="size-options-row">
-                      {sizes.slice(3).map((size) => (
+                {/* Size Selection - Only show if variants are configured */}
+                {hasVariants && (
+                  <div className="size-selection">
+                    <label>Choose Size:</label>
+                    <div className="size-options">
+                      {variants.slice(0, 3).map((variant) => (
                         <button
-                          key={size.id}
-                          onClick={() => handleSizeSelect(size.id)}
-                          className={`size-option ${selectedSize === size.id ? 'selected' : ''}`}
+                          key={variant.id}
+                          onClick={() => handleSizeSelect(variant.id)}
+                          className={`size-option ${
+                            selectedSize === variant.id ? 'selected' : ''
+                          } ${variant.is_default ? 'popular' : ''}`}
                         >
-                          <span className="size-label">{size.label}</span>
-                          <span className="size-price">₹{size.price.toFixed(0)}</span>
+                          {variant.is_default && <span className="popular-badge">Default</span>}
+                          <span className="size-label">{variant.variant_name}</span>
+                          <span className="size-price">₹{parseFloat(variant.price).toFixed(0)}</span>
                         </button>
                       ))}
                     </div>
-                  )}
-                </div>
+                    {variants.length > 3 && (
+                      <div className="size-options-row">
+                        {variants.slice(3).map((variant) => (
+                          <button
+                            key={variant.id}
+                            onClick={() => handleSizeSelect(variant.id)}
+                            className={`size-option ${selectedSize === variant.id ? 'selected' : ''}`}
+                          >
+                            <span className="size-label">{variant.variant_name}</span>
+                            <span className="size-price">₹{parseFloat(variant.price).toFixed(0)}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 <div className="quantity-selector">
                   <label htmlFor="quantity">Quantity:</label>

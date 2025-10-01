@@ -1481,22 +1481,34 @@ app.get('/api/products', asyncHandler(async (req, res) => {
     const { data: products, error: productsError } = await supabase
         .from('products')
         .select('*');
-    
+
     if (productsError) throw productsError;
 
-    // Fetch wholesale prices for all products
-    const { data: wholesalePrices, error: wholesaleError } = await supabase
-        .from('wholesale_prices')
-        .select('*')
-        .order('quantity', { ascending: true });
+    // Fetch variants and wholesale prices in parallel for efficiency
+    const [variantsResult, wholesalePricesResult] = await Promise.all([
+        supabase
+            .from('product_variants')
+            .select('*')
+            .eq('is_active', true)
+            .order('product_id')
+            .order('display_order', { ascending: true }),
+        supabase
+            .from('wholesale_prices')
+            .select('*')
+            .order('quantity', { ascending: true })
+    ]);
 
-    if (wholesaleError) {
-        logger.warn('Error fetching wholesale prices', {
-            error: wholesaleError
-        });
-        // Continue without wholesale prices if there's an error
-        return res.json(products);
-    }
+    const { data: variants, error: variantsError } = variantsResult;
+    const { data: wholesalePrices, error: wholesaleError } = wholesalePricesResult;
+
+    // Group variants by product_id
+    const variantsByProduct = {};
+    variants?.forEach(variant => {
+        if (!variantsByProduct[variant.product_id]) {
+            variantsByProduct[variant.product_id] = [];
+        }
+        variantsByProduct[variant.product_id].push(variant);
+    });
 
     // Group wholesale prices by product_id
     const wholesalePricesByProduct = {};
@@ -1507,57 +1519,63 @@ app.get('/api/products', asyncHandler(async (req, res) => {
         wholesalePricesByProduct[wp.product_id].push(wp);
     });
 
-    // Attach wholesale prices to products
-    const productsWithWholesale = products.map(product => ({
+    // Attach variants and wholesale prices to products
+    const productsWithData = products.map(product => ({
         ...product,
+        variants: variantsByProduct[product.id] || [],
         wholesale_prices: wholesalePricesByProduct[product.id] || []
     }));
 
     logger.info('Products retrieved successfully', {
-        productCount: productsWithWholesale?.length
+        productCount: productsWithData?.length,
+        variantCount: variants?.length || 0
     });
 
-    res.json(productsWithWholesale);
+    res.json(productsWithData);
 }));
 
 app.get('/api/products/:id', asyncHandler(async (req, res) => {
     const { id } = req.params;
-    
+
     const { data: product, error: productError } = await supabase
         .from('products')
         .select('*')
         .eq('id', id)
         .single();
-    
+
     if (productError) throw productError;
     if (!product) return res.status(404).json({ message: 'Product not found' });
 
-    // Fetch wholesale prices for this product
-    const { data: wholesalePrices, error: wholesaleError } = await supabase
-        .from('wholesale_prices')
-        .select('*')
-        .eq('product_id', id)
-        .order('quantity', { ascending: true });
+    // Fetch variants and wholesale prices in parallel for efficiency
+    const [variantsResult, wholesalePricesResult] = await Promise.all([
+        supabase
+            .from('product_variants')
+            .select('*')
+            .eq('product_id', id)
+            .eq('is_active', true)
+            .order('display_order', { ascending: true }),
+        supabase
+            .from('wholesale_prices')
+            .select('*')
+            .eq('product_id', id)
+            .order('quantity', { ascending: true })
+    ]);
 
-    if (wholesaleError) {
-        logger.warn('Error fetching wholesale prices', {
-            productId: id,
-            error: wholesaleError
-        });
-        // Continue without wholesale prices if there's an error
-        return res.json(product);
-    }
+    const { data: variants, error: variantsError } = variantsResult;
+    const { data: wholesalePrices, error: wholesaleError } = wholesalePricesResult;
 
-    const productWithWholesale = {
+    const productWithData = {
         ...product,
+        variants: variants || [],
         wholesale_prices: wholesalePrices || []
     };
 
     logger.info('Product retrieved successfully', {
-        productId: id
+        productId: id,
+        variantCount: variants?.length || 0
     });
 
-    res.json(productWithWholesale);
+    res.json(productWithData);
 }));
 
 app.get('/api/products/category/:category_name', async (req, res) => {
@@ -1607,10 +1625,141 @@ app.get('/api/admin/products', roleMiddleware.requirePermission(roleMiddleware.A
     }
 });
 
+// Product Variants Routes
+app.get('/api/admin/products/:id/variants', authenticateAdmin, asyncHandler(async (req, res) => {
+    const { id } = req.params;
+
+    const { data, error } = await supabase
+        .from('product_variants')
+        .select('*')
+        .eq('product_id', id)
+        .order('display_order', { ascending: true });
+
+    if (error) throw error;
+
+    logger.info('Product variants retrieved', {
+        userId: req.user?.id,
+        productId: id,
+        variantCount: data?.length || 0
+    });
+
+    res.json(data || []);
+}));
+
+app.post('/api/admin/products/:id/variants', authenticateAdmin, asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const { variants } = req.body;
+
+    if (!Array.isArray(variants)) {
+        return res.status(400).json({ error: 'Variants must be an array' });
+    }
+
+    // Delete existing variants
+    await supabase
+        .from('product_variants')
+        .delete()
+        .eq('product_id', id);
+
+    // Insert new variants if provided
+    if (variants.length > 0) {
+        const variantData = variants.map((variant, index) => ({
+            product_id: id,
+            variant_name: variant.variant_name,
+            size_value: parseFloat(variant.size_value),
+            size_unit: variant.size_unit,
+            price: parseFloat(variant.price),
+            sku: variant.sku || null,
+            is_active: variant.is_active !== undefined ? variant.is_active : true,
+            is_default: variant.is_default || false,
+            display_order: variant.display_order !== undefined ? variant.display_order : index
+        }));
+
+        const { data, error } = await supabase
+            .from('product_variants')
+            .insert(variantData)
+            .select();
+
+        if (error) throw error;
+
+        // Log admin action
+        await supabase.from('admin_logs').insert([{
+            admin_id: req.user.id,
+            action: 'UPDATE_PRODUCT_VARIANTS',
+            entity_type: 'product',
+            entity_id: id,
+            details: { variant_count: variantData.length }
+        }]);
+
+        logger.info('Product variants updated', {
+            userId: req.user?.id,
+            productId: id,
+            variantCount: variantData.length
+        });
+
+        return res.json(data);
+    }
+
+    res.json([]);
+}));
+
+app.put('/api/admin/products/:productId/variants/:variantId', authenticateAdmin, asyncHandler(async (req, res) => {
+    const { productId, variantId } = req.params;
+    const variantUpdates = req.body;
+
+    // Ensure we're only updating fields that should be updateable
+    const allowedFields = ['variant_name', 'size_value', 'size_unit', 'price', 'sku', 'is_active', 'is_default', 'display_order'];
+    const updates = {};
+    allowedFields.forEach(field => {
+        if (variantUpdates[field] !== undefined) {
+            updates[field] = variantUpdates[field];
+        }
+    });
+
+    updates.updated_at = new Date().toISOString();
+
+    const { data, error } = await supabase
+        .from('product_variants')
+        .update(updates)
+        .eq('id', variantId)
+        .eq('product_id', productId)
+        .select()
+        .single();
+
+    if (error) throw error;
+
+    logger.info('Product variant updated', {
+        userId: req.user?.id,
+        productId,
+        variantId
+    });
+
+    res.json(data);
+}));
+
+app.delete('/api/admin/products/:productId/variants/:variantId', authenticateAdmin, asyncHandler(async (req, res) => {
+    const { productId, variantId } = req.params;
+
+    const { error } = await supabase
+        .from('product_variants')
+        .delete()
+        .eq('id', variantId)
+        .eq('product_id', productId);
+
+    if (error) throw error;
+
+    logger.info('Product variant deleted', {
+        userId: req.user?.id,
+        productId,
+        variantId
+    });
+
+    res.json({ message: 'Variant deleted successfully' });
+}));
+
 // Wholesale Prices Routes
 app.get('/api/admin/products/:id/wholesale-prices', authenticateAdmin, async (req, res) => {
     const { id } = req.params;
-    
+
     try {
         const { data, error } = await supabase
             .from('wholesale_prices')
@@ -3267,10 +3416,13 @@ app.post('/api/admin/party-payments', roleMiddleware.requirePermission(roleMiddl
                 payment_type,
                 amount: parseFloat(amount),
                 payment_date,
-                reference_number: reference_number || null,
+                payment_method: transaction_type_id,
+                reference_number: transaction_fields?.reference_number ||
+                                 transaction_fields?.cheque_number ||
+                                 reference_number || null,
+                release_date: transaction_type_id === 'cheque' ?
+                             (transaction_fields?.release_date || null) : null,
                 notes: notes || null,
-                transaction_type_id,
-                transaction_fields: transaction_fields || {},
                 created_by: req.user.id
             }])
             .select(`

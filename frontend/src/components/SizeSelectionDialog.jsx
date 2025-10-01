@@ -21,32 +21,44 @@ const SizeSelectionDialog = ({ isOpen, onClose, product, onAddToCart }) => {
   const { addToCart } = useCart();
   const { primaryImage } = useProductImage(product?.id, product?.image_url);
 
-  const sizes = [
-    { id: '250g', label: '250g', price: product?.price || 0, popular: false },
-    { id: '500g', label: '500g', price: product?.price ? product.price * 1.8 : 0, popular: true },
-    { id: '1kg', label: '1kg', price: product?.price ? product.price * 3.5 : 0, popular: false },
-    { id: '2kg', label: '2kg', price: product?.price ? product.price * 6.8 : 0, popular: false },
-    { id: '5kg', label: '5kg', price: product?.price ? product.price * 16 : 0, popular: false }
-  ];
+  // Use dynamic variants from product - only show if variants are configured
+  const sizes = React.useMemo(() => {
+    if (product?.variants && product.variants.length > 0) {
+      // Use configured variants from database
+      return product.variants.map(variant => ({
+        id: variant.id,
+        label: variant.variant_name,
+        price: parseFloat(variant.price),
+        popular: variant.is_default,
+        size_value: variant.size_value,
+        size_unit: variant.size_unit
+      }));
+    }
+    // No variants configured - return empty array
+    return [];
+  }, [product]);
 
   useEffect(() => {
     if (isOpen && sizes.length > 0) {
-      // Default to the popular option or first option
+      // Default to the popular/default option or first option
       const defaultSize = sizes.find(size => size.popular) || sizes[0];
       setSelectedSize(defaultSize.id);
       setQuantity(1);
     }
-  }, [isOpen]);
+  }, [isOpen, sizes]);
 
   const handleAddToCart = async () => {
     if (!selectedSize || !product) return;
 
     setIsAdding(true);
-    
+
     const selectedSizeData = sizes.find(size => size.id === selectedSize);
     const productWithSize = {
       ...product,
-      size: selectedSize,
+      size: selectedSizeData.label,
+      size_value: selectedSizeData.size_value,
+      size_unit: selectedSizeData.size_unit,
+      variant_id: selectedSizeData.id,
       price: selectedSizeData.price,
       originalId: product.id,
       id: `${product.id}-${selectedSize}`,
@@ -74,6 +86,9 @@ const SizeSelectionDialog = ({ isOpen, onClose, product, onAddToCart }) => {
 
   const selectedSizeData = sizes.find(size => size.id === selectedSize);
   const totalPrice = selectedSizeData ? selectedSizeData.price * quantity : 0;
+
+  // Don't show dialog if no variants configured
+  if (!isOpen || sizes.length === 0) return null;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>

@@ -9,6 +9,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { cn } from '../../../lib/utils';
 import { useApiSearch } from '../../../hooks/useApiSearch';
+import AddVendorModal from './AddVendorModal';
 
 const PartySelector = ({ 
   selectedParty, 
@@ -20,8 +21,11 @@ const PartySelector = ({
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const dropdownRef = useRef(null);
   const searchInputRef = useRef(null);
+
+  const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
   // Use API search for parties
   const { 
@@ -68,6 +72,28 @@ const PartySelector = ({
   const handleClearSelection = () => {
     onPartyChange(null);
     setSearchTerm('');
+  };
+
+  const handleOpenModal = () => {
+    setIsModalOpen(true);
+    setIsOpen(false); // Close the dropdown
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+  };
+
+  const handleVendorAdded = (vendor) => {
+    // Refresh search results by clearing and re-setting search term
+    // This will trigger the useApiSearch hook to refetch data
+    const currentSearch = searchTerm;
+    setSearchTerm('');
+    setTimeout(() => setSearchTerm(currentSearch), 100);
+
+    // Auto-select the newly added vendor if it matches the search
+    if (vendor && vendor.name.toLowerCase().includes(searchTerm.toLowerCase())) {
+      handlePartySelect(vendor);
+    }
   };
 
   const formatCurrency = (amount) => {
@@ -255,11 +281,7 @@ const PartySelector = ({
               <button
                 type="button"
                 className="w-full text-left px-3 py-2 text-sm text-primary hover:bg-primary/10 rounded-lg transition-colors"
-                onClick={() => {
-                  // This could trigger a modal to add a new party
-                  // Add new party functionality
-                  setIsOpen(false);
-                }}
+                onClick={handleOpenModal}
               >
                 + Add new party "{searchTerm}"
               </button>
@@ -267,6 +289,16 @@ const PartySelector = ({
           )}
         </div>
       )}
+
+      {/* AddVendorModal for adding new vendors */}
+      <AddVendorModal
+        isOpen={isModalOpen}
+        onClose={handleCloseModal}
+        onVendorAdded={handleVendorAdded}
+        defaultName={searchTerm}
+        mode="add"
+        apiBaseUrl={API_BASE_URL}
+      />
     </div>
   );
 };

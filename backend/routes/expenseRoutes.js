@@ -117,7 +117,6 @@ router.post('/',
           total_amount,
           description,
           transaction_date,
-          payment_method,
           notes,
           status,
           expense_category,
@@ -446,10 +445,13 @@ router.get('/history',
 
     const offset = (parseInt(page) - 1) * parseInt(limit);
 
-    // Build query
+    // Build query with payment details from party_payments
     let query = supabase
       .from('unified_transactions')
-      .select('*', { count: 'exact' })
+      .select(`
+        *,
+        payment:party_payments(payment_method, reference_number, release_date)
+      `, { count: 'exact' })
       .eq('transaction_type', 'expense')
       .order('transaction_date', { ascending: false })
       .order('created_at', { ascending: false });
@@ -463,9 +465,7 @@ router.get('/history',
       query = query.eq('expense_category', category);
     }
 
-    if (payment_method) {
-      query = query.contains('payment_method', { type: payment_method });
-    }
+    // Note: payment_method filtering done client-side after fetch (see below)
 
     if (start_date) {
       query = query.gte('transaction_date', start_date);
@@ -490,19 +490,28 @@ router.get('/history',
 
     if (error) throw error;
 
+    // Filter by payment method client-side if specified
+    let filteredExpenses = expenses || [];
+    if (payment_method && filteredExpenses.length > 0) {
+      filteredExpenses = filteredExpenses.filter(expense =>
+        expense.payment?.payment_method === payment_method
+      );
+    }
+
     logger.info('Expense history retrieved', {
       user_id: req.user?.id,
       page: parseInt(page),
       total_count: count,
+      filtered_count: filteredExpenses.length,
       filters: { search, category, payment_method, start_date, end_date, min_amount, max_amount }
     });
 
     sendSuccess(res, {
-      expenses: expenses || [],
-      total: count || 0,
+      expenses: filteredExpenses,
+      total: filteredExpenses.length,
       page: parseInt(page),
       limit: parseInt(limit),
-      totalPages: Math.ceil((count || 0) / parseInt(limit))
+      totalPages: Math.ceil(filteredExpenses.length / parseInt(limit))
     }, 'Expense history retrieved successfully');
   }));
 
@@ -523,7 +532,10 @@ router.get('/export',
     // Build query (without pagination for export)
     let query = supabase
       .from('unified_transactions')
-      .select('*')
+      .select(`
+        *,
+        payment:party_payments(payment_method, reference_number, release_date)
+      `)
       .eq('transaction_type', 'expense')
       .order('transaction_date', { ascending: false })
       .order('created_at', { ascending: false });
@@ -537,9 +549,7 @@ router.get('/export',
       query = query.eq('expense_category', category);
     }
 
-    if (payment_method) {
-      query = query.contains('payment_method', { type: payment_method });
-    }
+    // Note: payment_method filtering done client-side after fetch (see below)
 
     if (start_date) {
       query = query.gte('transaction_date', start_date);
@@ -561,6 +571,14 @@ router.get('/export',
 
     if (error) throw error;
 
+    // Filter by payment method client-side if specified
+    let filteredExpenses = expenses || [];
+    if (payment_method && filteredExpenses.length > 0) {
+      filteredExpenses = filteredExpenses.filter(expense =>
+        expense.payment?.payment_method === payment_method
+      );
+    }
+
     // Create Excel workbook
     const ExcelJS = require('exceljs');
     const workbook = new ExcelJS.Workbook();
@@ -580,14 +598,14 @@ router.get('/export',
     ];
 
     // Add data rows
-    expenses.forEach(expense => {
+    filteredExpenses.forEach(expense => {
       worksheet.addRow({
         transaction_date: expense.transaction_date,
         reference_number: expense.reference_number || '',
         description: expense.description,
         expense_category: expense.expense_category,
         total_amount: parseFloat(expense.total_amount) || 0,
-        payment_method: expense.payment_method?.type || 'Unknown',
+        payment_method: expense.payment?.payment_method || 'Unknown',
         status: expense.status || 'completed',
         notes: expense.notes || '',
         created_at: new Date(expense.created_at).toLocaleString()
@@ -611,7 +629,7 @@ router.get('/export',
 
     logger.info('Expenses exported', {
       user_id: req.user?.id,
-      record_count: expenses.length,
+      record_count: filteredExpenses.length,
       filters: { search, category, payment_method, start_date, end_date }
     });
 
@@ -705,6 +723,86 @@ router.get('/:id',
     });
 
     sendSuccess(res, transaction, 'Transaction retrieved successfully');
+  }));
+
+// Get upcoming cheque clearances
+router.get('/cheques/upcoming',
+  roleMiddleware.requirePermission(roleMiddleware.ADMIN_PERMISSIONS.VIEW_EXPENSES),
+  asyncHandler(async (req, res) => {
+    const { days = 7 } = req.query;
+
+    const { data: cheques, error } = await supabase
+      .rpc('get_cheques_due_in_days', { days_ahead: parseInt(days) });
+
+    if (error) throw error;
+
+    logger.info('Upcoming cheques retrieved', {
+      user_id: req.user?.id,
+      days_ahead: days,
+      count: cheques?.length || 0
+    });
+
+    sendSuccess(res, {
+      cheques: cheques || [],
+      days_ahead: parseInt(days),
+      total_count: cheques?.length || 0,
+      total_amount: cheques?.reduce((sum, c) => sum + parseFloat(c.amount || 0), 0) || 0
+    }, 'Upcoming cheques retrieved successfully');
+  }));
+
+// Get all cheques with filtering
+router.get('/cheques',
+  roleMiddleware.requirePermission(roleMiddleware.ADMIN_PERMISSIONS.VIEW_EXPENSES),
+  asyncHandler(async (req, res) => {
+    const {
+      start_date,
+      end_date,
+      party_id,
+      status = 'all' // 'all', 'pending', 'cleared'
+    } = req.query;
+
+    let query = supabase
+      .from('party_payments')
+      .select(`
+        *,
+        party:party_id(id, name, contact_person)
+      `)
+      .eq('payment_method', 'cheque')
+      .order('release_date', { ascending: true });
+
+    if (start_date) {
+      query = query.gte('release_date', start_date);
+    }
+
+    if (end_date) {
+      query = query.lte('release_date', end_date);
+    }
+
+    if (party_id) {
+      query = query.eq('party_id', party_id);
+    }
+
+    if (status === 'pending') {
+      query = query.gte('release_date', new Date().toISOString().split('T')[0]);
+    } else if (status === 'cleared') {
+      query = query.lt('release_date', new Date().toISOString().split('T')[0]);
+    }
+
+    const { data: cheques, error } = await query;
+
+    if (error) throw error;
+
+    logger.info('Cheques retrieved', {
+      user_id: req.user?.id,
+      filters: { start_date, end_date, party_id, status },
+      count: cheques?.length || 0
+    });
+
+    sendSuccess(res, {
+      cheques: cheques || [],
+      total_count: cheques?.length || 0,
+      total_amount: cheques?.reduce((sum, c) => sum + parseFloat(c.amount || 0), 0) || 0
+    }, 'Cheques retrieved successfully');
   }));
 
 // Helper function: Validate expense transaction
@@ -801,10 +899,32 @@ function validateTransactionFields(type, fields) {
 
 // Helper function: Process quick expense
 async function processQuickExpense(data) {
-  const category = data.party?.party_type === 'vendor' ? 'Vendor Payment' : 
-                  data.party?.party_type === 'employee' ? 'Employee Payout' : 
+  const category = data.party?.party_type === 'vendor' ? 'Vendor Payment' :
+                  data.party?.party_type === 'employee' ? 'Employee Payout' :
                   'Miscellaneous';
 
+  // First create party_payment record for payment tracking
+  const { data: payment, error: paymentError } = await supabase
+    .from('party_payments')
+    .insert({
+      party_id: data.party?.party_id || null,
+      payment_type: 'payment',
+      amount: data.total_amount,
+      payment_date: data.transaction_date,
+      payment_method: data.payment_method.type,
+      reference_number: data.payment_method.details?.reference_number ||
+                       data.payment_method.details?.cheque_number || null,
+      release_date: data.payment_method.type === 'cheque' ?
+                   (data.payment_method.details?.release_date || null) : null,
+      notes: data.notes,
+      created_by: data.created_by
+    })
+    .select()
+    .single();
+
+  if (paymentError) throw paymentError;
+
+  // Then create expense record referencing the payment
   const { data: expense, error } = await supabase
     .from('expenses')
     .insert({
@@ -813,8 +933,7 @@ async function processQuickExpense(data) {
       category: category,
       vendor_id: data.party?.party_type === 'vendor' ? data.party.party_id : null,
       employee_id: data.party?.party_type === 'employee' ? data.party.party_id : null,
-      transaction_type_id: data.payment_method.type,
-      transaction_fields: data.payment_method.details || {},
+      party_payment_id: payment.id,
       expense_date: data.transaction_date,
       notes: data.notes,
       created_by: data.created_by
@@ -823,7 +942,7 @@ async function processQuickExpense(data) {
     .single();
 
   if (error) throw error;
-  return { expense_id: expense.id };
+  return { expense_id: expense.id, party_payment_id: payment.id };
 }
 
 // Helper function: Process vendor order
@@ -902,10 +1021,13 @@ async function processVendorPayment(data) {
       payment_type: 'payment', // This is a debit transaction for the vendor
       amount: data.total_amount,
       payment_date: data.transaction_date,
-      transaction_type_id: data.payment_method.type,
-      transaction_fields: data.payment_method.details || {},
+      payment_method: data.payment_method.type,
+      reference_number: data.payment_method.details?.reference_number ||
+                       data.payment_method.details?.cheque_number ||
+                       data.reference_number || null,
+      release_date: data.payment_method.type === 'cheque' ?
+                   (data.payment_method.details?.release_date || null) : null,
       notes: `${data.description}${data.notes ? ' | ' + data.notes : ''}`,
-      reference_number: data.reference_number,
       created_by: data.created_by
     })
     .select()
@@ -937,14 +1059,35 @@ async function processVendorPayment(data) {
 
 // Helper function: Process other expense
 async function processOtherExpense(data) {
+  // First create party_payment record for payment tracking
+  const { data: payment, error: paymentError } = await supabase
+    .from('party_payments')
+    .insert({
+      party_id: null, // No party for miscellaneous expenses
+      payment_type: 'payment',
+      amount: data.total_amount,
+      payment_date: data.transaction_date,
+      payment_method: data.payment_method.type,
+      reference_number: data.payment_method.details?.reference_number ||
+                       data.payment_method.details?.cheque_number || null,
+      release_date: data.payment_method.type === 'cheque' ?
+                   (data.payment_method.details?.release_date || null) : null,
+      notes: data.notes,
+      created_by: data.created_by
+    })
+    .select()
+    .single();
+
+  if (paymentError) throw paymentError;
+
+  // Then create expense record referencing the payment
   const { data: expense, error } = await supabase
     .from('expenses')
     .insert({
       amount: data.total_amount,
       description: data.description,
       category: 'Miscellaneous',
-      transaction_type_id: data.payment_method.type,
-      transaction_fields: data.payment_method.details || {},
+      party_payment_id: payment.id,
       expense_date: data.transaction_date,
       notes: data.notes,
       created_by: data.created_by
@@ -953,7 +1096,7 @@ async function processOtherExpense(data) {
     .single();
 
   if (error) throw error;
-  return { expense_id: expense.id };
+  return { expense_id: expense.id, party_payment_id: payment.id };
 }
 
 // Helper function: Process attachments
@@ -995,7 +1138,7 @@ function getTransactionSchema(type) {
         required: ['items'],
         optional: ['expected_delivery_date', 'payment_terms', 'priority'],
         items_min: 1,
-        items_max: 10
+        items_max: 1000
       },
       regular_expense_specific: {
         required: ['total_amount'],
@@ -1111,48 +1254,16 @@ async function processVendorOrderExpense(data) {
 
   if (itemsError) throw itemsError;
 
-  // Create party payment entry to track the debt to vendor (only if no payment made immediately)
-  if (!data.payment_method || !data.payment_method.type) {
-    // No immediate payment - create credit entry for vendor (money owed to vendor)
-    const { data: partyPayment, error: paymentError } = await supabase
-      .from('party_payments')
-      .insert({
-        party_id: primaryVendorId,
-        payment_type: 'adjustment', // This creates a credit adjustment for the vendor (we owe them money)
-        amount: finalAmount,
-        payment_date: data.transaction_date,
-        transaction_type_id: 'vendor_order',
-        transaction_fields: {},
-        notes: `Purchase Order: ${data.description}${data.notes ? ' | ' + data.notes : ''}`,
-        reference_number: poNumber,
-        created_by: data.created_by
-      })
-      .select()
-      .single();
+  // If immediate payment was made, create a payment entry
+  // Note: We do NOT create adjustment entries for purchase orders - the purchase_orders table itself tracks the debt
+  const hasValidPaymentMethod = data.payment_method &&
+                                data.payment_method.type !== null &&
+                                data.payment_method.type !== undefined &&
+                                typeof data.payment_method.type === 'string' &&
+                                data.payment_method.type.trim() !== '' &&
+                                data.payment_method.type !== 'none';
 
-    if (paymentError) throw paymentError;
-  } else {
-    // Immediate payment made - create both credit (purchase) and debit (payment) entries
-    // First create the purchase credit
-    const { data: purchaseCredit, error: creditError } = await supabase
-      .from('party_payments')
-      .insert({
-        party_id: primaryVendorId,
-        payment_type: 'adjustment',
-        amount: finalAmount,
-        payment_date: data.transaction_date,
-        transaction_type_id: 'vendor_order',
-        transaction_fields: {},
-        notes: `Purchase Order: ${data.description}${data.notes ? ' | ' + data.notes : ''}`,
-        reference_number: poNumber,
-        created_by: data.created_by
-      })
-      .select()
-      .single();
-
-    if (creditError) throw creditError;
-
-    // Then create the payment debit
+  if (hasValidPaymentMethod) {
     const { data: paymentDebit, error: debitError } = await supabase
       .from('party_payments')
       .insert({
@@ -1160,10 +1271,12 @@ async function processVendorOrderExpense(data) {
         payment_type: 'payment',
         amount: finalAmount,
         payment_date: data.transaction_date,
-        transaction_type_id: data.payment_method.type,
-        transaction_fields: data.payment_method.details || {},
+        payment_method: data.payment_method.type,
+        reference_number: data.payment_method.details?.reference_number ||
+                         data.payment_method.details?.cheque_number || poNumber,
+        release_date: data.payment_method.type === 'cheque' ?
+                     (data.payment_method.details?.release_date || null) : null,
         notes: `Payment for PO: ${poNumber} - ${data.description}`,
-        reference_number: data.payment_method.details?.reference_number || poNumber,
         created_by: data.created_by
       })
       .select()
@@ -1198,6 +1311,29 @@ async function processVendorOrderExpense(data) {
 
 // New Helper function: Process regular expense (simplified structure)
 async function processRegularExpense(data) {
+  // First create party_payment record for payment tracking
+  const { data: payment, error: paymentError } = await supabase
+    .from('party_payments')
+    .insert({
+      party_id: data.party?.id || null,
+      payment_type: 'payment',
+      amount: data.total_amount,
+      payment_date: data.transaction_date,
+      payment_method: data.payment_method.type || 'cash',
+      reference_number: data.payment_method.details?.reference_number ||
+                       data.payment_method.details?.cheque_number ||
+                       data.reference_number || null,
+      release_date: data.payment_method.type === 'cheque' ?
+                   (data.payment_method.details?.release_date || null) : null,
+      notes: data.notes,
+      created_by: data.created_by
+    })
+    .select()
+    .single();
+
+  if (paymentError) throw paymentError;
+
+  // Then create expense record referencing the payment
   const { data: expense, error } = await supabase
     .from('expenses')
     .insert({
@@ -1205,11 +1341,9 @@ async function processRegularExpense(data) {
       description: data.description,
       category: data.expense_category,
       vendor_id: data.party?.id || null,
-      transaction_type_id: data.payment_method.type || 'cash',
-      transaction_fields: data.payment_method.details || {},
+      party_payment_id: payment.id,
       expense_date: data.transaction_date,
       notes: data.notes,
-      reference_number: data.reference_number,
       created_by: data.created_by
     })
     .select()
@@ -1235,8 +1369,9 @@ async function processRegularExpense(data) {
     }
   }
 
-  return { 
+  return {
     expense_id: expense.id,
+    party_payment_id: payment.id,
     party_id: data.party?.id || null
   };
 }
@@ -1288,10 +1423,17 @@ async function validateSimplifiedExpenseTransaction(data) {
     }
     
     // For vendor orders, payment method is optional
-    if (data.payment_method && data.payment_method.type) {
+    const hasValidPaymentMethod = data.payment_method &&
+                                  data.payment_method.type !== null &&
+                                  data.payment_method.type !== undefined &&
+                                  typeof data.payment_method.type === 'string' &&
+                                  data.payment_method.type.trim() !== '' &&
+                                  data.payment_method.type !== 'none';
+
+    if (hasValidPaymentMethod) {
       // Validate payment method only if provided
       const paymentValidation = validateTxnFields(
-        data.payment_method.type, 
+        data.payment_method.type,
         data.payment_method.details || {}
       );
       if (!paymentValidation.isValid) {
@@ -1325,14 +1467,23 @@ async function validateSimplifiedExpenseTransaction(data) {
   }
   
   // Validate payment method for non-vendor-order transactions
-  if (data.expense_category !== 'Vendor Order' && data.payment_method && data.payment_method.type) {
-    const paymentValidation = validateTxnFields(
-      data.payment_method.type, 
-      data.payment_method.details || {}
-    );
-    if (!paymentValidation.isValid) {
-      errors.payment_method = paymentValidation.errors;
-      isValid = false;
+  if (data.expense_category !== 'Vendor Order') {
+    const hasValidPaymentMethod = data.payment_method &&
+                                  data.payment_method.type !== null &&
+                                  data.payment_method.type !== undefined &&
+                                  typeof data.payment_method.type === 'string' &&
+                                  data.payment_method.type.trim() !== '' &&
+                                  data.payment_method.type !== 'none';
+
+    if (hasValidPaymentMethod) {
+      const paymentValidation = validateTxnFields(
+        data.payment_method.type,
+        data.payment_method.details || {}
+      );
+      if (!paymentValidation.isValid) {
+        errors.payment_method = paymentValidation.errors;
+        isValid = false;
+      }
     }
   }
 

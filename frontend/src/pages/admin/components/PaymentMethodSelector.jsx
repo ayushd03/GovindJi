@@ -1,28 +1,32 @@
 import React from 'react';
 import StaticTransactionTypeSelector from '../../../components/StaticTransactionTypeSelector';
 
-const PaymentMethodSelector = ({ 
-  paymentMethod, 
-  onPaymentMethodChange, 
+const PaymentMethodSelector = ({
+  paymentMethod,
+  onPaymentMethodChange,
   errors = {},
   className = "",
-  required = true 
+  required = true
 }) => {
   const handleTypeChange = (typeId) => {
-    onPaymentMethodChange({
-      type: typeId,
-      details: {}
-    });
+    // Only reset details if changing to a different payment type
+    // Preserve details if clicking the same type again
+    if (paymentMethod?.type !== typeId) {
+      onPaymentMethodChange({
+        type: typeId,
+        details: {}
+      });
+    }
   };
 
   const handleFieldChange = (fieldName, value) => {
-    onPaymentMethodChange(prev => ({
-      ...prev,
+    onPaymentMethodChange({
+      type: paymentMethod?.type,
       details: {
-        ...prev.details,
+        ...(paymentMethod?.details || {}),
         [fieldName]: value
       }
-    }));
+    });
   };
 
   return (
