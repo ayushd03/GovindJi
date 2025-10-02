@@ -6,7 +6,7 @@ import {
   ArrowPathIcon
 } from '@heroicons/react/24/outline';
 import { cn } from '../../../lib/utils';
-import { useApiSearch } from '../../../hooks/useApiSearch';
+import { useApiSearch, prefetchApiSearch } from '../../../hooks/useApiSearch';
 import AddProductModal from './AddProductModal';
 
 const ProductSelector = ({ 
@@ -25,11 +25,23 @@ const ProductSelector = ({
 
   const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
+  // Prefetch initial product list on mount for instant dropdown open
+  useEffect(() => {
+    prefetchApiSearch('/api/admin/expenses/search/products', {
+      limit: 20,
+      filters: categoryId ? { category_id: categoryId } : {}
+    }).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [categoryId]);
+
   // Use API search for products
   const {
     results: searchResults,
     loading,
-    error: searchError
+    error: searchError,
+    hasMore,
+    loadMore,
+    loadingMore
   } = useApiSearch(
     '/api/admin/expenses/search/products',
     searchTerm,
@@ -115,19 +127,19 @@ const ProductSelector = ({
       {/* Selected Product Display / Search Input */}
       <div
         className={cn(
-          "w-full px-3 py-2 border rounded-lg cursor-pointer transition-colors",
+          "w-full px-2 py-1.5 border rounded-md cursor-pointer transition-colors text-sm",
           "focus-within:outline-none focus-within:ring-2 focus-within:ring-primary",
           error ? "border-red-500" : "border-border hover:border-primary/50",
           isOpen && "ring-2 ring-primary"
         )}
         onClick={() => setIsOpen(!isOpen)}
       >
-        <div className="flex items-center space-x-3">
-          <MagnifyingGlassIcon className="w-5 h-5 text-muted-foreground flex-shrink-0" />
+        <div className="flex items-center space-x-2">
+          <MagnifyingGlassIcon className="w-4 h-4 text-muted-foreground flex-shrink-0" />
           <input
             ref={searchInputRef}
             type="text"
-            className="flex-1 bg-transparent outline-none"
+            className="flex-1 bg-transparent outline-none placeholder:text-muted-foreground"
             placeholder={selectedProduct ? selectedProduct.name : placeholder}
             value={isOpen ? searchTerm : (selectedProduct?.name || '')}
             onChange={(e) => {
@@ -136,26 +148,24 @@ const ProductSelector = ({
             }}
             onFocus={() => setIsOpen(true)}
           />
-          <div className="flex items-center space-x-2">
-            {selectedProduct && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleClearSelection();
-                }}
-                className="text-muted-foreground hover:text-foreground p-1"
-              >
-                ×
-              </button>
-            )}
-            <ChevronDownIcon 
-              className={cn(
-                "w-4 h-4 text-muted-foreground transition-transform",
-                isOpen && "transform rotate-180"
-              )} 
-            />
-          </div>
+          {selectedProduct && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleClearSelection();
+              }}
+              className="text-muted-foreground hover:text-foreground p-1"
+            >
+              ×
+            </button>
+          )}
+          <ChevronDownIcon 
+            className={cn(
+              "w-4 h-4 text-muted-foreground transition-transform",
+              isOpen && "transform rotate-180"
+            )} 
+          />
         </div>
       </div>
 
@@ -166,7 +176,7 @@ const ProductSelector = ({
 
       {/* Dropdown */}
       {isOpen && (
-        <div className="absolute z-10 w-full mt-1 bg-card border border-border rounded-lg shadow-lg max-h-60 overflow-hidden">
+        <div className="absolute z-10 w-full mt-1 bg-card border border-border rounded-md shadow-lg max-h-72 overflow-hidden">
           {/* Loading state */}
           {loading && (
             <div className="p-4 flex items-center justify-center">
@@ -182,42 +192,52 @@ const ProductSelector = ({
             </div>
           )}
 
-          {/* Products list */}
-          <div className="max-h-60 overflow-y-auto">
+          {/* Products list with infinite scroll */}
+          <div 
+            className="max-h-60 overflow-y-auto"
+            onScroll={(e) => {
+              const el = e.currentTarget;
+              if (el.scrollTop + el.clientHeight >= el.scrollHeight - 20) {
+                if (hasMore && !loading && !loadingMore) {
+                  loadMore();
+                }
+              }
+            }}
+          >
             {!loading && !searchError && searchResults.length > 0 ? (
               searchResults.map((product) => (
                 <button
                   key={product.id}
                   type="button"
-                  className="w-full px-4 py-3 hover:bg-muted/50 transition-colors text-left border-b border-border last:border-b-0"
+                  className="w-full px-3 py-2 hover:bg-muted/50 transition-colors text-left border-b border-border last:border-b-0 text-sm"
                   onClick={() => handleProductSelect(product)}
                 >
                   <div className="flex items-center space-x-3">
-                    <CubeIcon className="w-5 h-5 text-primary flex-shrink-0" />
+                    <CubeIcon className="w-4 h-4 text-primary flex-shrink-0" />
                     <div className="min-w-0 flex-1">
                       <p className="font-medium text-foreground truncate">{product.name}</p>
-                      <div className="flex items-center space-x-4 mt-1">
+                      <div className="flex items-center space-x-3 mt-0.5 text-xs text-muted-foreground">
                         {product.sku && (
-                          <span className="text-sm text-muted-foreground">
+                          <span>
                             SKU: {product.sku}
                           </span>
                         )}
                         {product.unit && (
-                          <span className="text-sm text-muted-foreground">
+                          <span>
                             Unit: {product.unit}
                           </span>
                         )}
                       </div>
                       
                       {/* Price and description */}
-                      <div className="flex items-center justify-between mt-2">
+                      <div className="flex items-center justify-between mt-1">
                         {product.description && (
                           <p className="text-xs text-muted-foreground truncate flex-1 mr-2">
                             {product.description}
                           </p>
                         )}
                         {product.price !== undefined && (
-                          <span className="text-sm font-medium text-primary">
+                          <span className="text-xs font-medium text-primary">
                             {formatCurrency(product.price)}
                           </span>
                         )}
@@ -233,7 +253,9 @@ const ProductSelector = ({
                 </p>
               </div>
             )}
-
+            {loadingMore && (
+              <div className="p-3 flex items-center justify-center text-xs text-muted-foreground">Loading more…</div>
+            )}
             {/* Removed the "Type to search" message when no search term - now shows all products by default */}
           </div>
 

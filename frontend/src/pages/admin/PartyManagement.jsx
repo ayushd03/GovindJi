@@ -36,6 +36,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/ca
 import { Toaster } from '../../components/ui/toaster';
 import AddVendorModal from './components/AddVendorModal';
 import UnifiedVendorPaymentForm from './components/UnifiedVendorPaymentForm';
+import { 
+  getBalanceTextColor, 
+  getBalancePillColors, 
+  getTransactionRowColors, 
+  getTransactionAmountText, 
+  getTransactionSubText 
+} from '../../utils/financeColors';
 
 const PARTY_CATEGORIES = [
   'Raw Materials',
@@ -772,7 +779,7 @@ const PartyManagement = () => {
                                   <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-secondary/10 text-secondary">{party.gst_type}</span>
                                 )}
                                 {party.current_balance !== 0 && (
-                                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${party.current_balance > 0 ? 'bg-warning/10 text-warning' : 'bg-success/10 text-success'}`}>
+                                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getBalancePillColors(party.current_balance)}`}>
                                     {formatCurrency(party.current_balance)}
                                   </span>
                                 )}
@@ -963,11 +970,7 @@ const PartyManagement = () => {
                     {showVendorDetailsModal.name}
                   </h2>
                   {vendorDetailsTab !== 'balance' && (
-                    <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-                      calculateVendorBalance(showVendorDetailsModal, vendorOrders, vendorPayments) > 0 
-                        ? 'bg-red-100 text-red-800' 
-                        : 'bg-green-100 text-green-800'
-                    }`}>
+                    <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getBalancePillColors(calculateVendorBalance(showVendorDetailsModal, vendorOrders, vendorPayments))}`}>
                       Balance: {formatCurrency(calculateVendorBalance(showVendorDetailsModal, vendorOrders, vendorPayments))}
                     </span>
                   )}
@@ -1110,7 +1113,7 @@ const PartyManagement = () => {
                           <div className="flex items-center justify-between">
                             <div>
                               <p className="text-sm font-medium text-muted-foreground">Total Items Amount</p>
-                              <p className="text-2xl font-bold text-red-600">
+                              <p className={`text-2xl font-bold ${getBalanceTextColor(getTotalItemsValue(vendorOrderItems))}`}>
                                 {formatCurrency(getTotalItemsValue(vendorOrderItems))}
                               </p>
                             </div>
@@ -1124,7 +1127,7 @@ const PartyManagement = () => {
                           <div className="flex items-center justify-between">
                             <div>
                               <p className="text-sm font-medium text-muted-foreground">Total Payments</p>
-                              <p className="text-2xl font-bold text-green-600">
+                              <p className={`text-2xl font-bold ${getBalanceTextColor(-1)}`}>
                                 {formatCurrency(vendorPayments.filter(payment => payment.payment_type === 'payment').reduce((sum, payment) => sum + (payment.amount || 0), 0))}
                               </p>
                             </div>
@@ -1138,19 +1141,11 @@ const PartyManagement = () => {
                           <div className="flex items-center justify-between">
                             <div>
                               <p className="text-sm font-medium text-muted-foreground">Outstanding Balance</p>
-                              <p className={`text-2xl font-bold ${
-                                calculateVendorBalance(showVendorDetailsModal, vendorOrders, vendorPayments) > 0 
-                                  ? 'text-red-600' 
-                                  : 'text-green-600'
-                              }`}>
+                              <p className={`text-2xl font-bold ${getBalanceTextColor(calculateVendorBalance(showVendorDetailsModal, vendorOrders, vendorPayments))}`}>
                                 {formatCurrency(Math.abs(calculateVendorBalance(showVendorDetailsModal, vendorOrders, vendorPayments)))}
                               </p>
                             </div>
-                            <ReceiptPercentIcon className={`w-8 h-8 ${
-                              calculateVendorBalance(showVendorDetailsModal, vendorOrders, vendorPayments) > 0 
-                                ? 'text-red-500' 
-                                : 'text-green-500'
-                            }`} />
+                            <ReceiptPercentIcon className={`w-8 h-8 ${calculateVendorBalance(showVendorDetailsModal, vendorOrders, vendorPayments) > 0 ? 'text-red-500' : 'text-green-500'}`} />
                           </div>
                         </CardContent>
                       </Card>
@@ -1170,11 +1165,7 @@ const PartyManagement = () => {
                         ) : (
                           <div className="space-y-3 relative">
                             {getCombinedTransactionHistory(vendorOrders, vendorPayments).slice(0, 15).map((transaction, index) => (
-                              <div key={transaction.id} className={`flex items-center justify-between p-3 border rounded-lg relative ${
-                                transaction.type === 'po_created' 
-                                  ? 'bg-red-50 border-red-200' 
-                                  : 'bg-green-50 border-green-200'
-                              }`}>
+                              <div key={transaction.id} className={`flex items-center justify-between p-3 border rounded-lg relative ${getTransactionRowColors(transaction.type)}`}>
                                 <div className="flex-1">
                                   <div className="flex items-center gap-2">
                                     <span className="font-medium text-foreground">
@@ -1198,19 +1189,11 @@ const PartyManagement = () => {
                                   </div>
                                 </div>
                                 <div className="text-right">
-                                  <p className={`font-bold ${
-                                    transaction.type === 'po_created' 
-                                      ? 'text-red-600' 
-                                      : 'text-green-600'
-                                  }`}>
+                                  <p className={`font-bold ${getTransactionAmountText(transaction.type)}`}>
                                     {transaction.type === 'po_created' ? '-' : '+'}
                                     {formatCurrency(transaction.amount)}
                                   </p>
-                                  <p className={`text-xs ${
-                                    transaction.type === 'po_created' 
-                                      ? 'text-red-500' 
-                                      : 'text-green-500'
-                                  }`}>
+                                  <p className={`text-xs ${getTransactionSubText(transaction.type)}`}>
                                     {transaction.type === 'po_created' ? 'Amount Due' : 'Payment Made'}
                                   </p>
                                 </div>
