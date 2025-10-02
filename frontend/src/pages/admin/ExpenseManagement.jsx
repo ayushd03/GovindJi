@@ -22,6 +22,7 @@ import { Toaster } from '../../components/ui/toaster';
 
 // Import sub-components
 import ExpenseForm from './components/UnifiedExpenseForm';
+import UnifiedVendorPaymentForm from './components/UnifiedVendorPaymentForm';
 
 // Constants
 const EXPENSE_CATEGORIES = [
@@ -73,6 +74,7 @@ const ExpenseManagement = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [selectedExpense, setSelectedExpense] = useState(null);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
   
   // Filters and search
   const [searchTerm, setSearchTerm] = useState('');
@@ -484,6 +486,7 @@ const ExpenseManagement = () => {
                   <ListBulletIcon className="w-4 h-4 inline mr-1" />
                   List
                 </button>
+                {/* Unified approach: remove separate payment button; use category-driven modal trigger */}
               </div>
             </div>
             
@@ -761,6 +764,8 @@ const ExpenseManagement = () => {
             </div>
           </div>
         )}
+
+        {/* Payment modal removed; vendor payment uses inline category flow */}
 
         <Toaster />
       </div>

@@ -3574,6 +3574,112 @@ app.post('/api/admin/party-payments', roleMiddleware.requirePermission(roleMiddl
     }
 });
 
+// Create multiple party payments in bulk
+app.post('/api/admin/party-payments/bulk', roleMiddleware.requirePermission(roleMiddleware.ADMIN_PERMISSIONS.MANAGE_VENDORS), async (req, res) => {
+    try {
+        const { payments } = req.body || {};
+
+        if (!Array.isArray(payments) || payments.length === 0) {
+            return res.status(400).json({ error: 'payments array is required and must not be empty' });
+        }
+
+        const results = [];
+        const errors = [];
+
+        for (let i = 0; i < payments.length; i++) {
+            const p = payments[i] || {};
+            const {
+                party_id,
+                payment_type = 'payment',
+                amount,
+                payment_date,
+                transaction_type_id,
+                transaction_fields = {},
+                reference_number = null,
+                notes = null
+            } = p;
+
+            // Validate required fields per item
+            if (!party_id || !payment_type || !amount || !payment_date || !transaction_type_id) {
+                errors.push({ index: i, error: 'Missing required fields', fields: ['party_id', 'payment_type', 'amount', 'payment_date', 'transaction_type_id'] });
+                continue;
+            }
+
+            if (!['payment', 'adjustment'].includes(payment_type)) {
+                errors.push({ index: i, error: 'Invalid payment_type. Must be either "payment" or "adjustment"' });
+                continue;
+            }
+
+            if (isNaN(amount) || parseFloat(amount) <= 0) {
+                errors.push({ index: i, error: 'Amount must be a positive number' });
+                continue;
+            }
+
+            if (!validateTransactionTypeId(transaction_type_id)) {
+                errors.push({ index: i, error: 'Invalid transaction type' });
+                continue;
+            }
+
+            const validation = validateTransactionFields(transaction_type_id, transaction_fields || {});
+            if (!validation.isValid) {
+                errors.push({ index: i, error: 'Invalid transaction fields', field_errors: validation.errors });
+                continue;
+            }
+
+            // Insert payment
+            const { data: payment, error: paymentError } = await supabase
+                .from('party_payments')
+                .insert([{
+                    party_id,
+                    payment_type,
+                    amount: parseFloat(amount),
+                    payment_date,
+                    payment_method: transaction_type_id,
+                    reference_number: transaction_fields?.reference_number || transaction_fields?.cheque_number || reference_number || null,
+                    release_date: transaction_type_id === 'cheque' ? (transaction_fields?.release_date || null) : null,
+                    notes: notes || null,
+                    created_by: req.user.id
+                }])
+                .select(`
+                    *,
+                    party:party_id(name, contact_person)
+                `)
+                .single();
+
+            if (paymentError) {
+                errors.push({ index: i, error: paymentError.message });
+                continue;
+            }
+
+            // Attempt to update party balance (best-effort)
+            try {
+                const { data: newBalance, error: balanceError } = await supabase
+                    .rpc('calculate_party_current_balance', { party_id });
+
+                if (!balanceError && newBalance !== null) {
+                    await supabase
+                        .from('parties')
+                        .update({ current_balance: newBalance })
+                        .eq('id', party_id);
+                }
+            } catch (_) {
+                // best-effort, do not fail bulk on balance update issues
+            }
+
+            results.push(payment);
+        }
+
+        return res.status(201).json({
+            message: `Processed ${results.length} payment(s)${errors.length ? ` with ${errors.length} error(s)` : ''}`,
+            created: results,
+            errors
+        });
+    } catch (error) {
+        console.error('Error creating bulk party payments:', error);
+        return res.status(500).json({ error: error.message });
+    }
+});
+
 // ======================================
 // TRANSACTION TYPES API ROUTES (STATIC)
 // ======================================

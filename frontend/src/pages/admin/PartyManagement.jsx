@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useToast } from '../../hooks/useToast';
 import { PermissionGuard } from '../../components/PermissionGuard';
 import { ADMIN_PERMISSIONS } from '../../enums/roles';
@@ -29,11 +29,13 @@ import {
   CheckCircleIcon,
   ArchiveBoxIcon,
   ExclamationTriangleIcon,
+  ArrowPathIcon,
 } from '@heroicons/react/24/outline';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Toaster } from '../../components/ui/toaster';
 import AddVendorModal from './components/AddVendorModal';
+import UnifiedVendorPaymentForm from './components/UnifiedVendorPaymentForm';
 
 const PARTY_CATEGORIES = [
   'Raw Materials',
@@ -96,7 +98,11 @@ const PartyManagement = () => {
   const [vendorOrders, setVendorOrders] = useState([]);
   const [vendorOrderItems, setVendorOrderItems] = useState([]);
   const [vendorPayments, setVendorPayments] = useState([]);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [hoveredPO, setHoveredPO] = useState(null);
+  const [vendorDetailsLoading, setVendorDetailsLoading] = useState(false);
+  const listScrollYRef = useRef(0);
+  const paymentFormRef = useRef(null);
   
   // Removed formData state - now handled by AddVendorModal component
 
@@ -365,24 +371,34 @@ const PartyManagement = () => {
   };
 
   const fetchVendorDetails = async (partyId) => {
+    const vendor = parties.find(p => p.id === partyId);
+    // Immediately show inline details view with loading state
+    setShowVendorDetailsModal(vendor || null);
+    setVendorDetailsTab('orders');
+    setVendorOrders([]);
+    setVendorPayments([]);
+    setVendorOrderItems([]);
+    setVendorDetailsLoading(true);
     try {
       const token = localStorage.getItem('authToken');
-      
-      // Fetch vendor orders (for summary statistics)
-      const ordersResponse = await fetch(`${API_BASE_URL}/api/admin/purchase-orders?party_id=${partyId}&limit=1000`, {
+      const ts = Date.now();
+      const ordersUrl = `${API_BASE_URL}/api/admin/purchase-orders?party_id=${partyId}&limit=1000&__ts=${ts}`;
+      const paymentsUrl = `${API_BASE_URL}/api/admin/party-payments?party_id=${partyId}&limit=1000&__ts=${ts}`;
+
+      const commonOpts = {
+        cache: 'no-store',
         headers: {
           'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
         }
-      });
-      
-      // Fetch vendor payments
-      const paymentsResponse = await fetch(`${API_BASE_URL}/api/admin/party-payments?party_id=${partyId}&limit=1000`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
+      };
+
+      const [ordersResponse, paymentsResponse] = await Promise.all([
+        fetch(ordersUrl, commonOpts),
+        fetch(paymentsUrl, commonOpts)
+      ]);
 
       if (!ordersResponse.ok || !paymentsResponse.ok) {
         throw new Error('Failed to fetch vendor details');
@@ -390,11 +406,11 @@ const PartyManagement = () => {
 
       const ordersData = await ordersResponse.json();
       const paymentsData = await paymentsResponse.json();
-      
+
       const orders = ordersData.purchase_orders || [];
       setVendorOrders(orders);
       setVendorPayments(paymentsData.payments || []);
-      
+
       // Extract all items from all purchase orders
       const allItems = [];
       orders.forEach(order => {
@@ -410,14 +426,17 @@ const PartyManagement = () => {
           });
         }
       });
-      
       setVendorOrderItems(allItems);
-      
-      const vendor = parties.find(p => p.id === partyId);
-      setShowVendorDetailsModal(vendor);
     } catch (err) {
       showError('Failed to load vendor details');
+    } finally {
+      setVendorDetailsLoading(false);
     }
+  };
+
+  const openVendorDetails = (partyId) => {
+    listScrollYRef.current = window.scrollY || 0;
+    fetchVendorDetails(partyId);
   };
 
 
@@ -499,75 +518,107 @@ const PartyManagement = () => {
 
   const isLoading = viewMode === 'active' ? loading : loadingArchived;
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-96">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-        <span className="ml-3 text-lg text-muted-foreground">
-          Loading {viewMode === 'active' ? 'active' : 'archived'} parties...
-        </span>
-      </div>
-    );
-  }
-
   return (
     <PermissionGuard permission={ADMIN_PERMISSIONS.VIEW_VENDORS}>
       <div className="space-y-6">
-        {/* Header with Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Total Parties</p>
-                  <p className="text-2xl font-bold text-foreground">{totalParties}</p>
-                </div>
-                <BuildingOfficeIcon className="w-8 h-8 text-primary" />
+        {/* Top Header Bar with unified action */}
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                {showVendorDetailsModal ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setShowVendorDetailsModal(null)}
+                      className="inline-flex items-center px-3 py-1.5 text-sm rounded-md border hover:bg-muted"
+                    >
+                      <ChevronLeftIcon className="w-4 h-4 mr-1" /> Back
+                    </button>
+                    <div>
+                      <h1 className="text-lg sm:text-xl font-semibold text-foreground">{showVendorDetailsModal.name}</h1>
+                      <p className="text-xs text-muted-foreground">Vendor details</p>
+                    </div>
+                  </>
+                ) : (
+                  <div>
+                    <h1 className="text-lg sm:text-xl font-semibold text-foreground">Vendors</h1>
+                    <p className="text-xs text-muted-foreground">Manage vendors, balances and payments</p>
+                  </div>
+                )}
               </div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Active Vendors</p>
-                  <p className="text-2xl font-bold text-foreground">{parties.filter(p => p.is_active).length}</p>
+              <PermissionGuard permission={ADMIN_PERMISSIONS.MANAGE_VENDORS}>
+                {showVendorDetailsModal ? (
+                  <Button onClick={() => setShowPaymentModal(true)} className="btn-primary">
+                    <BanknotesIcon className="w-4 h-4 mr-2" /> Add Payment
+                  </Button>
+                ) : (
+                  <Button onClick={() => handleOpenModal()} className="btn-primary">
+                    <PlusIcon className="w-4 h-4 mr-2" /> Add Party
+                  </Button>
+                )}
+              </PermissionGuard>
+            </div>
+          </CardHeader>
+        </Card>
+        {/* Header with Summary Cards (hidden while viewing a vendor to avoid confusion) */}
+        {!showVendorDetailsModal && (
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Total Parties</p>
+                    <p className="text-2xl font-bold text-foreground">{totalParties}</p>
+                  </div>
+                  <BuildingOfficeIcon className="w-8 h-8 text-primary" />
                 </div>
-                <UserIcon className="w-8 h-8 text-success" />
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Outstanding Balance</p>
-                  <p className="text-2xl font-bold text-foreground">
-                    {formatCurrency(parties.reduce((sum, p) => sum + (p.current_balance || 0), 0))}
-                  </p>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Active Vendors</p>
+                    <p className="text-2xl font-bold text-foreground">{parties.filter(p => p.is_active).length}</p>
+                  </div>
+                  <UserIcon className="w-8 h-8 text-success" />
                 </div>
-                <CurrencyRupeeIcon className="w-8 h-8 text-warning" />
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">GST Registered</p>
-                  <p className="text-2xl font-bold text-foreground">
-                    {parties.filter(p => p.gst_type === 'Registered').length}
-                  </p>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Outstanding Balance</p>
+                    <p className="text-2xl font-bold text-foreground">
+                      {formatCurrency(parties.reduce((sum, p) => sum + (p.current_balance || 0), 0))}
+                    </p>
+                  </div>
+                  <CurrencyRupeeIcon className="w-8 h-8 text-warning" />
                 </div>
-                <IdentificationIcon className="w-8 h-8 text-info" />
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">GST Registered</p>
+                    <p className="text-2xl font-bold text-foreground">
+                      {parties.filter(p => p.gst_type === 'Registered').length}
+                    </p>
+                  </div>
+                  <IdentificationIcon className="w-8 h-8 text-info" />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
+        {!showVendorDetailsModal && (
         <Card>
           <CardHeader className="pb-4">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -578,12 +629,7 @@ const PartyManagement = () => {
                   Filters
                 </Button>
               </div>
-              <PermissionGuard permission={ADMIN_PERMISSIONS.MANAGE_VENDORS}>
-                <Button onClick={() => handleOpenModal()} className="btn-primary" disabled={viewMode === 'archived'}>
-                  <PlusIcon className="w-4 h-4 mr-2" />
-                  Add Party
-                </Button>
-              </PermissionGuard>
+              {/* Actions moved to unified header */}
             </div>
 
             {/* View Mode Tabs */}
@@ -649,18 +695,30 @@ const PartyManagement = () => {
             </div>
           </CardContent>
         </Card>
+        )}
 
         {error && (<div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4"><p className="text-destructive-foreground">{error}</p></div>)}
 
+        {!showVendorDetailsModal && (
         <Card>
           <CardHeader className="pb-4">
             <div className="flex items-center justify-between">
-              <CardTitle>{viewMode === 'active' ? 'Active' : 'Archived'} Parties ({currentTotal})</CardTitle>
-              <div className="text-sm text-muted-foreground">Showing {startIndex + 1}-{endIndex} of {currentTotal}</div>
+              <CardTitle>
+                {viewMode === 'active' ? 'Active' : 'Archived'} Parties
+                {!isLoading ? ` (${currentTotal})` : ''}
+              </CardTitle>
+              {!isLoading && (
+                <div className="text-sm text-muted-foreground">Showing {startIndex + 1}-{endIndex} of {currentTotal}</div>
+              )}
             </div>
           </CardHeader>
           <CardContent className="p-0">
-            {currentPartiesList.length === 0 ? (
+            {isLoading ? (
+              <div className="p-12 text-center">
+                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary mx-auto mb-3"></div>
+                <p className="text-sm text-muted-foreground">Loading {viewMode === 'active' ? 'active' : 'archived'} parties...</p>
+              </div>
+            ) : currentPartiesList.length === 0 ? (
               <div className="p-12 text-center">
                 {viewMode === 'archived' ? (
                   <ArchiveBoxIcon className="w-16 h-16 text-muted-foreground/50 mx-auto mb-4" />
@@ -687,8 +745,15 @@ const PartyManagement = () => {
                         <div className="flex-1 mb-3 sm:mb-0">
                           <div className="flex items-start justify-between sm:items-center sm:space-x-4">
                             <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 mb-1">
-                                <h3 className="text-base sm:text-lg font-medium text-foreground truncate">{party.name}</h3>
+                            <div className="flex items-center gap-2 mb-1">
+                              <button
+                                type="button"
+                                onClick={() => openVendorDetails(party.id)}
+                                className="text-left text-base sm:text-lg font-medium text-primary hover:underline truncate"
+                                title="View details"
+                              >
+                                {party.name}
+                              </button>
                                 {party.gstin && (
                                   <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-success/10 text-success">
                                     GST
@@ -715,7 +780,7 @@ const PartyManagement = () => {
                             </div>
                             <PermissionGuard permission={ADMIN_PERMISSIONS.MANAGE_VENDORS}>
                               <div className="hidden sm:flex items-center space-x-2 ml-4">
-                                <Button variant="ghost" size="icon" onClick={() => fetchVendorDetails(party.id)} className="h-9 w-9 text-muted-foreground hover:text-primary">
+                                <Button variant="ghost" size="icon" onClick={() => openVendorDetails(party.id)} className="h-9 w-9 text-muted-foreground hover:text-primary">
                                   <EyeIcon className="w-4 h-4" />
                                 </Button>
                                 {viewMode === 'active' ? (
@@ -738,7 +803,7 @@ const PartyManagement = () => {
                         </div>
                         <PermissionGuard permission={ADMIN_PERMISSIONS.MANAGE_VENDORS}>
                           <div className="flex sm:hidden space-x-2 mt-3 pt-3 border-t">
-                            <Button variant="outline" size="sm" onClick={() => fetchVendorDetails(party.id)} className="flex-1">
+                            <Button variant="outline" size="sm" onClick={() => openVendorDetails(party.id)} className="flex-1">
                               <EyeIcon className="w-4 h-4 mr-2" />View
                             </Button>
                             {viewMode === 'active' ? (
@@ -780,6 +845,7 @@ const PartyManagement = () => {
             )}
           </CardContent>
         </Card>
+        )}
 
         {/* Reusable AddVendorModal Component */}
         <AddVendorModal
@@ -887,56 +953,54 @@ const PartyManagement = () => {
           </div>
         )}
 
-        {/* Enhanced Vendor Details Modal */}
+        {/* Inline Vendor Details View */}
         {showVendorDetailsModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-2 sm:p-4 z-50">
-            <div className="bg-card rounded-xl shadow-xl w-full max-w-6xl max-h-[95vh] overflow-y-auto">
-              <div className="p-4 sm:p-6 border-b">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <h2 className="text-lg sm:text-xl font-semibold text-foreground">
-                      {showVendorDetailsModal.name} - Vendor Details
-                    </h2>
-                    <div className="flex items-center gap-2">
-                      <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-                        calculateVendorBalance(showVendorDetailsModal, vendorOrders, vendorPayments) > 0 
-                          ? 'bg-red-100 text-red-800' 
-                          : 'bg-green-100 text-green-800'
-                      }`}>
-                        Balance: {formatCurrency(calculateVendorBalance(showVendorDetailsModal, vendorOrders, vendorPayments))}
-                      </span>
-                    </div>
-                  </div>
-                  <button onClick={() => setShowVendorDetailsModal(null)} className="p-2 text-muted-foreground hover:text-foreground rounded-lg">
-                    <XMarkIcon className="w-5 h-5" />
-                  </button>
-                </div>
-                
-                {/* Tabs */}
-                <div className="mt-4 border-b">
-                  <nav className="flex space-x-8">
-                    <button 
-                      className={`py-2 px-1 border-b-2 font-medium text-sm ${vendorDetailsTab === 'orders' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
-                      onClick={() => setVendorDetailsTab('orders')}
-                    >
-                      <ClipboardDocumentListIcon className="w-4 h-4 mr-2 inline" />
-                      Ordered Items
-                    </button>
-                    <button 
-                      className={`py-2 px-1 border-b-2 font-medium text-sm ${vendorDetailsTab === 'balance' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
-                      onClick={() => setVendorDetailsTab('balance')}
-                    >
-                      <ReceiptPercentIcon className="w-4 h-4 mr-2 inline" />
-                      Balance Sheet
-                    </button>
-                  </nav>
+          <div className="bg-card rounded-xl shadow-sm border">
+            <div className="p-4 sm:p-6 border-b">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <h2 className="text-lg sm:text-xl font-semibold text-foreground">
+                    {showVendorDetailsModal.name}
+                  </h2>
+                  {vendorDetailsTab !== 'balance' && (
+                    <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                      calculateVendorBalance(showVendorDetailsModal, vendorOrders, vendorPayments) > 0 
+                        ? 'bg-red-100 text-red-800' 
+                        : 'bg-green-100 text-green-800'
+                    }`}>
+                      Balance: {formatCurrency(calculateVendorBalance(showVendorDetailsModal, vendorOrders, vendorPayments))}
+                    </span>
+                  )}
                 </div>
               </div>
-              
-              <div className="p-4 sm:p-6">
-                {/* Orders Tab */}
-                {vendorDetailsTab === 'orders' && (
-                  <div className="space-y-6">
+              <div className="mt-4 border-b">
+                <nav className="flex space-x-8">
+                  <button 
+                    className={`py-2 px-1 border-b-2 font-medium text-sm ${vendorDetailsTab === 'orders' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
+                    onClick={() => setVendorDetailsTab('orders')}
+                  >
+                    <ClipboardDocumentListIcon className="w-4 h-4 mr-2 inline" />
+                    Ordered Items
+                  </button>
+                  <button 
+                    className={`py-2 px-1 border-b-2 font-medium text-sm ${vendorDetailsTab === 'balance' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
+                    onClick={() => setVendorDetailsTab('balance')}
+                  >
+                    <ReceiptPercentIcon className="w-4 h-4 mr-2 inline" />
+                    Balance Sheet
+                  </button>
+                </nav>
+              </div>
+            </div>
+            <div className="p-4 sm:p-6">
+              {vendorDetailsLoading && (
+                <div className="mb-4 flex items-center text-sm text-muted-foreground">
+                  <ArrowPathIcon className="w-4 h-4 mr-2 animate-spin" /> Loading vendor details...
+                </div>
+              )}
+              {/* Orders Tab */}
+              {vendorDetailsTab === 'orders' && (
+                <div className="space-y-6">
                     {/* Summary Cards */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <Card>
@@ -1036,9 +1100,9 @@ const PartyManagement = () => {
                   </div>
                 )}
 
-                {/* Balance Sheet Tab */}
-                {vendorDetailsTab === 'balance' && (
-                  <div className="space-y-6">
+              {/* Balance Sheet Tab */}
+              {vendorDetailsTab === 'balance' && (
+                <div className="space-y-6">
                     {/* Balance Summary */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <Card>
@@ -1191,8 +1255,42 @@ const PartyManagement = () => {
                         )}
                       </CardContent>
                     </Card>
-                  </div>
-                )}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Vendor Payment Modal */}
+        {showPaymentModal && showVendorDetailsModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-2 sm:p-4 z-50">
+            <div className="bg-card rounded-xl shadow-xl w-full max-w-4xl h-[90vh] flex flex-col">
+              <div className="p-4 sm:p-6 border-b flex items-center justify-between sticky top-0 bg-card z-10">
+                <h2 className="text-lg sm:text-xl font-semibold text-foreground">
+                  Add Payment - {showVendorDetailsModal.name}
+                </h2>
+                <button onClick={() => setShowPaymentModal(false)} className="p-2 text-muted-foreground hover:text-foreground rounded-lg">
+                  <XMarkIcon className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="p-0 sm:p-0 flex-1 overflow-hidden">
+                <div className="p-4 sm:p-6 h-full overflow-y-auto">
+                  <UnifiedVendorPaymentForm
+                    ref={paymentFormRef}
+                    preSelectedParty={{ id: showVendorDetailsModal.id, name: showVendorDetailsModal.name, party_type: 'vendor' }}
+                    lockParty
+                    renderActions={false}
+                    onCancel={() => setShowPaymentModal(false)}
+                    onSuccess={async () => {
+                      setShowPaymentModal(false);
+                      await fetchVendorDetails(showVendorDetailsModal.id);
+                    }}
+                  />
+                </div>
+              </div>
+              <div className="border-t p-3 sm:p-4 flex items-center justify-end gap-2">
+                <Button variant="outline" onClick={() => setShowPaymentModal(false)}>Cancel</Button>
+                <Button className="btn-primary" onClick={() => paymentFormRef.current?.submit()}>Save Payments</Button>
               </div>
             </div>
           </div>
