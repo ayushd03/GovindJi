@@ -50,8 +50,19 @@ const ExpenseManagement = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   // Screen-level tabs: 'add' or 'view'
   const { prefs, setDefaultView, setDefaultScope, setLastDateRange } = useExpensePreferences();
-  const [activeTab, setActiveTab] = useState('view');
-  const [viewMode, setViewMode] = useState(prefs.defaultView || 'list'); // 'list' | 'calendar'
+  
+  // Initialize activeTab from local storage or default to 'view'
+  const [activeTab, setActiveTab] = useState(() => {
+    const savedActiveTab = localStorage.getItem('expenseActiveTab');
+    return savedActiveTab || 'view';
+  });
+  
+  // Initialize viewMode from local storage or preferences
+  const [viewMode, setViewMode] = useState(() => {
+    const savedViewMode = localStorage.getItem('expenseViewMode');
+    return savedViewMode || prefs.defaultView || 'list';
+  });
+  
   const [scope, setScope] = useState(prefs.defaultScope || 'month'); // 'week' | 'month'
   
   // Form dependencies
@@ -188,6 +199,16 @@ const ExpenseManagement = () => {
   useEffect(() => {
     setLastDateRange(dateRange);
   }, [dateRange, setLastDateRange]);
+
+  // Persist activeTab to local storage
+  useEffect(() => {
+    localStorage.setItem('expenseActiveTab', activeTab);
+  }, [activeTab]);
+
+  // Persist viewMode to local storage
+  useEffect(() => {
+    localStorage.setItem('expenseViewMode', viewMode);
+  }, [viewMode]);
 
   // Hide AdminLayout's header with CSS
   useEffect(() => {
