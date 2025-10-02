@@ -975,6 +975,23 @@ const PartyManagement = () => {
                     </span>
                   )}
                 </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => fetchVendorDetails(showVendorDetailsModal.id)}
+                    disabled={vendorDetailsLoading}
+                    className="gap-2"
+                  >
+                    <svg className={`w-4 h-4 ${vendorDetailsLoading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    {vendorDetailsLoading ? 'Refreshing...' : 'Refresh'}
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => setShowVendorDetailsModal(null)}>
+                    <XMarkIcon className="w-5 h-5" />
+                  </Button>
+                </div>
               </div>
               <div className="mt-4 border-b">
                 <nav className="flex space-x-8">

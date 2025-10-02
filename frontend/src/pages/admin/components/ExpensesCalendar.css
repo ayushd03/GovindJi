@@ -1,0 +1,634 @@
+/* Premium Expense Calendar Styling */
+
+/* Modern Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -1000px 0;
+  }
+  100% {
+    background-position: 1000px 0;
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.2s ease-out;
+}
+
+.animate-slideUp {
+  animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* FullCalendar Premium Styling */
+.fc {
+  font-family: 'Lato', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Calendar Container */
+.fc .fc-view-harness {
+  background: linear-gradient(to bottom, #ffffff, #fafbfc);
+  overflow: auto;
+  height: 100%;
+  flex: 1;
+}
+
+.fc .fc-view {
+  height: 100% !important;
+}
+
+.fc .fc-daygrid {
+  height: 100% !important;
+}
+
+.fc .fc-scrollgrid {
+  border-collapse: separate !important;
+  border-spacing: 0 !important;
+}
+
+/* Header Toolbar - Hidden when headerToolbar is false */
+.fc .fc-toolbar {
+  display: none;
+}
+
+.fc .fc-toolbar-title {
+  display: none;
+}
+
+/* Toolbar Buttons */
+.fc .fc-button {
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: #ffffff;
+  font-weight: 600;
+  padding: 0.375rem 0.875rem;
+  font-size: 0.875rem;
+  border-radius: 8px;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.fc .fc-button:hover {
+  background: rgba(255, 255, 255, 0.3);
+  border-color: rgba(255, 255, 255, 0.4);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.fc .fc-button:active,
+.fc .fc-button-active {
+  background: rgba(255, 255, 255, 0.4) !important;
+  border-color: rgba(255, 255, 255, 0.5) !important;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+  transform: translateY(0);
+}
+
+.fc .fc-button:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.3);
+}
+
+.fc .fc-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.fc .fc-button-group {
+  gap: 0.5rem;
+}
+
+/* Day Headers */
+.fc .fc-col-header {
+  background: linear-gradient(to bottom, #f8f9fa, #ffffff);
+  border-bottom: 2px solid #e9ecef;
+}
+
+.fc .fc-col-header-cell {
+  padding: 1rem 0.5rem;
+  font-weight: 600;
+  font-size: 0.875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #495057;
+  border: none;
+}
+
+.fc .fc-col-header-cell-cushion {
+  padding: 0.5rem;
+  transition: color 0.2s;
+}
+
+/* Day Cells */
+.fc .fc-daygrid-day {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+  z-index: 1;
+}
+
+.fc .fc-daygrid-day:hover {
+  background: linear-gradient(135deg, rgba(71, 85, 105, 0.03) 0%, rgba(51, 65, 85, 0.03) 100%);
+  z-index: 2;
+}
+
+.fc .fc-daygrid-day-frame {
+  min-height: 110px;
+  padding: 0.375rem;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.fc .fc-daygrid-day-events {
+  overflow: hidden !important;
+  margin-top: 0.25rem;
+  flex: 1;
+}
+
+.fc .fc-daygrid-event-harness {
+  overflow: hidden !important;
+  margin-bottom: 0.25rem;
+}
+
+.fc .fc-daygrid-day-bottom {
+  overflow: hidden !important;
+}
+
+.fc .fc-daygrid-day-top {
+  flex-direction: row;
+  justify-content: flex-end;
+  padding: 0.25rem 0.5rem;
+  position: relative;
+  z-index: 3;
+}
+
+.fc .fc-daygrid-day-number {
+  padding: 0.375rem 0.625rem;
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: #495057;
+  transition: all 0.2s;
+  border-radius: 6px;
+  position: relative;
+  z-index: 2;
+}
+
+.fc .fc-daygrid-day:hover .fc-daygrid-day-number {
+  background: rgba(71, 85, 105, 0.1);
+  color: #64748b;
+}
+
+/* Today Cell */
+.fc .fc-day-today {
+  background: linear-gradient(135deg, rgba(71, 85, 105, 0.05) 0%, rgba(51, 65, 85, 0.05) 100%) !important;
+  border: 2px solid rgba(71, 85, 105, 0.2) !important;
+}
+
+.fc .fc-day-today .fc-daygrid-day-number {
+  background: linear-gradient(135deg, #64748b 0%, #475569 100%);
+  color: #ffffff;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(71, 85, 105, 0.3);
+}
+
+/* Other Month Days - Force visibility */
+.fc .fc-day-other {
+  background: #f3f4f6 !important;
+  display: table-cell !important;
+  visibility: visible !important;
+}
+
+.fc .fc-day-other .fc-daygrid-day-top {
+  display: flex !important;
+  visibility: visible !important;
+}
+
+.fc .fc-day-other .fc-daygrid-day-number {
+  opacity: 1 !important;
+  color: #9ca3af !important;
+  font-weight: 500 !important;
+  display: inline-block !important;
+  visibility: visible !important;
+}
+
+.fc .fc-day-other .fc-daygrid-day-frame {
+  display: flex !important;
+  visibility: visible !important;
+}
+
+/* Weekend Days */
+.fc .fc-day-sat,
+.fc .fc-day-sun {
+  background: rgba(248, 249, 250, 0.5);
+}
+
+/* Events */
+.fc-event {
+  border: none !important;
+  border-radius: 8px !important;
+  padding: 0.5rem 0.75rem !important;
+  margin: 0.25rem 0 !important;
+  cursor: pointer !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08) !important;
+  backdrop-filter: blur(8px);
+  font-size: 0.8125rem !important;
+  font-weight: 500 !important;
+  overflow: hidden !important;
+  max-width: 100% !important;
+}
+
+.fc-event:hover {
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+  z-index: 10 !important;
+}
+
+.fc-event:active {
+  transform: translateY(0) !important;
+}
+
+/* Event Content */
+.fc-event-main {
+  color: inherit !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  max-width: 100% !important;
+}
+
+.fc-event-title {
+  font-weight: 600 !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  display: block !important;
+  max-width: 100% !important;
+}
+
+.fc-event-main-frame {
+  width: 100% !important;
+  overflow: hidden !important;
+}
+
+/* More Events Link */
+.fc .fc-more-link {
+  color: #64748b;
+  font-weight: 600;
+  padding: 0.25rem 0.5rem;
+  border-radius: 6px;
+  transition: all 0.2s;
+  background: rgba(100, 116, 139, 0.1);
+  margin: 0.25rem 0.5rem;
+  display: inline-block;
+}
+
+.fc .fc-more-link:hover {
+  background: rgba(100, 116, 139, 0.2);
+  color: #475569;
+  transform: translateY(-1px);
+}
+
+/* Popover for More Events */
+.fc .fc-popover {
+  border: none !important;
+  border-radius: 12px !important;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.15), 0 4px 8px rgba(0, 0, 0, 0.1) !important;
+  backdrop-filter: blur(20px);
+  overflow: hidden;
+}
+
+.fc .fc-popover-header {
+  background: linear-gradient(135deg, #64748b 0%, #475569 100%) !important;
+  padding: 1rem 1.25rem !important;
+  border: none !important;
+}
+
+.fc .fc-popover-title {
+  color: #ffffff !important;
+  font-weight: 600 !important;
+  font-size: 0.9375rem !important;
+}
+
+.fc .fc-popover-close {
+  opacity: 0.8 !important;
+  transition: all 0.2s !important;
+  color: #ffffff !important;
+}
+
+.fc .fc-popover-close:hover {
+  opacity: 1 !important;
+  transform: scale(1.1);
+}
+
+.fc .fc-popover-body {
+  background: #ffffff;
+  padding: 0.75rem !important;
+}
+
+/* Grid Lines */
+.fc .fc-scrollgrid {
+  border: none !important;
+}
+
+.fc .fc-scrollgrid-section > * {
+  border: none !important;
+}
+
+.fc .fc-daygrid-day,
+.fc .fc-col-header-cell {
+  border: 1px solid #e9ecef !important;
+}
+
+/* Loading State */
+.fc .fc-view-harness.fc-view-harness-active {
+  position: relative;
+}
+
+/* Custom Event Type Styles */
+.fc-event.fc-event-total {
+  background: linear-gradient(135deg, #475569 0%, #334155 100%) !important;
+  border: none !important;
+  color: #ffffff !important;
+  font-weight: 700 !important;
+  box-shadow: 0 2px 8px rgba(71, 85, 105, 0.3) !important;
+  padding: 0.5rem 0.625rem !important;
+  min-height: 32px !important;
+  max-height: 36px !important;
+  overflow: hidden !important;
+}
+
+.fc-event.fc-event-total .fc-event-main,
+.fc-event.fc-event-total .fc-event-title {
+  color: #ffffff !important;
+  overflow: hidden !important;
+  white-space: nowrap !important;
+  text-overflow: ellipsis !important;
+}
+
+.fc-event.fc-event-total:hover {
+  background: linear-gradient(135deg, #334155 0%, #1e293b 100%) !important;
+  box-shadow: 0 4px 12px rgba(71, 85, 105, 0.4) !important;
+}
+
+.fc-event.fc-event-product {
+  background: linear-gradient(135deg, #ffffff 0%, #f9fafb 100%) !important;
+  border-left: 4px solid #10b981 !important;
+  color: #1f2937 !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08) !important;
+  padding: 0.375rem 0.5rem !important;
+  font-size: 0.8125rem !important;
+  min-height: 28px !important;
+  max-height: 32px !important;
+  line-height: 1.4 !important;
+  position: relative;
+  z-index: 1;
+  overflow: hidden !important;
+}
+
+.fc-event.fc-event-product .fc-event-main {
+  color: #1f2937 !important;
+  overflow: hidden !important;
+}
+
+.fc-event.fc-event-product .fc-event-title {
+  color: #1f2937 !important;
+  font-weight: 600 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+.fc-event.fc-event-product:hover {
+  border-left-color: #059669 !important;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25) !important;
+  background: linear-gradient(135deg, #ffffff 0%, #ecfdf5 100%) !important;
+}
+
+.fc-event.fc-event-more {
+  background: linear-gradient(135deg, #e2e8f0 0%, #cbd5e1 100%) !important;
+  border: 2px solid #64748b !important;
+  color: #334155 !important;
+  font-weight: 600 !important;
+  box-shadow: 0 2px 4px rgba(100, 116, 139, 0.15) !important;
+  padding: 0.375rem 0.5rem !important;
+  min-height: 28px !important;
+  max-height: 32px !important;
+  overflow: hidden !important;
+}
+
+.fc-event.fc-event-more .fc-event-main,
+.fc-event.fc-event-more .fc-event-title {
+  color: #334155 !important;
+  overflow: hidden !important;
+  white-space: nowrap !important;
+  text-overflow: ellipsis !important;
+}
+
+.fc-event.fc-event-more:hover {
+  background: linear-gradient(135deg, #cbd5e1 0%, #94a3b8 100%) !important;
+  border-color: #475569 !important;
+  box-shadow: 0 4px 8px rgba(100, 116, 139, 0.25) !important;
+}
+
+/* Event Icons */
+.fc-event svg {
+  flex-shrink: 0;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.1));
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .fc .fc-toolbar {
+    padding: 0.75rem 1rem;
+  }
+
+  .fc .fc-toolbar-title {
+    font-size: 1.125rem;
+  }
+
+  .fc .fc-button {
+    padding: 0.375rem 0.75rem;
+    font-size: 0.875rem;
+  }
+
+  .fc .fc-daygrid-day-frame {
+    min-height: 80px;
+  }
+
+  .fc-event {
+    font-size: 0.75rem !important;
+    padding: 0.375rem 0.5rem !important;
+  }
+}
+
+/* Calendar Wrapper Enhancements */
+.premium-calendar-wrapper {
+  height: 100%;
+  overflow: hidden;
+  background: #ffffff;
+}
+
+.premium-calendar-wrapper:hover {
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.12), 0 4px 12px rgba(0, 0, 0, 0.06);
+}
+
+/* Loading Overlay */
+.calendar-loading-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: fadeIn 0.2s ease-in;
+}
+
+.calendar-spinner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+}
+
+/* Loading Skeleton (kept for backward compatibility) */
+.calendar-loading {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 8px;
+  height: 600px;
+}
+
+/* Scrollbar Styling */
+.fc-scroller::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.fc-scroller::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 4px;
+}
+
+.fc-scroller::-webkit-scrollbar-thumb {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  border-radius: 4px;
+  transition: background 0.2s;
+}
+
+.fc-scroller::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+}
+
+/* Empty State Styling */
+.fc .fc-daygrid-day:not(.fc-day-today):not(:hover)::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: transparent;
+  transition: background 0.3s ease;
+}
+
+/* Premium Glow Effect for Today */
+.fc .fc-day-today::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(37, 99, 235, 0.1) 100%);
+  border-radius: 4px;
+  z-index: -1;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* Event Badge Styles */
+.fc-event .event-badge {
+  display: inline-block;
+  padding: 0.125rem 0.5rem;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 9999px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* Premium Focus States */
+.fc .fc-button:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.5);
+  outline-offset: 2px;
+}
+
+/* Enhanced Event Interaction */
+.fc-event {
+  position: relative;
+  overflow: hidden;
+}
+
+/* Refined Typography */
+.fc .fc-toolbar-title {
+  font-family: 'Montserrat', sans-serif;
+  letter-spacing: -0.03em;
+}
+
+/* Additional Premium Touches */
+.premium-calendar-wrapper {
+  position: relative;
+}
+
+.premium-calendar-wrapper::before {
+  content: '';
+  position: absolute;
+  top: -4px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 60%;
+  height: 4px;
+  background: linear-gradient(90deg, transparent, rgba(59, 130, 246, 0.5), transparent);
+  border-radius: 9999px;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.premium-calendar-wrapper:hover::before {
+  opacity: 1;
+}
+
