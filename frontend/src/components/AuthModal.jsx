@@ -172,18 +172,16 @@ const AuthModal = ({ isOpen, onClose }) => {
 
           {/* Header */}
           <div className="px-6 pt-6 pb-6">
-            <h2 className="text-2xl font-bold text-gray-900 text-center mb-6">
+            <h2 className="text-2xl font-bold text-foreground text-center mb-6">
               {isLogin ? 'Welcome Back' : 'Create Account'}
             </h2>
             
-            <div className="flex bg-gray-100 rounded-lg p-1">
+            <div className="tab-list">
               <button
                 type="button"
                 onClick={() => handleTabSwitch(true)}
-                className={`flex-1 py-3 px-4 text-sm font-semibold rounded-md transition-all duration-300 ${
-                  isLogin
-                    ? 'bg-white text-primary-accent shadow-sm transform scale-105'
-                    : 'text-gray-600 hover:text-gray-800'
+                className={`flex-1 tab-button ${
+                  isLogin ? 'tab-button-selected' : 'tab-button-unselected'
                 }`}
               >
                 Login
@@ -191,10 +189,8 @@ const AuthModal = ({ isOpen, onClose }) => {
               <button
                 type="button"
                 onClick={() => handleTabSwitch(false)}
-                className={`flex-1 py-3 px-4 text-sm font-semibold rounded-md transition-all duration-300 ${
-                  !isLogin
-                    ? 'bg-white text-primary-accent shadow-sm transform scale-105'
-                    : 'text-gray-600 hover:text-gray-800'
+                className={`flex-1 tab-button ${
+                  !isLogin ? 'tab-button-selected' : 'tab-button-unselected'
                 }`}
               >
                 Sign Up
@@ -207,20 +203,20 @@ const AuthModal = ({ isOpen, onClose }) => {
               <div className="flex items-center justify-center mb-6">
                 <div className="flex items-center space-x-4">
                   <div className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-semibold transition-all duration-300 ${
-                    signupStep >= 1 ? 'bg-primary-accent text-white' : 'bg-gray-200 text-gray-600'
+                    signupStep >= 1 ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
                   }`}>
                     1
                   </div>
                   <div className={`w-16 h-1 rounded transition-all duration-300 ${
-                    signupStep >= 2 ? 'bg-primary-accent' : 'bg-gray-200'
+                    signupStep >= 2 ? 'bg-primary' : 'bg-muted'
                   }`}></div>
                   <div className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-semibold transition-all duration-300 ${
-                    signupStep >= 2 ? 'bg-primary-accent text-white' : 'bg-gray-200 text-gray-600'
+                    signupStep >= 2 ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
                   }`}>
                     2
                   </div>
                 </div>
-                <div className="ml-4 text-sm font-medium text-gray-600">
+                <div className="ml-4 text-sm font-medium text-muted-foreground">
                   Step {signupStep} of 2
                 </div>
               </div>
@@ -254,7 +250,7 @@ const AuthModal = ({ isOpen, onClose }) => {
                           name="email"
                           value={formData.email}
                           onChange={handleChange}
-                          className={`w-full pl-10 pr-4 py-4 border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-accent focus:border-primary-accent transition-all duration-300 bg-gray-50 hover:bg-white ${
+                          className={`w-full pl-10 pr-4 py-4 border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-300 bg-gray-50 hover:bg-white ${
                             errors.email ? 'border-red-500 bg-red-50' : 'border-gray-200 hover:border-gray-300'
                           }`}
                           placeholder="Enter your email"
@@ -276,7 +272,7 @@ const AuthModal = ({ isOpen, onClose }) => {
                           name="password"
                           value={formData.password}
                           onChange={handleChange}
-                          className={`w-full pl-10 pr-12 py-4 border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-accent focus:border-primary-accent transition-all duration-300 bg-gray-50 hover:bg-white ${
+                          className={`w-full pl-10 pr-12 py-4 border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-300 bg-gray-50 hover:bg-white ${
                             errors.password ? 'border-red-500 bg-red-50' : 'border-gray-200 hover:border-gray-300'
                           }`}
                           placeholder="Enter your password"
@@ -310,7 +306,7 @@ const AuthModal = ({ isOpen, onClose }) => {
                               name="email"
                               value={formData.email}
                               onChange={handleChange}
-                              className={`w-full pl-10 pr-4 py-4 border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-accent focus:border-primary-accent transition-all duration-300 bg-gray-50 hover:bg-white ${
+                              className={`w-full pl-10 pr-4 py-4 border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-300 bg-gray-50 hover:bg-white ${
                                 errors.email ? 'border-red-500 bg-red-50' : 'border-gray-200 hover:border-gray-300'
                               }`}
                               placeholder="Enter your email"
@@ -332,7 +328,7 @@ const AuthModal = ({ isOpen, onClose }) => {
                               name="name"
                               value={formData.name}
                               onChange={handleChange}
-                              className={`w-full pl-10 pr-4 py-4 border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-accent focus:border-primary-accent transition-all duration-300 bg-gray-50 hover:bg-white ${
+                              className={`w-full pl-10 pr-4 py-4 border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-300 bg-gray-50 hover:bg-white ${
                                 errors.name ? 'border-red-500 bg-red-50' : 'border-gray-200 hover:border-gray-300'
                               }`}
                               placeholder="Enter your full name"
@@ -358,7 +354,7 @@ const AuthModal = ({ isOpen, onClose }) => {
                               name="password"
                               value={formData.password}
                               onChange={handleChange}
-                              className={`w-full pl-10 pr-12 py-4 border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-accent focus:border-primary-accent transition-all duration-300 bg-gray-50 hover:bg-white ${
+                              className={`w-full pl-10 pr-12 py-4 border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-300 bg-gray-50 hover:bg-white ${
                                 errors.password ? 'border-red-500 bg-red-50' : 'border-gray-200 hover:border-gray-300'
                               }`}
                               placeholder="Enter your password"
@@ -387,7 +383,7 @@ const AuthModal = ({ isOpen, onClose }) => {
                               name="confirmPassword"
                               value={formData.confirmPassword}
                               onChange={handleChange}
-                              className={`w-full pl-10 pr-12 py-4 border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-accent focus:border-primary-accent transition-all duration-300 bg-gray-50 hover:bg-white ${
+                              className={`w-full pl-10 pr-12 py-4 border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-300 bg-gray-50 hover:bg-white ${
                                 errors.confirmPassword ? 'border-red-500 bg-red-50' : 'border-gray-200 hover:border-gray-300'
                               }`}
                               placeholder="Confirm your password"
@@ -422,7 +418,7 @@ const AuthModal = ({ isOpen, onClose }) => {
                 <button
                   type="button"
                   onClick={handleNextStep}
-                  className="w-full bg-gradient-to-r from-primary-accent to-secondary-accent text-white py-4 px-4 rounded-xl font-semibold hover:from-secondary-accent hover:to-primary-accent focus:outline-none focus:ring-2 focus:ring-primary-accent focus:ring-offset-2 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl"
+                  className="btn-primary w-full py-4 rounded-xl text-base transform transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-xl"
                 >
                   Continue
                 </button>
@@ -431,7 +427,7 @@ const AuthModal = ({ isOpen, onClose }) => {
                   <button
                     type="submit"
                     disabled={isLoading}
-                    className="w-full bg-gradient-to-r from-primary-accent to-secondary-accent text-white py-4 px-4 rounded-xl font-semibold hover:from-secondary-accent hover:to-primary-accent focus:outline-none focus:ring-2 focus:ring-primary-accent focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl"
+                    className="btn-primary w-full py-4 rounded-xl text-base disabled:opacity-50 disabled:cursor-not-allowed transform transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-xl"
                   >
                     {isLoading ? (
                       <div className="flex items-center justify-center">
@@ -445,7 +441,7 @@ const AuthModal = ({ isOpen, onClose }) => {
                   <button
                     type="button"
                     onClick={handlePrevStep}
-                    className="w-full bg-gray-100 text-gray-700 py-4 px-4 rounded-xl font-semibold hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 transition-all duration-300"
+                    className="btn-outline w-full py-4 rounded-xl text-base transition-all duration-300"
                   >
                     Back
                   </button>
@@ -454,7 +450,7 @@ const AuthModal = ({ isOpen, onClose }) => {
                 <button
                   type="submit"
                   disabled={isLoading}
-                  className="w-full bg-gradient-to-r from-primary-accent to-secondary-accent text-white py-4 px-4 rounded-xl font-semibold hover:from-secondary-accent hover:to-primary-accent focus:outline-none focus:ring-2 focus:ring-primary-accent focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl"
+                  className="btn-primary w-full py-4 rounded-xl text-base disabled:opacity-50 disabled:cursor-not-allowed transform transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-xl"
                 >
                   {isLoading ? (
                     <div className="flex items-center justify-center">

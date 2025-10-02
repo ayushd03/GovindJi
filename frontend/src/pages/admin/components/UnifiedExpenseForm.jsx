@@ -1,11 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { 
+import {
   CubeIcon,
-  BuildingOfficeIcon
+  BuildingOfficeIcon,
+  PlusIcon,
+  XMarkIcon
 } from '@heroicons/react/24/outline';
 import PaymentMethodSelector from './PaymentMethodSelector';
 import MultiVendorItemManager from './MultiVendorItemManager';
+import UnifiedVendorOrderForm from './UnifiedVendorOrderForm';
 import { Card, CardContent, CardHeader, CardTitle } from '../../../components/ui/card';
+import { Button } from '../../../components/ui/button';
+import { useToast } from '../../../hooks/useToast';
 
 // Simplified expense categories - this replaces the complex top-level categories
 const EXPENSE_CATEGORIES = [
@@ -25,10 +30,14 @@ const UnifiedExpenseForm = ({
   dependencies,
   validationErrors = {}
 }) => {
+  const { toast } = useToast();
   const [selectedVendor, setSelectedVendor] = useState(null);
   const [vendorSearch, setVendorSearch] = useState('');
   const [filteredVendors, setFilteredVendors] = useState([]);
   const [showVendorDropdown, setShowVendorDropdown] = useState(false);
+  const [showVendorOrderModal, setShowVendorOrderModal] = useState(false);
+
+  const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
   // Define expense category checks
   const isVendorOrder = transactionData.expense_category === 'Vendor Order';
@@ -107,7 +116,7 @@ const UnifiedExpenseForm = ({
 
   const handleCategoryChange = (category) => {
     handleFieldChange('expense_category', category);
-    
+
     // Reset relevant fields when changing categories
     if (category === 'Vendor Order') {
       handleFieldChange('total_amount', 0);
@@ -122,6 +131,106 @@ const UnifiedExpenseForm = ({
       setSelectedVendor(null);
       setVendorSearch('');
       updateTransactionData({ parties: [], items: [] });
+    }
+  };
+
+  // Handle vendor order submission - Creates POs via bulk API (optimized)
+  const handleVendorOrderSubmit = async (formData) => {
+    try {
+      const token = localStorage.getItem('authToken');
+
+      // Group items by vendor to create separate POs
+      const vendorGroups = {};
+      formData.items.forEach(item => {
+        const vendorId = item.vendor_id;
+        if (!vendorGroups[vendorId]) {
+          vendorGroups[vendorId] = {
+            party_id: vendorId,
+            order_date: formData.order_date,
+            expected_delivery_date: formData.expected_delivery_date,
+            payment_terms: formData.payment_terms,
+            delivery_address: formData.delivery_address,
+            notes: formData.notes,
+            items: []
+          };
+        }
+        vendorGroups[vendorId].items.push(item);
+      });
+
+      // Convert vendor groups to array for bulk API
+      const purchaseOrders = Object.values(vendorGroups);
+
+      // Single API call for bulk PO creation
+      const response = await fetch(`${API_BASE_URL}/api/admin/purchase-orders/bulk`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ purchase_orders: purchaseOrders })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create purchase orders');
+      }
+
+      const result = await response.json();
+      const createdPOs = result.created || [];
+      const failedCount = result.failed || 0;
+
+      // Update expense transaction with items and PO references
+      if (createdPOs.length > 0) {
+        const totalAmount = createdPOs.reduce((sum, po) => sum + (po.total_amount || 0), 0);
+
+        updateTransactionData({
+          items: formData.items,
+          notes: formData.notes,
+          total_amount: totalAmount,
+          purchase_orders: createdPOs.map(po => ({
+            po_id: po.id,
+            po_number: po.po_number,
+            vendor_id: po.party_id,
+            amount: po.total_amount
+          }))
+        });
+      }
+
+      setShowVendorOrderModal(false);
+
+      // Show feedback
+      if (failedCount === 0) {
+        toast({
+          title: "Success",
+          description: result.message || `Successfully created ${createdPOs.length} purchase order${createdPOs.length > 1 ? 's' : ''}!`,
+          variant: "success",
+          duration: 3000,
+        });
+      } else if (createdPOs.length > 0) {
+        toast({
+          title: "Partial Success",
+          description: result.message || `Created ${createdPOs.length} PO(s), ${failedCount} failed`,
+          variant: "warning",
+          duration: 5000,
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: result.error || 'Failed to create any purchase orders',
+          variant: "destructive",
+          duration: 5000,
+        });
+        throw new Error('All PO creation attempts failed');
+      }
+    } catch (err) {
+      console.error('Failed to create purchase orders:', err);
+      toast({
+        title: "Error",
+        description: 'Failed to create purchase orders: ' + err.message,
+        variant: "destructive",
+        duration: 5000,
+      });
+      throw err;
     }
   };
 
@@ -317,45 +426,60 @@ const UnifiedExpenseForm = ({
         )}
       </div>
 
-      {/* Vendor Order Items Section */}
+      {/* Vendor Order - Open Unified Form Modal */}
       {isVendorOrder && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <CubeIcon className="w-5 h-5" />
-              <span>Order Items</span>
-            </CardTitle>
-            <p className="text-sm text-muted-foreground">
-              Add items and select vendors for each item. Multiple vendors can be used in one order.
-            </p>
-          </CardHeader>
-          <CardContent>
-            <MultiVendorItemManager
-              items={transactionData.items || []}
-              onItemsChange={handleItemsChange}
-              validationErrors={validationErrors.items || {}}
-              showMultiVendorFeatures={true}
-            />
+        <Card className="border-primary/20 bg-primary/5">
+          <CardContent className="p-6">
+            <div className="text-center space-y-4">
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10">
+                <CubeIcon className="w-8 h-8 text-primary" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-foreground mb-2">Create Vendor Order</h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Add items from multiple vendors and create purchase orders in one go
+                </p>
+              </div>
+              <Button
+                type="button"
+                onClick={() => setShowVendorOrderModal(true)}
+                size="lg"
+                className="btn-primary"
+              >
+                <PlusIcon className="w-5 h-5 mr-2" />
+                Add Vendor Order Items
+              </Button>
+            </div>
           </CardContent>
         </Card>
       )}
 
+      {/* Vendor Order Modal */}
+      {showVendorOrderModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-2 sm:p-4 z-50">
+          <div className="bg-card rounded-xl shadow-xl w-full max-w-6xl max-h-[95vh] overflow-y-auto">
+            <div className="p-4 sm:p-6 border-b">
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg sm:text-xl font-semibold text-foreground">
+                  Create Vendor Orders
+                </h2>
+                <button
+                  onClick={() => setShowVendorOrderModal(false)}
+                  className="p-2 text-muted-foreground hover:text-foreground rounded-lg"
+                >
+                  <XMarkIcon className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
 
-      {/* Payment Method for Vendor Order */}
-      {isVendorOrder && (
-        <div>
-          <label className="block text-sm font-medium text-foreground mb-1">
-            Payment Method (Optional)
-          </label>
-          <p className="text-xs text-muted-foreground mb-2">
-            Leave empty to pay later using "Vendor Payment" category.
-          </p>
-          <PaymentMethodSelector
-            paymentMethod={transactionData.payment_method}
-            onPaymentMethodChange={handlePaymentMethodChange}
-            errors={validationErrors.payment_method || {}}
-            required={false}
-          />
+            <div className="p-4 sm:p-6">
+              <UnifiedVendorOrderForm
+                mode="create"
+                onSubmit={handleVendorOrderSubmit}
+                onCancel={() => setShowVendorOrderModal(false)}
+              />
+            </div>
+          </div>
         </div>
       )}
 

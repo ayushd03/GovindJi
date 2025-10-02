@@ -3085,6 +3085,134 @@ app.post('/api/admin/purchase-orders', roleMiddleware.requirePermission(roleMidd
     }
 });
 
+// Create multiple purchase orders in bulk (one API call, optimized for multi-vendor orders)
+app.post('/api/admin/purchase-orders/bulk', roleMiddleware.requirePermission(roleMiddleware.ADMIN_PERMISSIONS.MANAGE_VENDORS), async (req, res) => {
+    try {
+        const { purchase_orders } = req.body;
+
+        if (!purchase_orders || !Array.isArray(purchase_orders) || purchase_orders.length === 0) {
+            return res.status(400).json({ error: 'purchase_orders array is required and must not be empty' });
+        }
+
+        const createdPOs = [];
+        const errors = [];
+
+        // Process each PO sequentially to ensure proper PO number generation
+        for (let i = 0; i < purchase_orders.length; i++) {
+            try {
+                const poData = purchase_orders[i];
+                const {
+                    party_id, order_date, expected_delivery_date, payment_terms,
+                    delivery_address, notes, items
+                } = poData;
+
+                // Validate required fields
+                if (!party_id) {
+                    throw new Error(`PO ${i + 1}: party_id is required`);
+                }
+                if (!items || items.length === 0) {
+                    throw new Error(`PO ${i + 1}: items array is required`);
+                }
+
+                // Generate PO number
+                const { data: poNumberData, error: poError } = await supabase
+                    .rpc('generate_po_number');
+
+                if (poError) throw poError;
+                const po_number = poNumberData;
+
+                // Create purchase order
+                const { data: purchaseOrder, error: poInsertError } = await supabase
+                    .from('purchase_orders')
+                    .insert([{
+                        po_number,
+                        party_id,
+                        order_date,
+                        expected_delivery_date,
+                        payment_terms,
+                        delivery_address,
+                        notes,
+                        total_amount: 0, // Will be updated by trigger
+                        status: 'draft',
+                        created_by: req.user.id
+                    }])
+                    .select()
+                    .single();
+
+                if (poInsertError) throw poInsertError;
+
+                // Create purchase order items
+                const itemsToInsert = items.map(item => ({
+                    purchase_order_id: purchaseOrder.id,
+                    product_id: item.product_id || null,
+                    item_name: item.item_name,
+                    description: item.description || '',
+                    quantity: item.quantity,
+                    unit: item.unit || 'kg',
+                    price_per_unit: item.price_per_unit,
+                    discount_percentage: item.discount_percentage || 0,
+                    discount_amount: item.discount_amount || 0,
+                    tax_percentage: item.tax_percentage || 0,
+                    tax_amount: item.tax_amount || 0,
+                    total_amount: item.total_amount,
+                    pending_quantity: item.quantity
+                }));
+
+                const { error: itemsError } = await supabase
+                    .from('purchase_order_items')
+                    .insert(itemsToInsert);
+
+                if (itemsError) throw itemsError;
+
+                // Fetch the complete purchase order with items
+                const { data: completePO, error: fetchError } = await supabase
+                    .from('purchase_orders')
+                    .select(`
+                        *,
+                        party:party_id(name, contact_person, phone_number),
+                        purchase_order_items(*)
+                    `)
+                    .eq('id', purchaseOrder.id)
+                    .single();
+
+                if (fetchError) throw fetchError;
+
+                createdPOs.push(completePO);
+            } catch (error) {
+                errors.push({
+                    index: i,
+                    party_id: purchase_orders[i]?.party_id,
+                    error: error.message
+                });
+                console.error(`Error creating PO ${i + 1}:`, error);
+            }
+        }
+
+        // Return results
+        if (createdPOs.length === 0) {
+            return res.status(500).json({
+                error: 'Failed to create any purchase orders',
+                details: errors,
+                created: [],
+                failed: errors.length
+            });
+        }
+
+        res.status(201).json({
+            success: true,
+            created: createdPOs,
+            failed: errors.length,
+            errors: errors.length > 0 ? errors : undefined,
+            message: errors.length === 0
+                ? `Successfully created ${createdPOs.length} purchase order(s)`
+                : `Created ${createdPOs.length} PO(s), ${errors.length} failed`
+        });
+    } catch (error) {
+        console.error('Error in bulk purchase order creation:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // Update purchase order status
 app.put('/api/admin/purchase-orders/:id/status', roleMiddleware.requirePermission(roleMiddleware.ADMIN_PERMISSIONS.MANAGE_VENDORS), async (req, res) => {
     try {

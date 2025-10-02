@@ -28,16 +28,16 @@ const PartySelector = ({
   const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
   // Use API search for parties
-  const { 
-    results: searchResults, 
-    loading, 
-    error: searchError 
+  const {
+    results: searchResults,
+    loading,
+    error: searchError
   } = useApiSearch(
     '/api/admin/expenses/search/parties',
     searchTerm,
     {
       debounceDelay: 300,
-      minSearchLength: 1,
+      minSearchLength: 0, // Changed from 1 to 0 to show results by default
       limit: 20,
       filters: partyType ? { party_type: partyType } : {},
       enabled: isOpen // Only search when dropdown is open
@@ -268,11 +268,7 @@ const PartySelector = ({
               </div>
             )}
 
-            {!loading && !searchError && !searchTerm && (
-              <div className="p-4 text-center text-muted-foreground">
-                <p className="text-sm">Type to search for parties...</p>
-              </div>
-            )}
+            {/* Removed the "Type to search" message when no search term - now shows all parties by default */}
           </div>
 
           {/* Add new party option */}

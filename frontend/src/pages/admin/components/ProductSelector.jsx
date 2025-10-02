@@ -26,16 +26,16 @@ const ProductSelector = ({
   const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
   // Use API search for products
-  const { 
-    results: searchResults, 
-    loading, 
-    error: searchError 
+  const {
+    results: searchResults,
+    loading,
+    error: searchError
   } = useApiSearch(
     '/api/admin/expenses/search/products',
     searchTerm,
     {
       debounceDelay: 300,
-      minSearchLength: 1,
+      minSearchLength: 0, // Changed from 1 to 0 to show results by default
       limit: 20,
       filters: categoryId ? { category_id: categoryId } : {},
       enabled: isOpen // Only search when dropdown is open
@@ -234,11 +234,7 @@ const ProductSelector = ({
               </div>
             )}
 
-            {!loading && !searchError && !searchTerm && (
-              <div className="p-4 text-center text-muted-foreground">
-                <p className="text-sm">Type to search for products...</p>
-              </div>
-            )}
+            {/* Removed the "Type to search" message when no search term - now shows all products by default */}
           </div>
 
           {/* Add new product option */}
