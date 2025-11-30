@@ -21,6 +21,7 @@ import {
 import { useToast } from '../../hooks/useToast';
 import { Toaster } from '../../components/ui/toaster';
 import { useExpensePreferences } from '../../hooks/useExpensePreferences';
+import { formatMobileDayCurrency } from '../../utils/currencyUtils';
 import ExpensesCalendar from './components/ExpensesCalendar';
 
 // Import sub-components
@@ -93,6 +94,9 @@ const ExpenseManagement = () => {
   const [totalPages, setTotalPages] = useState(1);
   const [selectedExpense, setSelectedExpense] = useState(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  
+  // Ref to prevent duplicate API calls
+  const lastFetchParams = useRef(null);
   
   // Filters and search
   const [searchTerm, setSearchTerm] = useState('');
@@ -249,6 +253,17 @@ const ExpenseManagement = () => {
         ...(dateRange.end_date && { end_date: dateRange.end_date })
       });
 
+      const paramsString = searchParams.toString();
+      
+      // Prevent duplicate API calls with same parameters
+      if (lastFetchParams.current === paramsString) {
+        console.log('Skipping duplicate API call with same parameters');
+        return;
+      }
+      
+      lastFetchParams.current = paramsString;
+      console.log('Fetching expenses with params:', paramsString);
+
       const response = await makeApiCall(`/api/admin/expenses/history?${searchParams}`);
       const expenseData = response.data || response;
       
@@ -262,30 +277,36 @@ const ExpenseManagement = () => {
     }
   };
 
-  // Refresh expenses when filters, scope or view change (list only)
+  // Refresh expenses when filters change (list only)
   useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      if (activeTab === 'view' && viewMode === 'list') {
-        // If scope is week/month, compute current range accordingly
-        if (scope === 'week') {
-          const today = new Date();
-          const day = today.getDay();
-          const diff = today.getDate() - day + (day === 0 ? -6 : 1); // Monday
-          const weekStart = new Date(today.setDate(diff));
-          const weekEnd = new Date(weekStart);
-          weekEnd.setDate(weekStart.getDate() + 6);
-          setDateRange({ start_date: weekStart.toISOString().split('T')[0], end_date: weekEnd.toISOString().split('T')[0] });
-        } else if (scope === 'month') {
-          const start = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
-          const end = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0);
-          setDateRange({ start_date: start.toISOString().split('T')[0], end_date: end.toISOString().split('T')[0] });
-        }
+    if (activeTab === 'view' && viewMode === 'list') {
+      const timeoutId = setTimeout(() => {
         fetchExpenses(1);
-      }
-    }, 300);
+      }, 300);
 
-    return () => clearTimeout(timeoutId);
-  }, [searchTerm, selectedCategory, selectedPaymentMethod, dateRange, scope, activeTab, viewMode]);
+      return () => clearTimeout(timeoutId);
+    }
+  }, [searchTerm, selectedCategory, selectedPaymentMethod, dateRange, activeTab, viewMode]);
+
+  // Handle scope changes separately to avoid duplicate API calls
+  useEffect(() => {
+    if (activeTab === 'view' && viewMode === 'list') {
+      // If scope is week/month, compute current range accordingly
+      if (scope === 'week') {
+        const today = new Date();
+        const day = today.getDay();
+        const diff = today.getDate() - day + (day === 0 ? -6 : 1); // Monday
+        const weekStart = new Date(today.setDate(diff));
+        const weekEnd = new Date(weekStart);
+        weekEnd.setDate(weekStart.getDate() + 6);
+        setDateRange({ start_date: weekStart.toISOString().split('T')[0], end_date: weekEnd.toISOString().split('T')[0] });
+      } else if (scope === 'month') {
+        const start = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+        const end = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0);
+        setDateRange({ start_date: start.toISOString().split('T')[0], end_date: end.toISOString().split('T')[0] });
+      }
+    }
+  }, [scope, activeTab, viewMode]);
 
   // Validate expense form
   const validateExpenseForm = useCallback(async (formData) => {
@@ -445,11 +466,7 @@ const ExpenseManagement = () => {
 
   // Utility functions
   const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
-      minimumFractionDigits: 2
-    }).format(amount || 0);
+    return formatMobileDayCurrency(amount || 0);
   };
 
   const formatDate = (dateString) => {
@@ -655,91 +672,92 @@ const ExpenseManagement = () => {
         {activeTab === 'view' ? (
           <div className="flex-1 overflow-hidden flex flex-col">
             {/* Unified Header for List/Calendar Views */}
-            <div className="bg-gradient-to-r from-slate-700 via-slate-800 to-slate-900 px-6 py-4 flex items-center justify-between shadow-lg">
-              <div className="flex items-center gap-4">
+            <div className="bg-gradient-to-r from-slate-700 via-slate-800 to-slate-900 px-3 sm:px-6 py-3 sm:py-4 flex items-center justify-between shadow-lg flex-wrap gap-2">
+              <div className="flex items-center gap-2 sm:gap-4 flex-1 min-w-0">
                 <button
                   onClick={() => setShowFilters(!showFilters)}
-                  className="p-2 text-white/80 hover:text-white hover:bg-white/20 rounded-lg transition-all duration-200"
+                  className="p-1.5 sm:p-2 text-white/80 hover:text-white hover:bg-white/20 rounded-lg transition-all duration-200 flex-shrink-0"
                   title="Toggle Filters"
                 >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
                   </svg>
                 </button>
                 
                 {viewMode === 'calendar' ? (
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1 sm:gap-2 flex-1 min-w-0">
                     <button
                       onClick={() => calendarNavRef.current?.prev && calendarNavRef.current.prev()}
-                      className="p-2 text-white/80 hover:text-white hover:bg-white/20 rounded-lg transition-all duration-200"
+                      className="p-1 sm:p-2 text-white/80 hover:text-white hover:bg-white/20 rounded-lg transition-all duration-200 flex-shrink-0"
                     >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                       </svg>
                     </button>
-                    <div className="text-2xl font-bold text-white min-w-[200px] text-center">
+                    <div className="text-base sm:text-xl md:text-2xl font-bold text-white text-center flex-1 min-w-0 truncate px-1">
                       {calendarTitle || 'Calendar'}
                     </div>
                     <button
                       onClick={() => calendarNavRef.current?.next && calendarNavRef.current.next()}
-                      className="p-2 text-white/80 hover:text-white hover:bg-white/20 rounded-lg transition-all duration-200"
+                      className="p-1 sm:p-2 text-white/80 hover:text-white hover:bg-white/20 rounded-lg transition-all duration-200 flex-shrink-0"
                     >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                       </svg>
                     </button>
                     <button
                       onClick={() => calendarNavRef.current?.today && calendarNavRef.current.today()}
-                      className="ml-2 px-3 py-1.5 text-sm font-semibold text-white/90 hover:text-white hover:bg-white/20 rounded-lg transition-all duration-200"
+                      className="px-2 py-1 sm:px-3 sm:py-1.5 text-xs sm:text-sm font-semibold text-white/90 hover:text-white hover:bg-white/20 rounded-lg transition-all duration-200 flex-shrink-0"
                     >
                       Today
                     </button>
                   </div>
                 ) : (
-                  <div className="text-2xl font-bold text-white">
+                  <div className="text-base sm:text-xl md:text-2xl font-bold text-white truncate">
                     Expense List
                   </div>
                 )}
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
                 {/* View Mode Toggle */}
-                <div className="bg-white/20 backdrop-blur-sm rounded-lg p-1 flex items-center gap-1">
+                <div className="bg-white/20 backdrop-blur-sm rounded-lg p-0.5 sm:p-1 flex items-center gap-0.5 sm:gap-1">
                   <button
                     onClick={() => setViewMode('list')}
-                    className={`px-3 py-1.5 text-sm font-semibold rounded-md transition-all duration-200 flex items-center gap-1.5 ${
+                    className={`px-2 py-1 sm:px-3 sm:py-1.5 text-xs sm:text-sm font-semibold rounded-md transition-all duration-200 flex items-center gap-1 sm:gap-1.5 ${
                       viewMode === 'list'
                         ? 'bg-white text-slate-700 shadow-md'
                         : 'text-white/90 hover:text-white hover:bg-white/10'
                     }`}
                   >
-                    <ListBulletIcon className="w-4 h-4" />
-                    List
+                    <ListBulletIcon className="w-3 h-3 sm:w-4 sm:h-4" />
+                    <span className="hidden sm:inline">List</span>
                   </button>
                   <button
                     onClick={() => setViewMode('calendar')}
-                    className={`px-3 py-1.5 text-sm font-semibold rounded-md transition-all duration-200 flex items-center gap-1.5 ${
+                    className={`px-2 py-1 sm:px-3 sm:py-1.5 text-xs sm:text-sm font-semibold rounded-md transition-all duration-200 flex items-center gap-1 sm:gap-1.5 ${
                       viewMode === 'calendar'
                         ? 'bg-white text-slate-700 shadow-md'
                         : 'text-white/90 hover:text-white hover:bg-white/10'
                     }`}
                   >
-                    <CalendarIcon className="w-4 h-4" />
-                    Calendar
+                    <CalendarIcon className="w-3 h-3 sm:w-4 sm:h-4" />
+                    <span className="hidden sm:inline">Calendar</span>
                   </button>
                 </div>
 
                 {/* Add Expense Button */}
                 <button
                   onClick={() => setActiveTab('add')}
-                  className="px-4 py-2 text-sm font-semibold bg-white text-slate-700 rounded-lg hover:bg-slate-50 transition-all duration-200 flex items-center gap-2 shadow-md hover:shadow-lg hover:scale-105"
+                  className="px-2 py-1 sm:px-4 sm:py-2 text-xs sm:text-sm font-semibold bg-white text-slate-700 rounded-lg hover:bg-slate-50 transition-all duration-200 flex items-center gap-1 sm:gap-2 shadow-md hover:shadow-lg hover:scale-105 flex-shrink-0"
                 >
-                  <PlusIcon className="w-4 h-4" />
-                  Add Expense
+                  <PlusIcon className="w-3 h-3 sm:w-4 sm:h-4" />
+                  <span className="hidden sm:inline">Add Expense</span>
+                  <span className="inline sm:hidden">Add</span>
                 </button>
 
-                {/* Role Indicator */}
-                <div className="ml-2">
+                {/* Role Indicator - hide on mobile */}
+                <div className="ml-1 sm:ml-2 hidden md:block">
                   <RoleIndicator />
                 </div>
               </div>
@@ -754,7 +772,7 @@ const ExpenseManagement = () => {
                     <div className="flex items-center space-x-6">
                       <div className="flex items-center space-x-2">
                         <DocumentTextIcon className="w-4 h-4 text-blue-600" />
-                        <span className="text-gray-600">Total: <span className="font-semibold text-gray-900">{totalExpenses}</span></span>
+                        <span className="text-gray-600">Total: <span className="font-semibold text-gray-900">{formatMobileDayCurrency(totalExpenses)}</span></span>
                       </div>
                       <div className="flex items-center space-x-2">
                         <ListBulletIcon className="w-4 h-4 text-green-600" />
@@ -829,7 +847,7 @@ const ExpenseManagement = () => {
                           <div className="flex items-center space-x-3 ml-4">
                             <div className="text-right">
                               <p className="text-sm font-semibold text-gray-900">
-                                {formatCurrency(expense.total_amount)}
+                                {formatMobileDayCurrency(expense.total_amount)}
                               </p>
                               {expense.reference_number && (
                                 <p className="text-xs text-gray-500 truncate max-w-20">

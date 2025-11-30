@@ -459,27 +459,243 @@
 }
 
 /* Responsive Design */
-@media (max-width: 768px) {
-  .fc .fc-toolbar {
-    padding: 0.75rem 1rem;
-  }
 
-  .fc .fc-toolbar-title {
-    font-size: 1.125rem;
-  }
-
-  .fc .fc-button {
-    padding: 0.375rem 0.75rem;
-    font-size: 0.875rem;
+/* Tablet and smaller desktops (768px - 1024px) */
+@media (max-width: 1024px) and (min-width: 769px) {
+  .fc .fc-col-header-cell {
+    padding: 0.75rem 0.25rem;
+    font-size: 0.8125rem;
   }
 
   .fc .fc-daygrid-day-frame {
-    min-height: 80px;
+    min-height: 90px;
+    padding: 0.25rem;
+  }
+
+  .fc .fc-daygrid-day-number {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.8125rem;
   }
 
   .fc-event {
     font-size: 0.75rem !important;
     padding: 0.375rem 0.5rem !important;
+    margin: 0.15rem 0 !important;
+  }
+
+  .fc-event.fc-event-total {
+    min-height: 30px !important;
+    max-height: 34px !important;
+    padding: 0.4rem 0.5rem !important;
+  }
+
+  .fc-event.fc-event-product,
+  .fc-event.fc-event-more {
+    min-height: 26px !important;
+    max-height: 30px !important;
+  }
+}
+
+/* Mobile devices (up to 768px) */
+@media (max-width: 768px) {
+  /* Make calendar container flexible */
+  .premium-calendar-wrapper {
+    width: 100%;
+    overflow-x: hidden;
+  }
+
+  .fc {
+    width: 100%;
+    max-width: 100vw;
+    overflow-x: hidden;
+  }
+
+  /* Compact toolbar */
+  .fc .fc-toolbar {
+    padding: 0.5rem;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .fc .fc-toolbar-title {
+    font-size: 1rem;
+  }
+
+  .fc .fc-button {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+  }
+
+  /* Compact header - abbreviate day names */
+  .fc .fc-col-header-cell {
+    padding: 0.5rem 0.125rem;
+    font-size: 0.6875rem;
+  }
+
+  .fc .fc-col-header-cell-cushion {
+    padding: 0.25rem;
+  }
+
+  /* Abbreviate day names to 2 letters on mobile */
+  .fc .fc-col-header-cell-cushion::first-letter {
+    font-size: 0.75rem;
+    font-weight: 700;
+  }
+
+  /* More compact day cells */
+  .fc .fc-daygrid-day-frame {
+    min-height: 65px;
+    padding: 0.125rem;
+  }
+
+  .fc .fc-daygrid-day-top {
+    padding: 0.125rem 0.25rem;
+  }
+
+  .fc .fc-daygrid-day-number {
+    padding: 0.125rem 0.375rem;
+    font-size: 0.75rem;
+  }
+
+  /* Reduce max events shown per day on mobile */
+  .fc .fc-daygrid-day-events {
+    margin-top: 0.125rem;
+  }
+
+  /* Compact events */
+  .fc-event {
+    font-size: 0.625rem !important;
+    padding: 0.25rem 0.375rem !important;
+    margin: 0.125rem 0 !important;
+    border-radius: 6px !important;
+  }
+
+  .fc-event.fc-event-total {
+    min-height: 24px !important;
+    max-height: 28px !important;
+    padding: 0.25rem 0.375rem !important;
+  }
+
+  .fc-event.fc-event-total .fc-event-main {
+    font-size: 0.625rem !important;
+  }
+
+  .fc-event.fc-event-product {
+    min-height: 22px !important;
+    max-height: 26px !important;
+    padding: 0.2rem 0.3rem !important;
+  }
+
+  .fc-event.fc-event-product svg {
+    width: 0.625rem !important;
+    height: 0.625rem !important;
+  }
+
+  .fc-event.fc-event-more {
+    min-height: 22px !important;
+    max-height: 26px !important;
+    padding: 0.2rem 0.3rem !important;
+  }
+
+  /* Smaller icons in events */
+  .fc-event svg {
+    width: 0.75rem;
+    height: 0.75rem;
+  }
+
+  /* More link styling */
+  .fc .fc-more-link {
+    padding: 0.125rem 0.25rem;
+    margin: 0.125rem;
+    font-size: 0.625rem;
+  }
+
+  /* Compact scrollbars */
+  .fc-scroller::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+
+  /* Modal adjustments for mobile */
+  .calendar-loading-overlay {
+    padding: 1rem;
+  }
+
+  .calendar-spinner {
+    padding: 1rem;
+  }
+
+  .calendar-spinner svg {
+    width: 2rem;
+    height: 2rem;
+  }
+
+  .calendar-spinner p {
+    font-size: 0.875rem;
+    margin-top: 0.5rem;
+  }
+}
+
+/* Small mobile devices (up to 480px) */
+@media (max-width: 480px) {
+  /* Even more compact on small screens */
+  .fc .fc-col-header-cell {
+    padding: 0.375rem 0.0625rem;
+    font-size: 0.625rem;
+  }
+
+  .fc .fc-daygrid-day-frame {
+    min-height: 55px;
+    padding: 0.0625rem;
+  }
+
+  .fc .fc-daygrid-day-number {
+    padding: 0.0625rem 0.25rem;
+    font-size: 0.6875rem;
+  }
+
+  /* Limit to fewer events on very small screens */
+  .fc .fc-daygrid-day {
+    font-size: 0.5625rem;
+  }
+
+  .fc-event {
+    font-size: 0.5625rem !important;
+    padding: 0.2rem 0.25rem !important;
+    margin: 0.0625rem 0 !important;
+  }
+
+  .fc-event.fc-event-total {
+    min-height: 20px !important;
+    max-height: 24px !important;
+  }
+
+  .fc-event.fc-event-product,
+  .fc-event.fc-event-more {
+    min-height: 18px !important;
+    max-height: 22px !important;
+  }
+
+  /* Hide some event details on very small screens */
+  .fc-event.fc-event-product .event-badge {
+    display: none;
+  }
+
+  /* Make grid lines thinner */
+  .fc .fc-daygrid-day,
+  .fc .fc-col-header-cell {
+    border-width: 0.5px !important;
+  }
+}
+
+/* Landscape mobile orientation */
+@media (max-width: 768px) and (orientation: landscape) {
+  .fc .fc-daygrid-day-frame {
+    min-height: 70px;
+  }
+
+  .fc-event {
+    font-size: 0.625rem !important;
   }
 }
 
@@ -488,10 +704,57 @@
   height: 100%;
   overflow: hidden;
   background: #ffffff;
+  width: 100%;
+  max-width: 100%;
 }
 
 .premium-calendar-wrapper:hover {
   box-shadow: 0 12px 48px rgba(0, 0, 0, 0.12), 0 4px 12px rgba(0, 0, 0, 0.06);
+}
+
+/* Prevent horizontal scroll on mobile */
+@media (max-width: 768px) {
+  body {
+    overflow-x: hidden;
+  }
+
+  .premium-calendar-wrapper {
+    overflow-x: hidden !important;
+    max-width: 100vw;
+  }
+
+  .fc-view-harness {
+    overflow-x: hidden !important;
+  }
+
+  .fc-scrollgrid {
+    width: 100% !important;
+    max-width: 100%;
+  }
+
+  .fc-daygrid-body {
+    width: 100% !important;
+  }
+
+  /* Ensure table layout doesn't break on mobile */
+  .fc-scrollgrid-sync-table {
+    width: 100% !important;
+    table-layout: fixed !important;
+  }
+
+  .fc-col-header,
+  .fc-daygrid-body {
+    width: 100% !important;
+  }
+
+  /* Force equal column widths */
+  .fc .fc-col-header-cell {
+    width: 14.28% !important; /* 100% / 7 days */
+  }
+
+  .fc .fc-daygrid-day {
+    width: 14.28% !important;
+  }
 }
 
 /* Loading Overlay */
