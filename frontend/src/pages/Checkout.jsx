@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { ordersAPI } from '../services/api';
+import paymentAPI from '../services/paymentApi';
 import { getImageUrl, handleImageError } from '../utils/imageUtils';
 import './Checkout.css';
 
@@ -20,7 +21,7 @@ const Checkout = () => {
     city: '',
     state: '',
     zipCode: '',
-    paymentMethod: 'cod',
+    paymentMethod: 'phonepe',
   });
   
   const [loading, setLoading] = useState(false);
@@ -43,9 +44,24 @@ const Checkout = () => {
     setError('');
 
     try {
+      const orderTotal = getCartTotal();
+
+      // Create order data
       const orderData = {
-        total_amount: getCartTotal(),
+        total_amount: orderTotal,
         status: 'pending',
+        payment_method: formData.paymentMethod.toUpperCase(),
+        payment_status: 'PENDING',
+        customer_phone: formData.phone,
+        customer_email: formData.email,
+        shipping_address: {
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          address: formData.address,
+          city: formData.city,
+          state: formData.state,
+          zipCode: formData.zipCode
+        },
         items: cartItems.map(item => ({
           product_id: item.originalId || item.id,
           quantity: item.quantity,
@@ -53,14 +69,52 @@ const Checkout = () => {
         })),
       };
 
+      console.log('Creating order with data:', JSON.stringify(orderData, null, 2));
+      console.log('Selected payment method:', formData.paymentMethod);
+
       const response = await ordersAPI.create(orderData);
-      
-      clearCart();
-      navigate('/order-success', { state: { order: response.data } });
+
+      // Extract order ID from response (nested in order property)
+      const orderId = response.data?.order?.id || response.data?.id;
+
+      if (!orderId) {
+        console.error('Order creation response:', response.data);
+        throw new Error('Failed to create order - no order ID returned');
+      }
+
+      console.log('Order created successfully:', orderId);
+
+      // Handle payment based on method
+      if (formData.paymentMethod === 'phonepe') {
+        // Initiate PhonePe payment
+        const paymentResponse = await paymentAPI.initiatePayment(
+          orderId,
+          orderTotal,
+          {
+            phone: formData.phone,
+            email: formData.email
+          },
+          'PHONEPE'
+        );
+
+        if (paymentResponse.success && paymentResponse.paymentUrl) {
+          // Store transaction ID in localStorage for verification page
+          localStorage.setItem('currentTransactionId', paymentResponse.merchantTransactionId);
+          localStorage.setItem('currentOrderId', orderId);
+
+          // Redirect to PhonePe payment page
+          window.location.href = paymentResponse.paymentUrl;
+        } else {
+          throw new Error('Failed to initiate payment');
+        }
+      } else if (formData.paymentMethod === 'cod') {
+        // COD flow - clear cart and navigate to success
+        clearCart();
+        navigate('/order-success', { state: { order: response.data.order || response.data } });
+      }
     } catch (err) {
-      setError('Failed to create order. Please try again.');
-      console.error('Order creation error:', err);
-    } finally {
+      setError(err.response?.data?.error || 'Failed to process checkout. Please try again.');
+      console.error('Checkout error:', err);
       setLoading(false);
     }
   };
@@ -186,6 +240,16 @@ const Checkout = () => {
                     <input
                       type="radio"
                       name="paymentMethod"
+                      value="phonepe"
+                      checked={formData.paymentMethod === 'phonepe'}
+                      onChange={handleChange}
+                    />
+                    <span>PhonePe / UPI / Card / Net Banking</span>
+                  </label>
+                  <label className="payment-option">
+                    <input
+                      type="radio"
+                      name="paymentMethod"
                       value="cod"
                       checked={formData.paymentMethod === 'cod'}
                       onChange={handleChange}
@@ -193,14 +257,18 @@ const Checkout = () => {
                     <span>Cash on Delivery</span>
                   </label>
                 </div>
+                <p style={{ fontSize: '12px', color: '#666', marginTop: '8px' }}>
+                  Selected: {formData.paymentMethod.toUpperCase()}
+                </p>
               </div>
 
-              <button 
-                type="submit" 
+              <button
+                type="submit"
                 className="place-order-btn"
                 disabled={loading}
               >
-                {loading ? 'Placing Order...' : 'Place Order'}
+                {loading ? 'Processing...' :
+                 formData.paymentMethod === 'phonepe' ? 'Proceed to Payment' : 'Place Order'}
               </button>
             </form>
           </div>

@@ -247,7 +247,10 @@ const Orders = () => {
                           {order.shipping_address ? (
                             <div className="space-y-2">
                               <p className="text-gray-700 leading-relaxed">
-                                {order.shipping_address}
+                                {typeof order.shipping_address === 'object'
+                                  ? `${order.shipping_address.firstName} ${order.shipping_address.lastName}, ${order.shipping_address.address}, ${order.shipping_address.city}, ${order.shipping_address.state} ${order.shipping_address.zipCode}`
+                                  : order.shipping_address
+                                }
                               </p>
                               {order.phone_number && (
                                 <div className="flex items-center space-x-2 pt-2 border-t border-blue-200">

@@ -14,6 +14,10 @@ const { errorHandler, notFoundHandler, requestId, asyncHandler, logger, sendSucc
 // Import expense routes
 const expenseRoutes = require('./routes/expenseRoutes');
 
+// Import payment routes
+const paymentRoutes = require('./routes/paymentRoutes');
+const adminPaymentRoutes = require('./routes/adminPaymentRoutes');
+
 const app = express();
 const port = process.env.PORT || 3001;
 
@@ -25,7 +29,37 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 // Add request ID middleware first
 app.use(requestId);
 
-app.use(cors());
+// Configure CORS with explicit settings
+const corsOptions = {
+  origin: [
+    'http://localhost:80',
+    'http://localhost:3000',
+    'http://localhost',
+    process.env.FRONTEND_URL,
+    process.env.CLIENT_URL
+  ].filter(Boolean), // Remove any undefined values
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: [
+    'Content-Type',
+    'Authorization',
+    'X-Requested-With',
+    'Accept',
+    'Origin',
+    'Access-Control-Request-Method',
+    'Access-Control-Request-Headers'
+  ],
+  exposedHeaders: ['Content-Range', 'X-Content-Range'],
+  maxAge: 86400, // 24 hours
+  optionsSuccessStatus: 200
+};
+
+app.use(cors(corsOptions));
+
+// Note: CORS preflight requests are handled automatically by app.use(cors(corsOptions))
+// The explicit app.options('*', cors(...)) call was causing an error in Express 5.x
+// Removing it to fix the issue
+
 app.use(express.json({ limit: '1gb' }));
 app.use(express.urlencoded({ limit: '1gb', extended: true }));
 
@@ -140,6 +174,10 @@ const authenticateAdmin = asyncHandler(async (req, res, next) => {
 
 // Use expense routes
 app.use('/api/admin/expenses', expenseRoutes);
+
+// Use payment routes
+app.use('/api/payments', paymentRoutes);
+app.use('/api/admin', adminPaymentRoutes);
 
 // Admin Routes
 // Admin Dashboard
@@ -2109,12 +2147,30 @@ app.post('/api/auth/refresh', asyncHandler(async (req, res) => {
 
 // Order Routes (protected by authentication middleware)
 app.post('/api/orders', authenticateToken, asyncHandler(async (req, res) => {
-    const { total_amount, status, items } = req.body;
+    const {
+        total_amount,
+        status,
+        items,
+        payment_method,
+        payment_status,
+        customer_phone,
+        customer_email,
+        shipping_address
+    } = req.body;
     const { user } = req;
 
     const { data: order, error: orderError } = await supabase
         .from('orders')
-        .insert([{ user_id: user.id, total_amount, status }])
+        .insert([{
+            user_id: user.id,
+            total_amount,
+            status,
+            payment_method: payment_method || 'COD',
+            payment_status: payment_status || 'PENDING',
+            customer_phone,
+            customer_email,
+            shipping_address
+        }])
         .select()
         .single();
 

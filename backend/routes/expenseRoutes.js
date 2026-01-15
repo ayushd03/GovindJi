@@ -636,95 +636,6 @@ router.get('/export',
     res.end();
   }));
 
-// Get transaction by ID
-router.get('/:id', 
-  roleMiddleware.requirePermission(roleMiddleware.ADMIN_PERMISSIONS.VIEW_EXPENSES),
-  asyncHandler(async (req, res) => {
-    const { id } = req.params;
-
-    // Validate ID format
-    if (!id || id.trim() === '') {
-      logger.warn('Invalid transaction ID provided', null, {
-        provided_id: id,
-        user_id: req.user?.id
-      });
-      return sendError(res, 'Transaction ID is required', 400);
-    }
-
-    const { data: transaction, error } = await supabase
-      .from('unified_transactions')
-      .select(`
-        *,
-        expense:expenses(*),
-        purchase_order:purchase_orders(*)
-      `)
-      .eq('id', id)
-      .single();
-
-    if (error) {
-      logger.error('Database error fetching transaction', error, {
-        transaction_id: id,
-        user_id: req.user?.id
-      });
-      throw error;
-    }
-
-    if (!transaction) {
-      logger.warn('Transaction not found', null, {
-        transaction_id: id,
-        user_id: req.user?.id
-      });
-      return sendError(res, 'Transaction not found', 404);
-    }
-
-    // Manually fetch party information if party_id exists
-    if (transaction.party_id) {
-      try {
-        const { data: partyData, error: partyError } = await supabase
-          .from('parties')
-          .select('*')
-          .eq('id', transaction.party_id)
-          .single();
-          
-        if (!partyError && partyData) {
-          transaction.party = partyData;
-        }
-      } catch (partyFetchError) {
-        logger.warn('Failed to fetch party information', partyFetchError, {
-          transaction_id: id,
-          party_id: transaction.party_id
-        });
-      }
-    }
-
-    // Manually fetch attachments for this transaction
-    try {
-      const { data: attachmentsData, error: attachmentsError } = await supabase
-        .from('transaction_attachments')
-        .select('*')
-        .eq('unified_transaction_id', id);
-        
-      if (!attachmentsError && attachmentsData) {
-        transaction.attachments = attachmentsData;
-      } else {
-        transaction.attachments = [];
-      }
-    } catch (attachmentsFetchError) {
-      logger.warn('Failed to fetch attachments', attachmentsFetchError, {
-        transaction_id: id
-      });
-      transaction.attachments = [];
-    }
-
-    logger.info('Transaction retrieved successfully', {
-      transaction_id: id,
-      transaction_type: transaction.transaction_type,
-      user_id: req.user?.id
-    });
-
-    sendSuccess(res, transaction, 'Transaction retrieved successfully');
-  }));
-
 // Get upcoming cheque clearances
 router.get('/cheques/upcoming',
   roleMiddleware.requirePermission(roleMiddleware.ADMIN_PERMISSIONS.VIEW_EXPENSES),
@@ -803,6 +714,95 @@ router.get('/cheques',
       total_count: cheques?.length || 0,
       total_amount: cheques?.reduce((sum, c) => sum + parseFloat(c.amount || 0), 0) || 0
     }, 'Cheques retrieved successfully');
+  }));
+
+// Get transaction by ID (MUST BE LAST to avoid route conflicts)
+router.get('/:id',
+  roleMiddleware.requirePermission(roleMiddleware.ADMIN_PERMISSIONS.VIEW_EXPENSES),
+  asyncHandler(async (req, res) => {
+    const { id } = req.params;
+
+    // Validate ID format
+    if (!id || id.trim() === '') {
+      logger.warn('Invalid transaction ID provided', null, {
+        provided_id: id,
+        user_id: req.user?.id
+      });
+      return sendError(res, 'Transaction ID is required', 400);
+    }
+
+    const { data: transaction, error } = await supabase
+      .from('unified_transactions')
+      .select(`
+        *,
+        expense:expenses(*),
+        purchase_order:purchase_orders(*)
+      `)
+      .eq('id', id)
+      .single();
+
+    if (error) {
+      logger.error('Database error fetching transaction', error, {
+        transaction_id: id,
+        user_id: req.user?.id
+      });
+      throw error;
+    }
+
+    if (!transaction) {
+      logger.warn('Transaction not found', null, {
+        transaction_id: id,
+        user_id: req.user?.id
+      });
+      return sendError(res, 'Transaction not found', 404);
+    }
+
+    // Manually fetch party information if party_id exists
+    if (transaction.party_id) {
+      try {
+        const { data: partyData, error: partyError } = await supabase
+          .from('parties')
+          .select('*')
+          .eq('id', transaction.party_id)
+          .single();
+
+        if (!partyError && partyData) {
+          transaction.party = partyData;
+        }
+      } catch (partyFetchError) {
+        logger.warn('Failed to fetch party information', partyFetchError, {
+          transaction_id: id,
+          party_id: transaction.party_id
+        });
+      }
+    }
+
+    // Manually fetch attachments for this transaction
+    try {
+      const { data: attachmentsData, error: attachmentsError } = await supabase
+        .from('transaction_attachments')
+        .select('*')
+        .eq('unified_transaction_id', id);
+
+      if (!attachmentsError && attachmentsData) {
+        transaction.attachments = attachmentsData;
+      } else {
+        transaction.attachments = [];
+      }
+    } catch (attachmentsFetchError) {
+      logger.warn('Failed to fetch attachments', attachmentsFetchError, {
+        transaction_id: id
+      });
+      transaction.attachments = [];
+    }
+
+    logger.info('Transaction retrieved successfully', {
+      transaction_id: id,
+      transaction_type: transaction.transaction_type,
+      user_id: req.user?.id
+    });
+
+    sendSuccess(res, transaction, 'Transaction retrieved successfully');
   }));
 
 // Helper function: Validate expense transaction

@@ -14,6 +14,7 @@ import ProductDetail from './pages/ProductDetail';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 import Checkout from './pages/Checkout';
+import PaymentVerify from './pages/PaymentVerify';
 import OrderSuccess from './pages/OrderSuccess';
 import Orders from './pages/Orders';
 import AdminDashboard from './pages/admin/AdminDashboard';
@@ -115,14 +116,15 @@ const AppContent = () => {
                 <Route path="/products/:id" element={<ProductDetail />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/signup" element={<Signup />} />
-                <Route 
-                  path="/checkout" 
+                <Route
+                  path="/checkout"
                   element={
                     <ProtectedRoute>
                       <Checkout />
                     </ProtectedRoute>
-                  } 
+                  }
                 />
+                <Route path="/payment/verify" element={<PaymentVerify />} />
                 <Route path="/order-success" element={<OrderSuccess />} />
                 <Route 
                   path="/orders" 
