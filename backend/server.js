@@ -18,6 +18,12 @@ const expenseRoutes = require('./routes/expenseRoutes');
 const paymentRoutes = require('./routes/paymentRoutes');
 const adminPaymentRoutes = require('./routes/adminPaymentRoutes');
 
+// Import delivery routes
+const deliveryRoutes = require('./routes/deliveryRoutes');
+const adminDeliveryRoutes = require('./routes/adminDeliveryRoutes');
+const deliveryService = require('./services/delivery/DeliveryService');
+const pickupScheduler = require('./services/delivery/pickupScheduler');
+
 const app = express();
 const port = process.env.PORT || 3001;
 
@@ -78,6 +84,20 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
         process.exit(1);
     }
 })();
+
+// Initialize delivery service
+try {
+    deliveryService.initialize();
+    logger.info('✅ Delivery service initialized successfully');
+
+    // Start automated pickup scheduler
+    if (process.env.ENABLE_PICKUP_SCHEDULER === 'true') {
+        pickupScheduler.start();
+        logger.info('✅ Pickup scheduler started - daily pickups will be scheduled at 6 PM IST');
+    }
+} catch (error) {
+    logger.warn('⚠️  Delivery service initialization failed - delivery features will be disabled', error.message);
+}
 
 // Configure multer for memory storage (for cloud upload)
 const upload = multer({
@@ -178,6 +198,10 @@ app.use('/api/admin/expenses', expenseRoutes);
 // Use payment routes
 app.use('/api/payments', paymentRoutes);
 app.use('/api/admin', adminPaymentRoutes);
+
+// Use delivery routes
+app.use('/api/delivery', deliveryRoutes);
+app.use('/api/admin/delivery', adminDeliveryRoutes);
 
 // Admin Routes
 // Admin Dashboard
@@ -478,6 +502,23 @@ app.put('/api/admin/orders/:id/status', authenticateAdmin, asyncHandler(async (r
         orderId: id,
         newStatus: status
     });
+
+    // Auto-create shipment when order status changes to 'processing'
+    if (status === 'processing' && !data.has_shipment) {
+        try {
+            const shipmentResult = await deliveryService.autoCreateShipment(id);
+            logger.info('Shipment auto-created successfully', {
+                orderId: id,
+                awbNumber: shipmentResult.awb_number
+            });
+        } catch (shipmentError) {
+            // Log error but don't fail the status update
+            logger.error('Auto-shipment creation failed', shipmentError, {
+                orderId: id
+            });
+            // Admin can manually create shipment later
+        }
+    }
 
     res.json(data);
 }));

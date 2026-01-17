@@ -28,7 +28,12 @@
       "WebSearch",
       "Bash(npm run:*)",
       "Bash(psql:*)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "WebFetch(domain:developer.phonepe.com)",
+      "Bash(timeout 5 npm start:*)",
+      "WebFetch(domain:one.delhivery.com)",
+      "WebFetch(domain:delhivery-express-api-doc.readme.io)",
+      "WebFetch(domain:help.delhivery.com)"
     ],
     "deny": []
   }

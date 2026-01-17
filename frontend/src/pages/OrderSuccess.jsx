@@ -21,10 +21,10 @@ const OrderSuccess = () => {
           {order && (
             <div className="order-details">
               <h3>Order Details</h3>
-              <p><strong>Order ID:</strong> {order.order?.id}</p>
-              <p><strong>Total Amount:</strong> ₹{parseFloat(order.order?.total_amount || 0).toFixed(2)}</p>
-              <p><strong>Payment Method:</strong> Cash on Delivery</p>
-              <p><strong>Status:</strong> {order.order?.status || 'Pending'}</p>
+              <p><strong>Order ID:</strong> {order.id}</p>
+              <p><strong>Total Amount:</strong> ₹{parseFloat(order.total_amount || 0).toFixed(2)}</p>
+              <p><strong>Payment Method:</strong> {order.payment_method || 'Cash on Delivery'}</p>
+              <p><strong>Status:</strong> {order.status || 'Pending'}</p>
             </div>
           )}
           

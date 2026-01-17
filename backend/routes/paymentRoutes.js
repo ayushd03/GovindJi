@@ -235,14 +235,13 @@ router.post('/callback', async (req, res) => {
       .update(updateData)
       .eq('merchant_transaction_id', merchantTransactionId);
 
-    // Update order status
+    // Update order payment status
     if (paymentSuccess) {
       await supabase
         .from('orders')
         .update({
           payment_status: 'PAID',
           payment_method: 'PHONEPE',
-          status: 'processing',
           updated_at: new Date().toISOString()
         })
         .eq('id', transaction.order_id);
@@ -320,7 +319,6 @@ router.get('/status/:merchantTransactionId', authenticateToken, async (req, res)
               .from('orders')
               .update({
                 payment_status: 'PAID',
-                status: 'processing',
                 updated_at: new Date().toISOString()
               })
               .eq('id', transaction.order_id);

@@ -141,4 +141,18 @@ export const ordersAPI = {
   createCheckoutSession: (items) => api.post('/api/create-checkout-session', { items }),
 };
 
+export const deliveryAPI = {
+  // Customer-facing endpoints
+  trackOrder: (orderId) => api.get(`/api/delivery/track/${orderId}`),
+  checkServiceability: (pincode) => api.get(`/api/delivery/check-serviceability?pincode=${pincode}`),
+
+  // Admin endpoints
+  createShipment: (orderId) => api.post(`/api/admin/delivery/create-shipment/${orderId}`),
+  schedulePickup: (pickupData) => api.post('/api/admin/delivery/schedule-pickup', pickupData),
+  getShipments: (params) => api.get('/api/admin/delivery/shipments', { params }),
+  getShipmentByAwb: (awbNumber) => api.get(`/api/admin/delivery/shipment/${awbNumber}`),
+  cancelShipment: (awbNumber) => api.put(`/api/admin/delivery/cancel/${awbNumber}`),
+  getPickupRequests: () => api.get('/api/admin/delivery/pickup-requests'),
+};
+
 export default api;

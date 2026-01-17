@@ -55,12 +55,11 @@ const Checkout = () => {
         customer_phone: formData.phone,
         customer_email: formData.email,
         shipping_address: {
-          firstName: formData.firstName,
-          lastName: formData.lastName,
+          name: `${formData.firstName} ${formData.lastName}`,
           address: formData.address,
           city: formData.city,
           state: formData.state,
-          zipCode: formData.zipCode
+          pincode: formData.zipCode
         },
         items: cartItems.map(item => ({
           product_id: item.originalId || item.id,
