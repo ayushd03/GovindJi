@@ -1,8 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import paymentAPI from '../services/paymentApi';
 import './PaymentVerify.css';
+
+const MAX_POLLS = 30; // Poll for max 60 seconds (30 * 2 seconds)
 
 /**
  * Payment Verification Page
@@ -17,65 +19,79 @@ function PaymentVerify() {
   const [transactionDetails, setTransactionDetails] = useState(null);
   const [error, setError] = useState('');
   const [pollCount, setPollCount] = useState(0);
-  const maxPolls = 30; // Poll for max 60 seconds (30 * 2 seconds)
+
+  const pollCountRef = useRef(0);
+  const timerRef = useRef(null);
+  const clearCartRef = useRef(clearCart);
+  clearCartRef.current = clearCart;
+
+  // Stable txnId extracted once from URL/localStorage
+  const txnId = useMemo(
+    () => searchParams.get('txnId') || localStorage.getItem('currentTransactionId'),
+    // searchParams identity may change, but the txnId value won't mid-session
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
+  );
 
   useEffect(() => {
-    verifyPayment();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    if (!txnId) {
+      setStatus('failed');
+      setError('No transaction ID found');
+      return;
+    }
 
-  const verifyPayment = async () => {
-    try {
-      // Get transaction ID from URL or localStorage
-      const txnId = searchParams.get('txnId') || localStorage.getItem('currentTransactionId');
+    let cancelled = false;
 
-      if (!txnId) {
-        setStatus('failed');
-        setError('No transaction ID found');
-        return;
-      }
+    const poll = async () => {
+      try {
+        const response = await paymentAPI.checkPaymentStatus(txnId);
 
-      console.log('Verifying payment for transaction:', txnId);
+        if (cancelled) return;
 
-      // Check payment status
-      const response = await paymentAPI.checkPaymentStatus(txnId);
+        if (response.success) {
+          setTransactionDetails(response.transaction);
 
-      if (response.success) {
-        setTransactionDetails(response.transaction);
-
-        if (response.transaction.status === 'COMPLETED') {
-          setStatus('success');
-          clearCart();
-
-          // Clean up localStorage
-          localStorage.removeItem('currentTransactionId');
-          localStorage.removeItem('currentOrderId');
-
-          console.log('Payment verified successfully');
-        } else if (response.transaction.status === 'FAILED') {
-          setStatus('failed');
-          setError('Payment failed. Please try again.');
-        } else {
-          // Still pending, poll again after 2 seconds
-          if (pollCount < maxPolls) {
-            setPollCount(pollCount + 1);
-            setTimeout(verifyPayment, 2000);
-          } else {
-            // Timeout - payment is taking too long
+          if (response.transaction.status === 'COMPLETED') {
+            setStatus('success');
+            clearCartRef.current();
+            localStorage.removeItem('currentTransactionId');
+            localStorage.removeItem('currentOrderId');
+          } else if (response.transaction.status === 'FAILED') {
             setStatus('failed');
-            setError('Payment verification timed out. Please check your orders page.');
+            setError('Payment failed. Please try again.');
+          } else {
+            // Still pending — schedule next poll
+            pollCountRef.current += 1;
+            setPollCount(pollCountRef.current);
+            if (pollCountRef.current < MAX_POLLS) {
+              timerRef.current = setTimeout(poll, 2000);
+            } else {
+              setStatus('failed');
+              setError('Payment verification timed out. Please check your orders page.');
+            }
+          }
+        } else {
+          if (!cancelled) {
+            setStatus('failed');
+            setError('Failed to verify payment status');
           }
         }
-      } else {
-        setStatus('failed');
-        setError('Failed to verify payment status');
+      } catch (err) {
+        if (!cancelled) {
+          console.error('Payment verification error:', err);
+          setStatus('failed');
+          setError(err.response?.data?.error || 'Failed to verify payment');
+        }
       }
-    } catch (error) {
-      console.error('Payment verification error:', error);
-      setStatus('failed');
-      setError(error.response?.data?.error || 'Failed to verify payment');
-    }
-  };
+    };
+
+    poll();
+
+    return () => {
+      cancelled = true;
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, [txnId]);
 
   if (status === 'verifying') {
     return (
@@ -88,9 +104,9 @@ function PaymentVerify() {
           <p className="verify-message">Please wait while we confirm your payment with PhonePe.</p>
           <div className="progress-indicator">
             <div className="progress-bar">
-              <div className="progress-fill" style={{ width: `${Math.min((pollCount / maxPolls) * 100, 100)}%` }}></div>
+              <div className="progress-fill" style={{ width: `${Math.min((pollCount / MAX_POLLS) * 100, 100)}%` }}></div>
             </div>
-            <p className="poll-info">Checking status... ({pollCount}/{maxPolls})</p>
+            <p className="poll-info">Checking status... ({pollCount}/{MAX_POLLS})</p>
           </div>
           <p className="note">Do not close this window or press the back button.</p>
         </div>

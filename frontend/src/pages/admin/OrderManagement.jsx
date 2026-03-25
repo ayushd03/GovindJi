@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { PermissionGuard } from '../../components/PermissionGuard';
 import { ADMIN_PERMISSIONS } from '../../enums/roles';
+import { formatShippingAddress } from '../../utils/orderUtils';
 import { Dialog, Transition } from '@headlessui/react';
 import {
   MagnifyingGlassIcon,
@@ -286,6 +287,8 @@ const OrderManagement = () => {
                               <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(selectedOrder.status)}`}>{selectedOrder.status.toUpperCase()}</span>
                             </div>
                             <div className="flex justify-between"><span className="text-muted-foreground">Total Amount:</span><span className="font-medium text-lg">₹{selectedOrder.total_amount}</span></div>
+                            <div className="flex justify-between"><span className="text-muted-foreground">Payment Method:</span><span className="font-medium">{selectedOrder.payment_method || 'N/A'}</span></div>
+                            <div className="flex justify-between"><span className="text-muted-foreground">Payment Status:</span><span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${selectedOrder.payment_status === 'PAID' ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning-foreground'}`}>{selectedOrder.payment_status || 'N/A'}</span></div>
                           </div>
                         </div>
                         <div className="bg-muted/50 rounded-lg p-4">
@@ -293,8 +296,8 @@ const OrderManagement = () => {
                           <div className="space-y-2 text-sm">
                             <div className="flex justify-between"><span className="text-muted-foreground">Name:</span><span className="font-medium">{selectedOrder.users?.name || 'N/A'}</span></div>
                             <div className="flex justify-between"><span className="text-muted-foreground">Email:</span><span className="font-medium">{selectedOrder.users?.email || 'N/A'}</span></div>
-                            <div className="flex justify-between"><span className="text-muted-foreground">Phone:</span><span className="font-medium">{selectedOrder.phone_number || 'N/A'}</span></div>
-                            <div className="flex flex-col"><span className="text-muted-foreground mb-1">Address:</span><span className="font-medium text-xs">{selectedOrder.shipping_address || 'N/A'}</span></div>
+                            <div className="flex justify-between"><span className="text-muted-foreground">Phone:</span><span className="font-medium">{selectedOrder.customer_phone || 'N/A'}</span></div>
+                            <div className="flex flex-col"><span className="text-muted-foreground mb-1">Address:</span><span className="font-medium text-xs">{formatShippingAddress(selectedOrder.shipping_address)}</span></div>
                           </div>
                         </div>
                       </div>

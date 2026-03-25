@@ -340,8 +340,8 @@ const Home = () => {
       </motion.section>
 
       {/* Shop by Category Section */}
-      <motion.section 
-        className="section-padding bg-gradient-to-br from-light-gray to-white"
+      <motion.section
+        className="py-16 bg-gradient-to-br from-light-gray to-white"
         {...fadeInUp}
       >
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
@@ -406,7 +406,7 @@ const Home = () => {
       </motion.section>
 
       {/* Featured Products Section */}
-      <motion.section className="section-padding bg-white" {...fadeInUp}>
+      <motion.section className="py-16 bg-white" {...fadeInUp}>
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <motion.div className="text-center mb-16" {...fadeInUp}>
             <h2 className="text-4xl md:text-5xl font-bold text-primary-text mb-4">
@@ -489,8 +489,8 @@ const Home = () => {
       </motion.section>
 
       {/* Why Choose Us Section */}
-      <motion.section 
-        className="section-padding bg-gradient-to-br from-primary-accent/5 to-secondary-accent/5"
+      <motion.section
+        className="py-16 bg-gradient-to-br from-orange-50 to-orange-100"
         {...fadeInUp}
       >
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">

@@ -34,31 +34,30 @@ const Footer = () => {
   };
 
   return (
-    <footer className="bg-footer-bg text-white mt-auto pt-8">
+    <footer style={{ backgroundColor: '#2c5530' }} className="text-gray-100 mt-16">
       {/* Main Footer Content */}
-      <motion.div 
-        className="container mx-auto px-4 sm:px-6 lg:px-8 pt-16 pb-16"
+      <motion.div
+        className="container mx-auto px-4 sm:px-6 lg:px-8 py-16"
         variants={stagger}
         initial="initial"
         whileInView="whileInView"
         viewport={{ once: true }}
       >
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-12 items-start">
           {/* Company Info */}
           <motion.div variants={fadeInUp} className="space-y-6">
             <div>
-              <h3 className="text-xl font-bold text-amber-400 mb-3">
-                GovindJi Dry Fruits
+              <h3 className="text-xl font-bold text-white mb-3">
+                GovindJi
               </h3>
-              <p className="text-gray-300 leading-relaxed">
-                Your trusted destination for premium quality dry fruits and nuts. 
-                Serving customers with excellence since years.
+              <p className="text-gray-400 leading-relaxed text-sm">
+                Premium quality dry fruits and nuts, handpicked for freshness.
               </p>
             </div>
             
             {/* Social Media */}
             <div>
-              <h4 className="text-lg font-semibold mb-4 text-amber-400">Follow Us</h4>
+              <h4 className="text-lg font-semibold mb-4 text-white">Follow Us</h4>
               <div className="flex space-x-4">
                 {[
                   { icon: Facebook, href: '#', label: 'Facebook' },
@@ -73,7 +72,7 @@ const Footer = () => {
                       href={social.href}
                       whileHover={{ scale: 1.1, y: -2 }}
                       whileTap={{ scale: 0.9 }}
-                      className="w-10 h-10 bg-white/10 rounded-full flex items-center justify-center hover:bg-amber-500 transition-all duration-300"
+                      className="w-10 h-10 bg-gray-700 rounded-full flex items-center justify-center hover:bg-orange-500 transition-all duration-300 text-gray-200 hover:text-white"
                       aria-label={social.label}
                     >
                       <IconComponent className="w-5 h-5" />
@@ -86,19 +85,17 @@ const Footer = () => {
 
           {/* Quick Links */}
           <motion.div variants={fadeInUp}>
-            <h4 className="text-lg font-semibold mb-6 text-amber-400">Quick Links</h4>
+            <h4 className="text-lg font-semibold mb-6 text-white">Shop</h4>
             <ul className="space-y-3">
               {[
                 { name: 'All Products', href: '/products' },
-                { name: 'Featured Products', href: '/products?featured=true' },
-                { name: 'Best Sellers', href: '/products?bestseller=true' },
-                { name: 'New Arrivals', href: '/products?new=true' },
-                { name: 'Gift Hampers', href: '/products?category=gifts' }
+                { name: 'Featured', href: '/products?featured=true' },
+                { name: 'Best Sellers', href: '/products?bestseller=true' }
               ].map((link) => (
                 <li key={link.name}>
                   <Link
                     to={link.href}
-                    className="text-gray-300 hover:text-amber-400 transition-colors duration-300 inline-flex items-center group"
+                    className="text-gray-400 hover:text-orange-400 transition-colors duration-300 inline-flex items-center group"
                   >
                     <span className="group-hover:translate-x-1 transition-transform duration-300">
                       {link.name}
@@ -111,20 +108,18 @@ const Footer = () => {
 
           {/* Customer Service */}
           <motion.div variants={fadeInUp}>
-            <h4 className="text-lg font-semibold mb-6 text-amber-400">Customer Service</h4>
+            <h4 className="text-lg font-semibold mb-6 text-white">Support</h4>
             <ul className="space-y-3">
               {[
-                { name: 'Help Center', href: '/help' },
-                { name: 'Shipping Information', href: '/shipping' },
-                { name: 'Returns & Exchanges', href: '/returns' },
-                { name: 'Size Guide', href: '/size-guide' },
                 { name: 'Track Your Order', href: '/track-order' },
+                { name: 'Shipping Info', href: '/shipping' },
+                { name: 'Returns', href: '/returns' },
                 { name: 'FAQ', href: '/faq' }
               ].map((link) => (
                 <li key={link.name}>
                   <Link
                     to={link.href}
-                    className="text-gray-300 hover:text-amber-400 transition-colors duration-300 inline-flex items-center group"
+                    className="text-gray-400 hover:text-orange-400 transition-colors duration-300 inline-flex items-center group"
                   >
                     <span className="group-hover:translate-x-1 transition-transform duration-300">
                       {link.name}
@@ -137,44 +132,43 @@ const Footer = () => {
 
           {/* Contact Info */}
           <motion.div variants={fadeInUp}>
-            <h4 className="text-lg font-semibold mb-6 text-amber-400">Get In Touch</h4>
+            <h4 className="text-lg font-semibold mb-6 text-white">Get In Touch</h4>
             <div className="space-y-4">
               <div className="flex items-start space-x-3">
-                <MapPin className="w-5 h-5 text-amber-400 mt-1 flex-shrink-0" />
+                <MapPin className="w-5 h-5 text-orange-400 mt-1 flex-shrink-0" />
                 <div>
-                  <p className="text-gray-300 leading-relaxed">
-                    PV82+M8J, Marothia Bazar,<br />
-                    Bartan Bazar, Indore,<br />
-                    Madhya Pradesh 452002
+                  <p className="text-gray-400 text-sm leading-relaxed">
+                    Bartan Bazar, Indore<br />
+                    MP 452002
                   </p>
                 </div>
               </div>
               
               <div className="flex items-center space-x-3">
-                <Phone className="w-5 h-5 text-amber-400 flex-shrink-0" />
-                <a 
-                  href="tel:+919340637575" 
-                  className="text-gray-300 hover:text-amber-400 transition-colors duration-300"
+                <Phone className="w-5 h-5 text-orange-400 flex-shrink-0" />
+                <a
+                  href="tel:+919340637575"
+                  className="text-gray-400 hover:text-orange-400 transition-colors duration-300 text-sm"
                 >
-                  093406 37575
+                  +91 93406 37575
                 </a>
               </div>
-              
+
               <div className="flex items-center space-x-3">
-                <Mail className="w-5 h-5 text-amber-400 flex-shrink-0" />
-                <a 
-                  href="mailto:info@govindjidryfruit.com" 
-                  className="text-gray-300 hover:text-amber-400 transition-colors duration-300"
+                <Mail className="w-5 h-5 text-orange-400 flex-shrink-0" />
+                <a
+                  href="mailto:info@govindjidryfruit.com"
+                  className="text-gray-400 hover:text-orange-400 transition-colors duration-300 text-sm"
                 >
-                  info@govindjidryfruit.com
+                  info@govindji.com
                 </a>
               </div>
               
               <div className="flex items-start space-x-3">
-                <div className="w-5 h-5 text-amber-400 mt-1 flex-shrink-0">🕐</div>
+                <div className="w-5 h-5 text-orange-400 mt-1 flex-shrink-0">🕐</div>
                 <div>
-                  <p className="text-gray-300 leading-relaxed">
-                    Closed ⋅ Opens 9 am Mon
+                  <p className="text-gray-400 text-sm leading-relaxed">
+                    9 am - 6 pm Mon-Fri
                   </p>
                 </div>
               </div>
@@ -182,17 +176,17 @@ const Footer = () => {
 
             {/* Newsletter Signup */}
             <div className="mt-6">
-              <h5 className="text-sm font-semibold mb-3 text-amber-400">Newsletter</h5>
+              <h5 className="text-sm font-semibold mb-3 text-white">Newsletter</h5>
               <div className="flex">
                 <input
                   type="email"
                   placeholder="Your email address"
-                  className="flex-1 px-3 py-2 bg-white/10 border border-white/20 rounded-l-lg text-white placeholder-gray-400 focus:outline-none focus:border-amber-400 transition-colors duration-300"
+                  className="flex-1 px-3 py-2 bg-gray-800 border border-gray-700 rounded-l-lg text-white placeholder-gray-500 focus:outline-none focus:border-orange-400 transition-colors duration-300"
                 />
                 <motion.button
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
-                  className="px-4 py-2 bg-amber-500 text-white rounded-r-lg hover:bg-amber-600 transition-colors duration-300 font-medium"
+                  className="px-4 py-2 bg-orange-500 text-white rounded-r-lg hover:bg-orange-600 transition-colors duration-300 font-medium"
                 >
                   Subscribe
                 </motion.button>
@@ -203,8 +197,9 @@ const Footer = () => {
       </motion.div>
 
       {/* Footer Bottom */}
-      <motion.div 
-        className="border-t border-white/10 bg-black/20 py-6"
+      <motion.div
+        style={{ backgroundColor: '#1a3a1d' }}
+        className="border-t border-opacity-20 border-white py-8"
         initial={{ opacity: 0 }}
         whileInView={{ opacity: 1 }}
         transition={{ duration: 0.6, delay: 0.3 }}
@@ -212,20 +207,20 @@ const Footer = () => {
       >
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
-            <div className="flex items-center space-x-2 text-gray-300">
+            <div className="flex items-center space-x-2 text-gray-400">
               <span>&copy; 2025 GovindJi Dry Fruits. All rights reserved.</span>
             </div>
-            
+
             <div className="flex items-center space-x-6">
-              <Link 
-                to="/privacy" 
-                className="text-gray-300 hover:text-amber-400 transition-colors duration-300 text-sm"
+              <Link
+                to="/privacy"
+                className="text-gray-400 hover:text-orange-400 transition-colors duration-300 text-sm"
               >
                 Privacy Policy
               </Link>
-              <Link 
+              <Link
                 to="/terms"
-                className="text-gray-300 hover:text-amber-400 transition-colors duration-300 text-sm"
+                className="text-gray-400 hover:text-orange-400 transition-colors duration-300 text-sm"
               >
                 Terms & Conditions
               </Link>
@@ -233,7 +228,7 @@ const Footer = () => {
                 onClick={scrollToTop}
                 whileHover={{ scale: 1.1, y: -2 }}
                 whileTap={{ scale: 0.9 }}
-                className="w-10 h-10 bg-amber-500 rounded-full flex items-center justify-center hover:bg-amber-600 transition-all duration-300 shadow-lg"
+                className="w-10 h-10 bg-orange-500 rounded-full flex items-center justify-center hover:bg-orange-600 transition-all duration-300 shadow-lg text-white"
                 aria-label="Scroll to top"
               >
                 <ArrowUp className="w-5 h-5" />

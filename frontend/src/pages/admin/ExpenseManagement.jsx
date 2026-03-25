@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { PermissionGuard } from '../../components/PermissionGuard';
 import { ADMIN_PERMISSIONS } from '../../enums/roles';
-import RoleIndicator from '../../components/RoleIndicator';
 import {
   CurrencyDollarIcon,
   PlusIcon,
@@ -755,11 +754,6 @@ const ExpenseManagement = () => {
                   <span className="hidden sm:inline">Add Expense</span>
                   <span className="inline sm:hidden">Add</span>
                 </button>
-
-                {/* Role Indicator - hide on mobile */}
-                <div className="ml-1 sm:ml-2 hidden md:block">
-                  <RoleIndicator />
-                </div>
               </div>
             </div>
 
@@ -906,11 +900,6 @@ const ExpenseManagement = () => {
                   </svg>
                   Back to {viewMode === 'list' ? 'List' : 'Calendar'}
                 </button>
-
-                {/* Role Indicator */}
-                <div className="ml-2">
-                  <RoleIndicator />
-                </div>
               </div>
             </div>
 

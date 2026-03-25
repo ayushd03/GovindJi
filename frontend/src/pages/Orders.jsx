@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { ordersAPI } from '../services/api';
-import { 
-  ShoppingBagIcon, 
-  ClockIcon, 
-  TruckIcon, 
-  CheckCircleIcon, 
+import {
+  ShoppingBagIcon,
+  ClockIcon,
+  TruckIcon,
+  CheckCircleIcon,
   XCircleIcon,
   CalendarIcon,
   CurrencyRupeeIcon,
@@ -14,6 +14,7 @@ import {
   HashtagIcon,
   BuildingOfficeIcon
 } from '@heroicons/react/24/outline';
+import { formatShippingAddress } from '../utils/orderUtils';
 import { motion } from 'framer-motion';
 
 const Orders = () => {
@@ -247,15 +248,12 @@ const Orders = () => {
                           {order.shipping_address ? (
                             <div className="space-y-2">
                               <p className="text-gray-700 leading-relaxed">
-                                {typeof order.shipping_address === 'object'
-                                  ? `${order.shipping_address.firstName} ${order.shipping_address.lastName}, ${order.shipping_address.address}, ${order.shipping_address.city}, ${order.shipping_address.state} ${order.shipping_address.zipCode}`
-                                  : order.shipping_address
-                                }
+                                {formatShippingAddress(order.shipping_address)}
                               </p>
-                              {order.phone_number && (
+                              {order.customer_phone && (
                                 <div className="flex items-center space-x-2 pt-2 border-t border-blue-200">
                                   <PhoneIcon className="h-4 w-4 text-blue-600" />
-                                  <span className="text-sm font-medium text-gray-700">{order.phone_number}</span>
+                                  <span className="text-sm font-medium text-gray-700">{order.customer_phone}</span>
                                 </div>
                               )}
                             </div>

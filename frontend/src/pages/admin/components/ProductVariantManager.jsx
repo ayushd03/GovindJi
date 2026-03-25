@@ -48,6 +48,7 @@ const ProductVariantManager = ({ isOpen, onClose, product, onSave }) => {
       size_value: '',
       size_unit: 'GRAMS',
       price: '',
+      weight_grams: '',  // Weight for shipping
       is_default: true, // First variant should be default
       is_active: true,
       display_order: 0
@@ -60,11 +61,28 @@ const ProductVariantManager = ({ isOpen, onClose, product, onSave }) => {
       size_value: '',
       size_unit: 'GRAMS',
       price: '',
+      weight_grams: '',  // Weight for shipping
       is_default: variants.length === 0,
       is_active: true,
       display_order: variants.length
     };
     setVariants([...variants, newVariant]);
+  };
+
+  // Auto-calculate weight_grams based on size_unit and size_value
+  const calculateWeight = (sizeValue, sizeUnit) => {
+    const value = parseFloat(sizeValue);
+    if (!value || value <= 0) return '';
+
+    switch (sizeUnit) {
+      case 'GRAMS':
+        return Math.round(value);
+      case 'KILOGRAMS':
+        return Math.round(value * 1000);
+      default:
+        // For non-weight units, return empty (user must enter manually)
+        return '';
+    }
   };
 
   const removeVariant = (index) => {
@@ -85,6 +103,21 @@ const ProductVariantManager = ({ isOpen, onClose, product, onSave }) => {
       newVariants.forEach((v, i) => {
         if (i !== index) v.is_default = false;
       });
+    }
+
+    // Auto-calculate weight when size_value or size_unit changes
+    if (field === 'size_value' || field === 'size_unit') {
+      const sizeValue = field === 'size_value' ? value : newVariants[index].size_value;
+      const sizeUnit = field === 'size_unit' ? value : newVariants[index].size_unit;
+      const calculatedWeight = calculateWeight(sizeValue, sizeUnit);
+
+      // Only auto-update if it's a weight unit (GRAMS/KILOGRAMS)
+      if (calculatedWeight !== '') {
+        newVariants[index].weight_grams = calculatedWeight;
+      } else if (field === 'size_unit') {
+        // Clear weight when switching to non-weight unit
+        newVariants[index].weight_grams = '';
+      }
     }
 
     setVariants(newVariants);
@@ -124,6 +157,17 @@ const ProductVariantManager = ({ isOpen, onClose, product, onSave }) => {
       }
       if (!variant.price || parseFloat(variant.price) <= 0) {
         setError(`Variant ${i + 1}: Price must be greater than 0`);
+        return false;
+      }
+
+      // Validate weight_grams for shipping
+      if (!variant.weight_grams || parseFloat(variant.weight_grams) <= 0) {
+        const nonWeightUnits = ['PIECES', 'LITERS', 'MILLILITERS'];
+        if (nonWeightUnits.includes(variant.size_unit)) {
+          setError(`Variant ${i + 1}: Shipping weight (grams) is required for ${variant.size_unit}`);
+        } else {
+          setError(`Variant ${i + 1}: Shipping weight is required`);
+        }
         return false;
       }
     }
@@ -211,10 +255,13 @@ const ProductVariantManager = ({ isOpen, onClose, product, onSave }) => {
                 <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg text-blue-800 text-sm">
                   <p className="font-medium mb-1">💡 Configure size variants for this product</p>
                   <p>Add different sizes (e.g., 250g, 500g, 1kg) with individual prices. Customers will see these options when adding to cart.</p>
+                  <p className="mt-2 text-xs"><strong>Shipping Weight:</strong> For GRAMS/KILOGRAMS units, weight is auto-calculated. For other units (PIECES, LITERS), enter the actual weight for shipping purposes.</p>
                 </div>
 
                 <div className="space-y-3">
-                  {variants.map((variant, index) => (
+                  {variants.map((variant, index) => {
+                    const isWeightUnit = ['GRAMS', 'KILOGRAMS'].includes(variant.size_unit);
+                    return (
                     <div
                       key={index}
                       className="border rounded-lg p-4 bg-gray-50 hover:bg-gray-100 transition-colors"
@@ -284,8 +331,33 @@ const ProductVariantManager = ({ isOpen, onClose, product, onSave }) => {
                           />
                         </div>
 
+                        {/* Weight for shipping */}
+                        <div className="md:col-span-2">
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                            Weight (g) *
+                            {isWeightUnit && <span className="text-green-600 ml-1">✓ Auto</span>}
+                          </label>
+                          <input
+                            type="number"
+                            step="1"
+                            value={variant.weight_grams}
+                            onChange={(e) => updateVariant(index, 'weight_grams', e.target.value)}
+                            placeholder={isWeightUnit ? "Auto-calculated" : "Enter weight in grams"}
+                            disabled={isWeightUnit}
+                            className={`input-field w-full px-3 py-2 border rounded-md text-sm ${
+                              isWeightUnit ? 'bg-green-50 text-green-700 cursor-not-allowed' : ''
+                            }`}
+                            title={isWeightUnit ? "Auto-calculated from size" : "Enter actual weight for shipping"}
+                          />
+                          {!isWeightUnit && (
+                            <p className="text-xs text-orange-600 mt-1">
+                              Required for shipping
+                            </p>
+                          )}
+                        </div>
+
                         {/* Checkboxes */}
-                        <div className="md:col-span-2 flex flex-col gap-2">
+                        <div className="md:col-span-1 flex flex-col gap-2">
                           <label className="flex items-center text-xs">
                             <input
                               type="checkbox"
@@ -334,7 +406,8 @@ const ProductVariantManager = ({ isOpen, onClose, product, onSave }) => {
                         </div>
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
 
                 <button

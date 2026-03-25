@@ -51,7 +51,6 @@ const Checkout = () => {
         total_amount: orderTotal,
         status: 'pending',
         payment_method: formData.paymentMethod.toUpperCase(),
-        payment_status: 'PENDING',
         customer_phone: formData.phone,
         customer_email: formData.email,
         shipping_address: {
@@ -63,13 +62,11 @@ const Checkout = () => {
         },
         items: cartItems.map(item => ({
           product_id: item.originalId || item.id,
+          variant_id: item.variant_id || null,
           quantity: item.quantity,
           price: item.price,
         })),
       };
-
-      console.log('Creating order with data:', JSON.stringify(orderData, null, 2));
-      console.log('Selected payment method:', formData.paymentMethod);
 
       const response = await ordersAPI.create(orderData);
 

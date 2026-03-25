@@ -3,7 +3,6 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { usePermissions } from '../context/PermissionContext';
 import { AdminPanelGuard } from './PermissionGuard';
-import RoleIndicator from './RoleIndicator';
 import {
   HomeIcon,
   ChartBarIcon,
@@ -209,11 +208,6 @@ const AdminLayout = ({ children }) => {
         <div className={`flex-1 ${sidebarOpen ? 'ml-0 lg:ml-72' : 'ml-0 lg:ml-16'} transition-all duration-300 flex flex-col min-h-screen`}>
           <main className="flex-1 overflow-y-auto overflow-x-hidden">
             <div className="p-6">
-              <div className="flex items-center justify-end mb-6">
-                <div className="flex items-center space-x-3">
-                  <RoleIndicator />
-                </div>
-              </div>
               {children}
             </div>
           </main>

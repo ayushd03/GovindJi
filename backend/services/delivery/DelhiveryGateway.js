@@ -211,6 +211,18 @@ class DelhiveryGateway extends DeliveryInterface {
         throw new Error('Missing shipping address or pincode in order data');
       }
 
+      // Validate weight before proceeding
+      if (!shipmentDetails.weight_grams || shipmentDetails.weight_grams === 0) {
+        throw new Error(
+          `Invalid shipment weight: ${shipmentDetails.weight_grams || 0}g. ` +
+          'Product weight configuration is required. Please configure weights in admin panel.'
+        );
+      }
+
+      if (shipmentDetails.weight_grams < 50) {
+        console.warn(`[DelhiveryGateway] Warning: Very low weight ${shipmentDetails.weight_grams}g for order ${orderData.id}`);
+      }
+
       // Get AWB number
       const awbNumbers = await this.getWaybills(1);
       const awbNumber = awbNumbers[0];
@@ -256,7 +268,7 @@ class DelhiveryGateway extends DeliveryInterface {
             // Physical details
             shipment_width: shipmentDetails.dimensions_width || 10,
             shipment_height: shipmentDetails.dimensions_height || 10,
-            weight: Math.ceil(shipmentDetails.weight_grams / 1000) || 1, // Convert grams to kg, round up
+            weight: Math.max(Math.ceil(shipmentDetails.weight_grams / 1000), 1), // Convert grams to kg, round up, minimum 1kg
             seller_gst_tin: '',
             shipping_mode: shipmentDetails.shipping_mode || 'Surface', // Surface or Express
             address_type: 'home'
@@ -266,6 +278,15 @@ class DelhiveryGateway extends DeliveryInterface {
           name: this.warehouseName
         }
       };
+
+      // Log weight conversion for audit
+      const weightKg = shipmentData.shipments[0].weight;
+      console.log(`[DelhiveryGateway] Weight conversion: ${shipmentDetails.weight_grams}g → ${weightKg}kg (sent to Delhivery)`, {
+        order_id: orderData.id,
+        awb_number: awbNumber,
+        original_grams: shipmentDetails.weight_grams,
+        sent_kg: weightKg
+      });
 
       // Format as required by Delhivery (form-data format)
       const formData = `format=json&data=${JSON.stringify(shipmentData)}`;

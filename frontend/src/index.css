@@ -166,6 +166,14 @@
   .tab-button-unselected {
     @apply text-muted-foreground hover:bg-card/50 hover:text-foreground;
   }
+
+  .section-padding {
+    @apply py-16 px-4 sm:px-6 lg:px-8;
+  }
+
+  .primary-text {
+    @apply text-gray-900;
+  }
 }
 
 /* Animations */

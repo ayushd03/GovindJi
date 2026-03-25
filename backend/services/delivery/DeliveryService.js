@@ -78,14 +78,15 @@ class DeliveryService {
     try {
       console.log(`[DeliveryService] Auto-creating shipment for order ${orderId}`);
 
-      // Fetch order with all details
+      // Fetch order with all details including product variants
       const { data: order, error: orderError } = await this.supabase
         .from('orders')
         .select(`
           *,
           order_items (
             *,
-            products (*)
+            products (*),
+            product_variants (*)
           )
         `)
         .eq('id', orderId)
@@ -117,17 +118,67 @@ class DeliveryService {
         throw new Error(`Delivery not available to pincode ${order.shipping_address.pincode}`);
       }
 
-      // Calculate total weight
+      // Calculate total weight with variant support
       let totalWeight = 0;
       let productsDesc = [];
+      const weightDetails = [];
 
       if (order.order_items && order.order_items.length > 0) {
         for (const item of order.order_items) {
-          const weight = item.products?.weight_grams || 250; // Default 250g if not set
-          totalWeight += weight * item.quantity;
-          productsDesc.push(`${item.products?.name || 'Product'} (${item.quantity})`);
+          let itemWeight = 0;
+          let weightSource = 'default';
+
+          // Priority: variant weight > product weight > default 250g
+          if (item.variant_id && item.product_variants?.weight_grams) {
+            itemWeight = item.product_variants.weight_grams;
+            weightSource = 'variant';
+          } else if (item.products?.weight_grams) {
+            itemWeight = item.products.weight_grams;
+            weightSource = 'product';
+          } else {
+            itemWeight = 250;  // Last resort default
+            weightSource = 'default';
+            console.warn(`[DeliveryService] Order ${orderId} item ${item.id}: No weight configured. Using default 250g. Product: ${item.products?.name}`);
+          }
+
+          const lineWeight = itemWeight * item.quantity;
+          totalWeight += lineWeight;
+
+          // Build product description
+          const itemName = item.products?.name || 'Product';
+          const variantName = item.product_variants?.variant_name;
+          const displayName = variantName ? `${itemName} - ${variantName}` : itemName;
+          productsDesc.push(`${displayName} (${item.quantity})`);
+
+          // Track weight details for logging
+          weightDetails.push({
+            product: itemName,
+            variant: variantName || null,
+            quantity: item.quantity,
+            unit_weight: itemWeight,
+            total_weight: lineWeight,
+            source: weightSource
+          });
         }
       }
+
+      // Validate total weight
+      if (totalWeight === 0) {
+        const errorMsg = `Cannot create shipment for order ${orderId}: Total weight is 0g. Please configure product weights in admin panel.`;
+        console.error(`[DeliveryService] ${errorMsg}`, { weightDetails });
+        throw new Error(errorMsg);
+      }
+
+      if (totalWeight < 50) {
+        console.warn(`[DeliveryService] Order ${orderId}: Very low weight ${totalWeight}g`, { weightDetails });
+      }
+
+      // Log weight calculation breakdown
+      console.log(`[DeliveryService] Order ${orderId} weight calculation:`, {
+        total_grams: totalWeight,
+        total_kg: Math.ceil(totalWeight / 1000),
+        items: weightDetails
+      });
 
       // Determine payment mode
       const paymentMode = order.payment_method === 'COD' ? 'COD' : 'Prepaid';

@@ -251,17 +251,139 @@ app.get('/api/admin/dashboard', authenticateAdmin, asyncHandler(async (req, res)
     res.json(dashboardData);
 }));
 
+// ============================================================================
+// HELPER FUNCTIONS FOR WEIGHT MANAGEMENT
+// ============================================================================
+
+/**
+ * Calculate weight in grams based on weight value and unit
+ * This ensures consistent weight storage for Delhivery integration
+ *
+ * @param {number} weight - The weight value
+ * @param {string} unit - The unit (kg, g, etc.)
+ * @param {number} explicitWeightGrams - Optional explicit weight_grams value
+ * @returns {number} Weight in grams
+ */
+function calculateWeightGrams(weight, unit, explicitWeightGrams = null) {
+    // If explicit weight_grams provided, use it (for non-weight units like "pieces")
+    if (explicitWeightGrams !== null && explicitWeightGrams !== undefined) {
+        return Math.round(parseFloat(explicitWeightGrams) || 0);
+    }
+
+    const weightValue = parseFloat(weight) || 0;
+    const normalizedUnit = (unit || '').toLowerCase().trim();
+
+    // Convert based on unit
+    switch (normalizedUnit) {
+        case 'kg':
+        case 'kilograms':
+        case 'kilogram':
+            return Math.round(weightValue * 1000);
+
+        case 'g':
+        case 'grams':
+        case 'gram':
+            return Math.round(weightValue);
+
+        case 'lb':
+        case 'lbs':
+        case 'pounds':
+        case 'pound':
+            // 1 pound = 453.592 grams
+            return Math.round(weightValue * 453.592);
+
+        case 'oz':
+        case 'ounces':
+        case 'ounce':
+            // 1 ounce = 28.3495 grams
+            return Math.round(weightValue * 28.3495);
+
+        default:
+            // For unknown units, apply heuristic:
+            // If weight < 100, assume kg; if >= 100, assume grams
+            if (weightValue > 0 && weightValue < 100) {
+                logger.warn('Unknown weight unit, assuming kilograms', { weight: weightValue, unit });
+                return Math.round(weightValue * 1000);
+            } else if (weightValue >= 100) {
+                logger.warn('Unknown weight unit, assuming grams', { weight: weightValue, unit });
+                return Math.round(weightValue);
+            }
+
+            // Default fallback
+            logger.warn('Could not calculate weight, using default 250g', { weight: weightValue, unit });
+            return 250;
+    }
+}
+
+/**
+ * Calculate variant weight in grams based on size_value and size_unit
+ *
+ * @param {number} sizeValue - The size value
+ * @param {string} sizeUnit - The size unit (GRAMS, KILOGRAMS, PIECES, etc.)
+ * @param {number} explicitWeightGrams - Optional explicit weight_grams value
+ * @returns {number} Weight in grams
+ */
+function calculateVariantWeightGrams(sizeValue, sizeUnit, explicitWeightGrams = null) {
+    // For weight-based units, auto-calculate from size
+    const normalizedUnit = (sizeUnit || '').toUpperCase().trim();
+    const value = parseFloat(sizeValue) || 0;
+
+    switch (normalizedUnit) {
+        case 'GRAMS':
+            return Math.round(value);
+
+        case 'KILOGRAMS':
+            return Math.round(value * 1000);
+
+        case 'POUNDS':
+            return Math.round(value * 453.592);
+
+        case 'OUNCES':
+            return Math.round(value * 28.3495);
+
+        default:
+            // For non-weight units (PIECES, LITERS, etc.), require explicit weight
+            if (explicitWeightGrams !== null && explicitWeightGrams !== undefined) {
+                return Math.round(parseFloat(explicitWeightGrams) || 0);
+            }
+
+            // No explicit weight provided for non-weight unit
+            logger.warn('Variant with non-weight unit requires explicit weight_grams', {
+                sizeValue,
+                sizeUnit,
+                message: 'Defaulting to 250g - admin should configure proper weight'
+            });
+            return 250;
+    }
+}
+
+// ============================================================================
 // Admin Product Management
+// ============================================================================
+
 app.post('/api/admin/products', authenticateAdmin, validateProduct, asyncHandler(async (req, res) => {
-    const { 
+    const {
         name, description, price, image_url, category_id, stock_quantity, min_stock_level, sku, weight, unit,
         // New enhanced fields
         item_hsn, is_service, base_unit, secondary_unit, unit_conversion_value,
         sale_price_without_tax, discount_on_sale_price, discount_type,
         opening_quantity_at_price, opening_quantity_as_of_date, stock_location,
-        wholesale_prices
+        wholesale_prices,
+        weight_grams  // Optional explicit weight in grams
     } = req.body;
-    
+
+    // Calculate weight in grams for Delhivery integration
+    const calculatedWeightGrams = calculateWeightGrams(weight, unit || 'kg', weight_grams);
+
+    // Log weight calculation for debugging
+    logger.info('Product weight calculated', {
+        productName: name,
+        inputWeight: weight,
+        inputUnit: unit,
+        explicitWeightGrams: weight_grams,
+        calculatedWeightGrams
+    });
+
     // Insert product with new fields
     const { data: product, error: productError } = await supabase
         .from('products')
@@ -276,6 +398,7 @@ app.post('/api/admin/products', authenticateAdmin, validateProduct, asyncHandler
             sku,
             weight,
             unit: unit || 'kg',
+            weight_grams: calculatedWeightGrams,  // Add calculated weight
             // New fields
             item_hsn,
             is_service: is_service || false,
@@ -342,6 +465,36 @@ app.put('/api/admin/products/:id', authenticateAdmin, validateProduct, asyncHand
     const { id } = req.params;
     const { wholesale_prices, ...productUpdates } = req.body;
     productUpdates.updated_at = new Date().toISOString();
+
+    // Recalculate weight_grams if weight or unit is being updated
+    if (productUpdates.weight !== undefined || productUpdates.unit !== undefined || productUpdates.weight_grams !== undefined) {
+        // Fetch current product to get existing values
+        const { data: currentProduct, error: fetchError } = await supabase
+            .from('products')
+            .select('weight, unit, weight_grams')
+            .eq('id', id)
+            .single();
+
+        if (fetchError) throw fetchError;
+
+        // Use updated values if provided, otherwise use current values
+        const finalWeight = productUpdates.weight !== undefined ? productUpdates.weight : currentProduct.weight;
+        const finalUnit = productUpdates.unit !== undefined ? productUpdates.unit : currentProduct.unit;
+        const explicitWeightGrams = productUpdates.weight_grams;
+
+        // Recalculate weight_grams
+        productUpdates.weight_grams = calculateWeightGrams(finalWeight, finalUnit, explicitWeightGrams);
+
+        logger.info('Product weight recalculated on update', {
+            productId: id,
+            oldWeight: currentProduct.weight,
+            oldUnit: currentProduct.unit,
+            oldWeightGrams: currentProduct.weight_grams,
+            newWeight: finalWeight,
+            newUnit: finalUnit,
+            newWeightGrams: productUpdates.weight_grams
+        });
+    }
 
     // Update product
     const { data: product, error: productError } = await supabase
@@ -473,6 +626,131 @@ app.get('/api/admin/orders', authenticateAdmin, asyncHandler(async (req, res) =>
     });
 
     res.json(data);
+}));
+
+// Check shipment readiness before creating shipment
+app.get('/api/admin/orders/:id/shipment-readiness', authenticateAdmin, asyncHandler(async (req, res) => {
+    const { id } = req.params;
+
+    // Fetch order with all details including variants
+    const { data: order, error: orderError } = await supabase
+        .from('orders')
+        .select(`
+            *,
+            order_items (
+                *,
+                products (id, name, weight_grams),
+                product_variants (id, variant_name, weight_grams)
+            )
+        `)
+        .eq('id', id)
+        .single();
+
+    if (orderError) throw orderError;
+    if (!order) {
+        return res.status(404).json({ error: 'Order not found' });
+    }
+
+    const issues = [];
+    let totalWeight = 0;
+    const itemDetails = [];
+
+    // Check each order item for weight configuration
+    for (const item of order.order_items || []) {
+        let itemWeight = 0;
+        let weightSource = 'default';
+
+        // Determine weight source (variant > product > default)
+        if (item.variant_id && item.product_variants?.weight_grams) {
+            itemWeight = item.product_variants.weight_grams;
+            weightSource = 'variant';
+        } else if (item.products?.weight_grams) {
+            itemWeight = item.products.weight_grams;
+            weightSource = 'product';
+        }
+
+        // Flag items with missing or default weight
+        if (itemWeight === 0 || !itemWeight) {
+            issues.push({
+                type: 'MISSING_WEIGHT',
+                product: item.products?.name || 'Unknown Product',
+                variant: item.product_variants?.variant_name || null,
+                message: 'Weight not configured',
+                severity: 'error'
+            });
+        } else if (itemWeight === 250) {
+            issues.push({
+                type: 'DEFAULT_WEIGHT',
+                product: item.products?.name,
+                variant: item.product_variants?.variant_name || null,
+                message: 'Using default weight (250g) - consider configuring actual weight',
+                severity: 'warning'
+            });
+        }
+
+        const lineWeight = (itemWeight || 250) * item.quantity;
+        totalWeight += lineWeight;
+
+        itemDetails.push({
+            product: item.products?.name,
+            variant: item.product_variants?.variant_name || null,
+            quantity: item.quantity,
+            unit_weight: itemWeight || 250,
+            total_weight: lineWeight,
+            weight_source: weightSource
+        });
+    }
+
+    // Check shipping address
+    if (!order.shipping_address?.pincode) {
+        issues.push({
+            type: 'MISSING_PINCODE',
+            message: 'Shipping pincode is required',
+            severity: 'error'
+        });
+    }
+
+    if (!order.shipping_address?.address) {
+        issues.push({
+            type: 'MISSING_ADDRESS',
+            message: 'Shipping address is required',
+            severity: 'error'
+        });
+    }
+
+    // Check customer phone
+    if (!order.customer_phone) {
+        issues.push({
+            type: 'MISSING_PHONE',
+            message: 'Customer phone is required',
+            severity: 'error'
+        });
+    }
+
+    // Determine overall readiness
+    const errorIssues = issues.filter(i => i.severity === 'error');
+    const ready = errorIssues.length === 0 && totalWeight > 0;
+
+    logger.info('Shipment readiness check completed', {
+        orderId: id,
+        userId: req.user?.id,
+        ready,
+        totalWeight,
+        issueCount: issues.length
+    });
+
+    res.json({
+        ready,
+        total_weight_grams: totalWeight,
+        total_weight_kg: Math.ceil(totalWeight / 1000),
+        issues,
+        item_details: itemDetails,
+        summary: {
+            item_count: order.order_items?.length || 0,
+            error_count: errorIssues.length,
+            warning_count: issues.filter(i => i.severity === 'warning').length
+        }
+    });
 }));
 
 app.put('/api/admin/orders/:id/status', authenticateAdmin, asyncHandler(async (req, res) => {
@@ -1741,17 +2019,37 @@ app.post('/api/admin/products/:id/variants', authenticateAdmin, asyncHandler(asy
 
     // Insert new variants if provided
     if (variants.length > 0) {
-        const variantData = variants.map((variant, index) => ({
-            product_id: id,
-            variant_name: variant.variant_name,
-            size_value: parseFloat(variant.size_value),
-            size_unit: variant.size_unit,
-            price: parseFloat(variant.price),
-            sku: variant.sku || null,
-            is_active: variant.is_active !== undefined ? variant.is_active : true,
-            is_default: variant.is_default || false,
-            display_order: variant.display_order !== undefined ? variant.display_order : index
-        }));
+        const variantData = variants.map((variant, index) => {
+            // Calculate weight_grams for each variant
+            const weightGrams = calculateVariantWeightGrams(
+                variant.size_value,
+                variant.size_unit,
+                variant.weight_grams  // Explicit weight from frontend (optional)
+            );
+
+            // Log weight calculation
+            logger.info('Variant weight calculated', {
+                productId: id,
+                variantName: variant.variant_name,
+                sizeValue: variant.size_value,
+                sizeUnit: variant.size_unit,
+                explicitWeightGrams: variant.weight_grams,
+                calculatedWeightGrams: weightGrams
+            });
+
+            return {
+                product_id: id,
+                variant_name: variant.variant_name,
+                size_value: parseFloat(variant.size_value),
+                size_unit: variant.size_unit,
+                price: parseFloat(variant.price),
+                sku: variant.sku || null,
+                is_active: variant.is_active !== undefined ? variant.is_active : true,
+                is_default: variant.is_default || false,
+                display_order: variant.display_order !== undefined ? variant.display_order : index,
+                weight_grams: weightGrams  // Add calculated weight
+            };
+        });
 
         const { data, error } = await supabase
             .from('product_variants')
@@ -1786,13 +2084,44 @@ app.put('/api/admin/products/:productId/variants/:variantId', authenticateAdmin,
     const variantUpdates = req.body;
 
     // Ensure we're only updating fields that should be updateable
-    const allowedFields = ['variant_name', 'size_value', 'size_unit', 'price', 'sku', 'is_active', 'is_default', 'display_order'];
+    const allowedFields = ['variant_name', 'size_value', 'size_unit', 'price', 'sku', 'is_active', 'is_default', 'display_order', 'weight_grams'];
     const updates = {};
     allowedFields.forEach(field => {
         if (variantUpdates[field] !== undefined) {
             updates[field] = variantUpdates[field];
         }
     });
+
+    // Recalculate weight_grams if size_value, size_unit, or weight_grams is being updated
+    if (updates.size_value !== undefined || updates.size_unit !== undefined || updates.weight_grams !== undefined) {
+        // Fetch current variant to get existing values
+        const { data: currentVariant, error: fetchError } = await supabase
+            .from('product_variants')
+            .select('size_value, size_unit, weight_grams')
+            .eq('id', variantId)
+            .single();
+
+        if (fetchError) throw fetchError;
+
+        // Use updated values if provided, otherwise use current values
+        const finalSizeValue = updates.size_value !== undefined ? updates.size_value : currentVariant.size_value;
+        const finalSizeUnit = updates.size_unit !== undefined ? updates.size_unit : currentVariant.size_unit;
+        const explicitWeightGrams = updates.weight_grams;
+
+        // Recalculate weight_grams
+        updates.weight_grams = calculateVariantWeightGrams(finalSizeValue, finalSizeUnit, explicitWeightGrams);
+
+        logger.info('Variant weight recalculated on update', {
+            productId,
+            variantId,
+            oldSizeValue: currentVariant.size_value,
+            oldSizeUnit: currentVariant.size_unit,
+            oldWeightGrams: currentVariant.weight_grams,
+            newSizeValue: finalSizeValue,
+            newSizeUnit: finalSizeUnit,
+            newWeightGrams: updates.weight_grams
+        });
+    }
 
     updates.updated_at = new Date().toISOString();
 
@@ -2200,14 +2529,18 @@ app.post('/api/orders', authenticateToken, asyncHandler(async (req, res) => {
     } = req.body;
     const { user } = req;
 
+    // COD orders are considered paid on delivery; online payments start as PENDING
+    const resolvedPaymentMethod = payment_method || 'COD';
+    const resolvedPaymentStatus = resolvedPaymentMethod === 'COD' ? 'COD_PENDING' : (payment_status || 'PENDING');
+
     const { data: order, error: orderError } = await supabase
         .from('orders')
         .insert([{
             user_id: user.id,
             total_amount,
             status,
-            payment_method: payment_method || 'COD',
-            payment_status: payment_status || 'PENDING',
+            payment_method: resolvedPaymentMethod,
+            payment_status: resolvedPaymentStatus,
             customer_phone,
             customer_email,
             shipping_address
@@ -2227,6 +2560,7 @@ app.post('/api/orders', authenticateToken, asyncHandler(async (req, res) => {
     const orderItems = items.map(item => ({
         order_id: order.id,
         product_id: item.product_id,
+        variant_id: item.variant_id || null,  // Track which variant was ordered
         quantity: item.quantity,
         price: item.price,
     }));
@@ -2275,7 +2609,8 @@ app.get('/api/orders/:user_id', authenticateToken, asyncHandler(async (req, res)
                 products (*)
             )
         `)
-        .eq('user_id', user_id);
+        .eq('user_id', user_id)
+        .order('created_at', { ascending: false });
     
     if (error) {
         logger.error('Failed to fetch user orders', error, {
