@@ -2,9 +2,112 @@
   overscroll-behavior: contain;
 }
 
+.products-filter-panel {
+  display: flex;
+  flex-direction: column;
+}
+
+.products-range-input {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  height: 2.35rem;
+  border: 1px solid rgba(226, 232, 240, 1);
+  border-radius: 0.85rem;
+  background: rgba(248, 250, 252, 0.8);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+
+.products-range-input:focus-within {
+  border-color: rgba(35, 68, 42, 0.35);
+  background: #fff;
+  box-shadow: 0 0 0 4px rgba(35, 68, 42, 0.08);
+}
+
+.products-range-prefix {
+  flex: 0 0 auto;
+  padding-left: 0.65rem;
+  padding-right: 0.35rem;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgb(100 116 139);
+}
+
+.products-range-field {
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  border: 0;
+  background: transparent;
+  padding: 0 0.6rem 0 0.05rem;
+  font-size: 0.88rem;
+  color: rgb(51 65 85);
+  outline: none;
+}
+
+.products-range-field::placeholder {
+  color: rgb(148 163 184);
+}
+
+.products-sidebar-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.6rem;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  border-radius: 0.9rem;
+  background: linear-gradient(180deg, rgba(248, 250, 252, 0.96), rgba(255, 255, 255, 0.96));
+  padding: 0.7rem 0.75rem;
+}
+
+.products-sidebar-summary-label {
+  display: block;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgb(100 116 139);
+}
+
+.products-sidebar-summary-value {
+  margin-top: 0.2rem;
+  font-size: 1rem;
+  font-weight: 700;
+  color: rgb(15 23 42);
+}
+
+.products-display-section {
+  display: grid;
+  gap: 0.75rem;
+  border-top: 1px solid rgba(226, 232, 240, 0.9);
+  padding-top: 0.85rem;
+}
+
 @media (min-width: 1024px) {
   .products-layout {
     min-height: calc(100vh - 5rem);
+  }
+
+  .products-filter-panel {
+    max-height: calc(100vh - 8.5rem);
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(35, 68, 42, 0.22) transparent;
+  }
+
+  .products-filter-panel::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  .products-filter-panel::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .products-filter-panel::-webkit-scrollbar-thumb {
+    border-radius: 999px;
+    background: rgba(35, 68, 42, 0.2);
   }
 
   .products-results-scroll {

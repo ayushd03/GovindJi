@@ -225,24 +225,6 @@ const Products = () => {
     }));
   };
   
-  const removeFilter = (filterType, value = null) => {
-    setFilters(prev => {
-      switch (filterType) {
-        case 'search':
-          setSearchParams({});
-          return { ...prev, search: '' };
-        case 'category':
-          return { ...prev, categories: prev.categories.filter(id => id !== value) };
-        case 'price':
-          return { ...prev, priceRange: { min: '', max: '' } };
-        case 'weight':
-          return { ...prev, weightRange: { min: '', max: '' } };
-        default:
-          return prev;
-      }
-    });
-  };
-  
   const clearFilters = () => {
     setFilters({
       search: '',
@@ -274,9 +256,7 @@ const Products = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
   const activeFiltersCount = getActiveFiltersCount();
-  const resultsSummary = filters.search
-    ? `Showing ${filteredProducts.length} result${filteredProducts.length !== 1 ? 's' : ''} for "${filters.search}"`
-    : `${filteredProducts.length} product${filteredProducts.length !== 1 ? 's' : ''} available`;
+  const selectedSortOption = sortOptions.find((option) => option.id === filters.sortBy) || sortOptions[0];
 
   if (loading) {
     return (
@@ -295,7 +275,7 @@ const Products = () => {
   return (
     <div className="products-layout page-shell-soft py-6 lg:h-[calc(100vh-5rem)] lg:overflow-hidden">
       <div className="page-container h-full">
-        <div className="lg:grid lg:h-full lg:grid-cols-[248px_minmax(0,1fr)] lg:gap-4 lg:overflow-hidden xl:gap-5">
+        <div className="lg:grid lg:h-full lg:grid-cols-[236px_minmax(0,1fr)] lg:gap-3 lg:overflow-hidden xl:gap-4">
           <div className="mb-3 lg:hidden">
             <Button
               variant="outline"
@@ -318,14 +298,14 @@ const Products = () => {
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.4, delay: 0.15 }}
           >
-            <Card className="sticky top-6 overflow-hidden rounded-[1.45rem] border border-slate-200/80 bg-white shadow-[0_14px_28px_rgba(15,23,42,0.045)] lg:max-h-[calc(100vh-8.5rem)]">
-              <CardContent className="p-0">
-                <div className="space-y-5 p-4 sm:p-5">
-                  <div className="border-b border-slate-200 pb-4">
+            <Card className="sticky top-6 overflow-hidden rounded-[1.3rem] border border-slate-200/80 bg-white shadow-[0_14px_28px_rgba(15,23,42,0.045)] lg:max-h-[calc(100vh-8.5rem)]">
+              <CardContent className="products-filter-panel p-0">
+                <div className="space-y-3.5 px-2.5 py-3 sm:px-3 sm:py-3.5">
+                  <div className="border-b border-slate-200 pb-3">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Filters</p>
-                        <p className="mt-1 text-sm leading-6 text-slate-600">Search, categories, price and weight.</p>
+                        <p className="mt-0.5 text-xs leading-5 text-slate-600">Keyword, category, price, weight.</p>
                       </div>
                       {activeFiltersCount > 0 && (
                         <Badge className="shrink-0 rounded-full border-0 bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600 shadow-none">
@@ -334,9 +314,9 @@ const Products = () => {
                       )}
                     </div>
                     {activeFiltersCount > 0 && (
-                      <div className="mt-3 flex items-center justify-between gap-3">
-                        <p className="text-xs text-slate-500">
-                          {activeFiltersCount} filter{activeFiltersCount === 1 ? '' : 's'} applied
+                      <div className="mt-2 flex items-center justify-between gap-3">
+                        <p className="text-[11px] text-slate-500">
+                          {activeFiltersCount} active
                         </p>
                         <Button variant="ghost" size="sm" onClick={clearFilters} className="h-auto rounded-full px-2 py-1 text-xs text-[#23442a] hover:bg-[#23442a]/5 hover:text-[#23442a]">
                           Clear all
@@ -344,19 +324,25 @@ const Products = () => {
                       </div>
                     )}
                   </div>
-                </div>
 
-                <div className="space-y-5 px-4 pb-4 sm:px-5 sm:pb-5">
                   <div>
-                    <label className="mb-2.5 block text-sm font-semibold tracking-tight text-slate-900">
-                      Search Products
-                    </label>
+                    <div className="mb-1.5 flex items-center justify-between gap-3">
+                      <label className="block text-sm font-semibold tracking-tight text-slate-900">
+                        Search
+                      </label>
+                      {filters.search && (
+                        <span className="truncate text-[11px] font-medium text-slate-500" title={filters.search}>
+                          {filters.search}
+                        </span>
+                      )}
+                    </div>
                     <div className="relative">
                       <MagnifyingGlassIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                       <input
                         type="text"
-                        placeholder="Search by name or description..."
-                        className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/70 py-2 pl-10 pr-10 text-sm text-slate-700 shadow-sm transition-all duration-200 focus:border-[#23442a]/35 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#23442a]/15"
+                        placeholder="Name or keyword"
+                        title={filters.search || 'Name or keyword'}
+                        className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/70 py-2 pl-10 pr-10 text-sm text-slate-700 shadow-sm transition-all duration-200 placeholder:text-slate-400 focus:border-[#23442a]/35 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#23442a]/15"
                         value={filters.search}
                         onChange={(e) => handleFilterChange('search', e.target.value)}
                       />
@@ -373,16 +359,21 @@ const Products = () => {
                   </div>
 
                   <div>
-                    <label className="mb-2.5 block text-sm font-semibold tracking-tight text-slate-900">
-                      Categories
-                    </label>
-                    <div className="max-h-52 space-y-1.5 overflow-y-auto pr-1">
+                    <div className="mb-1.5 flex items-center justify-between gap-3">
+                      <label className="block text-sm font-semibold tracking-tight text-slate-900">
+                        Categories
+                      </label>
+                      <span className="text-[11px] font-medium text-slate-500">
+                        {filters.categories.length}/{categories.length}
+                      </span>
+                    </div>
+                    <div className="max-h-40 space-y-1 overflow-y-auto pr-0.5">
                       {categories.map((category) => {
                         const isSelected = filters.categories.includes(category.id);
                         return (
                           <div 
                             key={category.id} 
-                            className={`flex items-start gap-3 rounded-xl px-2.5 py-2 transition-colors hover:bg-slate-50 ${
+                            className={`flex items-start gap-2 rounded-xl px-1.5 py-1.5 transition-colors hover:bg-slate-50 ${
                               isSelected ? 'bg-[#23442a]/[0.03]' : ''
                             }`}
                           >
@@ -395,7 +386,8 @@ const Products = () => {
                             />
                             <label 
                               htmlFor={`category-${category.id}`}
-                              className={`min-w-0 cursor-pointer text-sm leading-5 transition-colors ${
+                              title={category.name}
+                              className={`min-w-0 cursor-pointer text-[13px] leading-5 transition-colors ${
                                 isSelected 
                                   ? 'font-semibold text-slate-900'
                                   : 'text-slate-500'
@@ -410,48 +402,150 @@ const Products = () => {
                   </div>
 
                   <div>
-                    <label className="mb-2.5 block text-sm font-semibold tracking-tight text-slate-900">
-                      Price Range (₹)
+                    <label className="mb-1.5 block text-sm font-semibold tracking-tight text-slate-900">
+                      Price range
                     </label>
-                    <div className="grid grid-cols-2 gap-3">
-                      <input
-                        type="number"
-                        placeholder="Min price"
-                        className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/70 px-3 text-sm shadow-sm transition-all duration-200 focus:border-[#23442a]/35 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#23442a]/15"
-                        value={filters.priceRange.min}
-                        onChange={(e) => handleFilterChange('priceRange', { ...filters.priceRange, min: e.target.value })}
-                      />
-                      <input
-                        type="number"
-                        placeholder="Max price"
-                        className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/70 px-3 text-sm shadow-sm transition-all duration-200 focus:border-[#23442a]/35 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#23442a]/15"
-                        value={filters.priceRange.max}
-                        onChange={(e) => handleFilterChange('priceRange', { ...filters.priceRange, max: e.target.value })}
-                      />
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <span className="mb-1 block text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">Min</span>
+                        <div className="products-range-input">
+                          <span className="products-range-prefix">₹</span>
+                          <input
+                            type="number"
+                            inputMode="numeric"
+                            placeholder="0"
+                            title={filters.priceRange.min || 'Minimum price'}
+                            className="products-range-field"
+                            value={filters.priceRange.min}
+                            onChange={(e) => handleFilterChange('priceRange', { ...filters.priceRange, min: e.target.value })}
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <span className="mb-1 block text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">Max</span>
+                        <div className="products-range-input">
+                          <span className="products-range-prefix">₹</span>
+                          <input
+                            type="number"
+                            inputMode="numeric"
+                            placeholder="Any"
+                            title={filters.priceRange.max || 'Maximum price'}
+                            className="products-range-field"
+                            value={filters.priceRange.max}
+                            onChange={(e) => handleFilterChange('priceRange', { ...filters.priceRange, max: e.target.value })}
+                          />
+                        </div>
+                      </div>
                     </div>
                   </div>
 
                   <div>
-                    <label className="mb-2.5 block text-sm font-semibold tracking-tight text-slate-900">
-                      Weight Range (kg)
+                    <label className="mb-1.5 block text-sm font-semibold tracking-tight text-slate-900">
+                      Weight range
                     </label>
-                    <div className="grid grid-cols-2 gap-3">
-                      <input
-                        type="number"
-                        step="0.1"
-                        placeholder="Min weight"
-                        className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/70 px-3 text-sm shadow-sm transition-all duration-200 focus:border-[#23442a]/35 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#23442a]/15"
-                        value={filters.weightRange.min}
-                        onChange={(e) => handleFilterChange('weightRange', { ...filters.weightRange, min: e.target.value })}
-                      />
-                      <input
-                        type="number"
-                        step="0.1"
-                        placeholder="Max weight"
-                        className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/70 px-3 text-sm shadow-sm transition-all duration-200 focus:border-[#23442a]/35 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#23442a]/15"
-                        value={filters.weightRange.max}
-                        onChange={(e) => handleFilterChange('weightRange', { ...filters.weightRange, max: e.target.value })}
-                      />
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <span className="mb-1 block text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">Min</span>
+                        <div className="products-range-input">
+                          <span className="products-range-prefix">kg</span>
+                          <input
+                            type="number"
+                            step="0.1"
+                            inputMode="decimal"
+                            placeholder="0"
+                            title={filters.weightRange.min || 'Minimum weight'}
+                            className="products-range-field"
+                            value={filters.weightRange.min}
+                            onChange={(e) => handleFilterChange('weightRange', { ...filters.weightRange, min: e.target.value })}
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <span className="mb-1 block text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">Max</span>
+                        <div className="products-range-input">
+                          <span className="products-range-prefix">kg</span>
+                          <input
+                            type="number"
+                            step="0.1"
+                            inputMode="decimal"
+                            placeholder="Any"
+                            title={filters.weightRange.max || 'Maximum weight'}
+                            className="products-range-field"
+                            value={filters.weightRange.max}
+                            onChange={(e) => handleFilterChange('weightRange', { ...filters.weightRange, max: e.target.value })}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="products-display-section">
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Display</p>
+                      <p className="mt-0.5 text-xs text-slate-600">Sort and viewing options.</p>
+                    </div>
+
+                    <div className="products-sidebar-summary">
+                      <div>
+                        <span className="products-sidebar-summary-label">Results</span>
+                        <p className="products-sidebar-summary-value">{filteredProducts.length}</p>
+                      </div>
+                      <div>
+                        <span className="products-sidebar-summary-label">Page</span>
+                        <p className="products-sidebar-summary-value">{currentPage}/{Math.max(totalPages, 1)}</p>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="mb-1.5 block text-sm font-semibold tracking-tight text-slate-900">
+                        Sort by
+                      </label>
+                      <select
+                        className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 shadow-sm transition-all duration-200 focus:border-[#23442a]/35 focus:outline-none focus:ring-2 focus:ring-[#23442a]/15"
+                        value={filters.sortBy}
+                        onChange={(e) => handleFilterChange('sortBy', e.target.value)}
+                      >
+                        {sortOptions.map((option) => (
+                          <option key={option.id} value={option.id}>
+                            {option.name}
+                          </option>
+                        ))}
+                      </select>
+                      <p className="mt-1 text-[11px] text-slate-500">{selectedSortOption.name}</p>
+                    </div>
+
+                    <div>
+                      <label className="mb-1.5 block text-sm font-semibold tracking-tight text-slate-900">
+                        Layout
+                      </label>
+                      <div className="grid grid-cols-2 gap-1 rounded-2xl bg-white p-1 shadow-[inset_0_0_0_1px_rgba(226,232,240,1)]">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setViewMode('grid')}
+                          className={`h-8 rounded-xl px-3 text-xs ${
+                            viewMode === 'grid'
+                              ? 'bg-[#23442a] text-white hover:bg-[#1d3722] hover:text-white'
+                              : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                          }`}
+                        >
+                          <ViewColumnsIcon className="mr-1.5 h-3.5 w-3.5" />
+                          Grid
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setViewMode('list')}
+                          className={`h-8 rounded-xl px-3 text-xs ${
+                            viewMode === 'list'
+                              ? 'bg-[#23442a] text-white hover:bg-[#1d3722] hover:text-white'
+                              : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                          }`}
+                        >
+                          <ListBulletIcon className="mr-1.5 h-3.5 w-3.5" />
+                          List
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -493,109 +587,6 @@ const Products = () => {
               </motion.div>
             ) : (
               <>
-                <div className="mb-4 rounded-[1.4rem] border border-slate-200/80 bg-white px-4 py-3 shadow-sm">
-                  <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                    <div>
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Catalogue</p>
-                      <p className="mt-1 text-sm font-semibold text-slate-900">{resultsSummary}</p>
-                      <p className="mt-1 text-xs text-slate-500">
-                        Page {currentPage} of {Math.max(totalPages, 1)}
-                      </p>
-                    </div>
-
-                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                      <select
-                        className="h-10 rounded-full border border-slate-200 bg-slate-50/70 px-4 text-sm text-slate-700 shadow-sm transition-all duration-200 focus:border-[#23442a]/35 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#23442a]/15"
-                        value={filters.sortBy}
-                        onChange={(e) => handleFilterChange('sortBy', e.target.value)}
-                      >
-                        {sortOptions.map((option) => (
-                          <option key={option.id} value={option.id}>
-                            {option.name}
-                          </option>
-                        ))}
-                      </select>
-
-                      <div className="rounded-full border border-slate-200 bg-slate-100 p-1">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setViewMode('grid')}
-                          className={`h-auto rounded-full px-3 py-1.5 text-xs ${
-                            viewMode === 'grid'
-                              ? 'bg-[#23442a] text-white hover:bg-[#1d3722] hover:text-white'
-                              : 'text-slate-600 hover:bg-white hover:text-slate-900'
-                          }`}
-                        >
-                          <ViewColumnsIcon className="mr-1 h-3.5 w-3.5" />
-                          Grid
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setViewMode('list')}
-                          className={`h-auto rounded-full px-3 py-1.5 text-xs ${
-                            viewMode === 'list'
-                              ? 'bg-[#23442a] text-white hover:bg-[#1d3722] hover:text-white'
-                              : 'text-slate-600 hover:bg-white hover:text-slate-900'
-                          }`}
-                        >
-                          <ListBulletIcon className="mr-1 h-3.5 w-3.5" />
-                          List
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-
-                  {activeFiltersCount > 0 && (
-                    <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3">
-                      {filters.search && (
-                        <Badge variant="secondary" className="rounded-full px-2.5 py-1 text-xs">
-                          Search: "{filters.search}"
-                          <button onClick={() => removeFilter('search')} className="ml-1">
-                            <XMarkIcon className="h-3 w-3" />
-                          </button>
-                        </Badge>
-                      )}
-                      {filters.categories.map(categoryId => {
-                        const category = categories.find(c => c.id === categoryId);
-                        return category ? (
-                          <Badge key={categoryId} variant="secondary" className="rounded-full px-2.5 py-1 text-xs">
-                            {category.name}
-                            <button onClick={() => removeFilter('category', categoryId)} className="ml-1">
-                              <XMarkIcon className="h-3 w-3" />
-                            </button>
-                          </Badge>
-                        ) : null;
-                      })}
-                      {(filters.priceRange.min || filters.priceRange.max) && (
-                        <Badge variant="secondary" className="rounded-full px-2.5 py-1 text-xs">
-                          Price: ₹{filters.priceRange.min || '0'} - ₹{filters.priceRange.max || '∞'}
-                          <button onClick={() => removeFilter('price')} className="ml-1">
-                            <XMarkIcon className="h-3 w-3" />
-                          </button>
-                        </Badge>
-                      )}
-                      {(filters.weightRange.min || filters.weightRange.max) && (
-                        <Badge variant="secondary" className="rounded-full px-2.5 py-1 text-xs">
-                          Weight: {filters.weightRange.min || '0'} - {filters.weightRange.max || '∞'} kg
-                          <button onClick={() => removeFilter('weight')} className="ml-1">
-                            <XMarkIcon className="h-3 w-3" />
-                          </button>
-                        </Badge>
-                      )}
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={clearFilters}
-                        className="h-auto rounded-full px-2 py-1 text-xs text-[#23442a] hover:bg-[#23442a]/5 hover:text-[#23442a]"
-                      >
-                        Clear all
-                      </Button>
-                    </div>
-                  )}
-                </div>
-
                 <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
