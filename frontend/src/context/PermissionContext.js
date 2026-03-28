@@ -20,9 +20,16 @@ export const usePermissions = () => {
 
 export const PermissionProvider = ({ children }) => {
   const { user } = useAuth();
-  
+
   // Get user role from user object, fallback to customer
-  const userRole = user?.role || USER_ROLES.CUSTOMER;
+  // Validate that the role is one of the known roles
+  let userRole = user?.role || USER_ROLES.CUSTOMER;
+
+  // Ensure role is valid, fallback to customer if not
+  if (!Object.values(USER_ROLES).includes(userRole)) {
+    console.warn('Invalid role detected:', userRole, 'Falling back to customer');
+    userRole = USER_ROLES.CUSTOMER;
+  }
   
   // Permission checking functions
   const checkPermission = (permission) => {

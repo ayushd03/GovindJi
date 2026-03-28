@@ -1,213 +1,238 @@
-import React, { useEffect, useState, useRef, useMemo } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import {
+  ArrowPathIcon,
+  CheckCircleIcon,
+  ExclamationTriangleIcon,
+  ShieldCheckIcon,
+} from '@heroicons/react/24/outline';
 import { useCart } from '../context/CartContext';
 import paymentAPI from '../services/paymentApi';
-import './PaymentVerify.css';
 
-const MAX_POLLS = 30; // Poll for max 60 seconds (30 * 2 seconds)
-
-/**
- * Payment Verification Page
- * Polls payment status and shows success/failure state
- */
 function PaymentVerify() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { clearCart } = useCart();
 
-  const [status, setStatus] = useState('verifying'); // verifying, success, failed
+  const [status, setStatus] = useState('verifying');
   const [transactionDetails, setTransactionDetails] = useState(null);
   const [error, setError] = useState('');
   const [pollCount, setPollCount] = useState(0);
-
   const pollCountRef = useRef(0);
   const timerRef = useRef(null);
-  const clearCartRef = useRef(clearCart);
-  clearCartRef.current = clearCart;
+  const maxPolls = 30;
 
-  // Stable txnId extracted once from URL/localStorage
-  const txnId = useMemo(
-    () => searchParams.get('txnId') || localStorage.getItem('currentTransactionId'),
-    // searchParams identity may change, but the txnId value won't mid-session
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    []
-  );
+  const verifyPayment = useCallback(async () => {
+    try {
+      const txnId = searchParams.get('txnId') || localStorage.getItem('currentTransactionId');
+
+      if (!txnId) {
+        setStatus('failed');
+        setError('No transaction ID found for this payment attempt.');
+        return;
+      }
+
+      const response = await paymentAPI.checkPaymentStatus(txnId);
+
+      if (!response.success) {
+        setStatus('failed');
+        setError('Failed to verify payment status.');
+        return;
+      }
+
+      setTransactionDetails(response.transaction);
+
+      if (response.transaction.status === 'COMPLETED') {
+        setStatus('success');
+        clearCart();
+        localStorage.removeItem('currentTransactionId');
+        localStorage.removeItem('currentOrderId');
+        return;
+      }
+
+      if (response.transaction.status === 'FAILED') {
+        setStatus('failed');
+        setError('Payment failed. Please try again.');
+        return;
+      }
+
+      pollCountRef.current += 1;
+      setPollCount(pollCountRef.current);
+
+      if (pollCountRef.current < maxPolls) {
+        timerRef.current = setTimeout(verifyPayment, 2000);
+        return;
+      }
+
+      setStatus('failed');
+      setError('Payment verification timed out. Please check your orders page.');
+    } catch (verificationError) {
+      setStatus('failed');
+      setError(verificationError.response?.data?.error || 'Failed to verify payment.');
+    }
+  }, [clearCart, searchParams]);
 
   useEffect(() => {
-    if (!txnId) {
-      setStatus('failed');
-      setError('No transaction ID found');
+    verifyPayment();
+    return () => clearTimeout(timerRef.current);
+  }, [verifyPayment]);
+
+  const retryPayment = async () => {
+    const orderId = localStorage.getItem('currentOrderId');
+    if (!orderId) {
+      navigate('/checkout');
       return;
     }
-
-    let cancelled = false;
-
-    const poll = async () => {
-      try {
-        const response = await paymentAPI.checkPaymentStatus(txnId);
-
-        if (cancelled) return;
-
-        if (response.success) {
-          setTransactionDetails(response.transaction);
-
-          if (response.transaction.status === 'COMPLETED') {
-            setStatus('success');
-            clearCartRef.current();
-            localStorage.removeItem('currentTransactionId');
-            localStorage.removeItem('currentOrderId');
-          } else if (response.transaction.status === 'FAILED') {
-            setStatus('failed');
-            setError('Payment failed. Please try again.');
-          } else {
-            // Still pending — schedule next poll
-            pollCountRef.current += 1;
-            setPollCount(pollCountRef.current);
-            if (pollCountRef.current < MAX_POLLS) {
-              timerRef.current = setTimeout(poll, 2000);
-            } else {
-              setStatus('failed');
-              setError('Payment verification timed out. Please check your orders page.');
-            }
-          }
-        } else {
-          if (!cancelled) {
-            setStatus('failed');
-            setError('Failed to verify payment status');
-          }
-        }
-      } catch (err) {
-        if (!cancelled) {
-          console.error('Payment verification error:', err);
-          setStatus('failed');
-          setError(err.response?.data?.error || 'Failed to verify payment');
-        }
+    try {
+      const paymentResponse = await paymentAPI.initiatePayment(orderId, {}, 'PHONEPE');
+      if (paymentResponse.success && paymentResponse.paymentUrl) {
+        localStorage.setItem('currentTransactionId', paymentResponse.merchantTransactionId);
+        window.location.href = paymentResponse.paymentUrl;
+      } else {
+        navigate('/checkout');
       }
-    };
+    } catch {
+      navigate('/checkout');
+    }
+  };
 
-    poll();
+  const progressWidth = `${Math.min((pollCount / maxPolls) * 100, 100)}%`;
 
-    return () => {
-      cancelled = true;
-      if (timerRef.current) clearTimeout(timerRef.current);
-    };
-  }, [txnId]);
-
-  if (status === 'verifying') {
-    return (
-      <div className="payment-verify-page">
-        <div className="verify-container">
-          <div className="spinner-wrapper">
-            <div className="spinner"></div>
-          </div>
-          <h2>Verifying Payment</h2>
-          <p className="verify-message">Please wait while we confirm your payment with PhonePe.</p>
-          <div className="progress-indicator">
-            <div className="progress-bar">
-              <div className="progress-fill" style={{ width: `${Math.min((pollCount / MAX_POLLS) * 100, 100)}%` }}></div>
-            </div>
-            <p className="poll-info">Checking status... ({pollCount}/{MAX_POLLS})</p>
-          </div>
-          <p className="note">Do not close this window or press the back button.</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (status === 'success') {
-    return (
-      <div className="payment-verify-page">
-        <div className="verify-container success">
-          <div className="icon-wrapper success-icon">
-            <svg className="checkmark" viewBox="0 0 52 52">
-              <circle className="checkmark-circle" cx="26" cy="26" r="25" fill="none"/>
-              <path className="checkmark-check" fill="none" d="M14.1 27.2l7.1 7.2 16.7-16.8"/>
-            </svg>
-          </div>
-          <h2>Payment Successful!</h2>
-          <p className="success-message">Your order has been confirmed and is being processed.</p>
-
-          {transactionDetails && (
-            <div className="transaction-details">
-              <div className="detail-row">
-                <span className="detail-label">Order ID</span>
-                <span className="detail-value">{transactionDetails.orderId}</span>
+  return (
+    <div className="page-shell-soft py-8">
+      <div className="page-container">
+        <div className="mx-auto max-w-3xl surface-section overflow-hidden">
+          <div className="border-b bg-[#23442a] px-6 py-5 text-white sm:px-8">
+            <div className="flex items-center gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/10">
+                <ShieldCheckIcon className="h-5 w-5" />
               </div>
-              <div className="detail-row">
-                <span className="detail-label">Transaction ID</span>
-                <span className="detail-value">{transactionDetails.merchantTransactionId}</span>
-              </div>
-              <div className="detail-row highlight">
-                <span className="detail-label">Amount Paid</span>
-                <span className="detail-value">₹{parseFloat(transactionDetails.amount).toFixed(2)}</span>
+              <div>
+                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-white/70">Order Payment</p>
+                <h1 className="mt-1 font-heading text-2xl font-semibold">Payment verification</h1>
               </div>
             </div>
-          )}
-
-          <div className="action-buttons">
-            <button onClick={() => navigate('/orders')} className="btn-primary">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M9 5H2v14h7V5z"/>
-                <path d="M16 5h7v14h-7V5z"/>
-                <path d="M7 12h10"/>
-              </svg>
-              View My Orders
-            </button>
-            <button onClick={() => navigate('/products')} className="btn-secondary">
-              Continue Shopping
-            </button>
           </div>
-        </div>
-      </div>
-    );
-  }
 
-  if (status === 'failed') {
-    return (
-      <div className="payment-verify-page">
-        <div className="verify-container failed">
-          <div className="icon-wrapper failed-icon">
-            <svg className="crossmark" viewBox="0 0 52 52">
-              <circle className="crossmark-circle" cx="26" cy="26" r="25" fill="none"/>
-              <path className="crossmark-cross" fill="none" d="M16 16 L36 36 M36 16 L16 36"/>
-            </svg>
-          </div>
-          <h2>Payment Failed</h2>
-          <p className="error-message">{error || 'We could not process your payment. Please try again.'}</p>
-
-          {transactionDetails && (
-            <div className="transaction-details">
-              <div className="detail-row">
-                <span className="detail-label">Transaction ID</span>
-                <span className="detail-value">{transactionDetails.merchantTransactionId}</span>
+          <div className="px-6 py-8 sm:px-8">
+            {status === 'verifying' && (
+              <div className="space-y-8 text-center">
+                <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-[#23442a]/8">
+                  <ArrowPathIcon className="h-10 w-10 animate-spin text-[#23442a]" />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-semibold text-foreground">Confirming your payment</h2>
+                  <p className="mt-3 text-base leading-7 text-muted-foreground">
+                    Please stay on this page while we verify the payment response and attach it to your order.
+                  </p>
+                </div>
+                <div className="mx-auto max-w-xl rounded-2xl border bg-muted/25 p-5 text-left">
+                  <div className="mb-3 flex items-center justify-between text-sm">
+                    <span className="font-medium text-foreground">Verification progress</span>
+                    <span className="text-muted-foreground">
+                      {pollCount}/{maxPolls}
+                    </span>
+                  </div>
+                  <div className="h-2 overflow-hidden rounded-full bg-muted">
+                    <div className="h-full rounded-full bg-[#23442a] transition-all duration-300" style={{ width: progressWidth }} />
+                  </div>
+                  <p className="mt-3 text-sm text-muted-foreground">
+                    Do not close this window or use the browser back button during payment verification.
+                  </p>
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
-          <div className="help-section">
-            <h4>Need Help?</h4>
-            <p>If money was deducted from your account, it will be refunded within 5-7 business days.</p>
-          </div>
+            {status === 'success' && (
+              <div className="space-y-8 text-center">
+                <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-emerald-50">
+                  <CheckCircleIcon className="h-10 w-10 text-emerald-600" />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-semibold text-foreground">Payment successful</h2>
+                  <p className="mt-3 text-base leading-7 text-muted-foreground">
+                    Your payment has been confirmed and the order is now in process.
+                  </p>
+                </div>
 
-          <div className="action-buttons">
-            <button onClick={() => navigate('/checkout')} className="btn-primary">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                <path d="M9 12l2 2 4-4"/>
-              </svg>
-              Try Again
-            </button>
-            <button onClick={() => navigate('/orders')} className="btn-secondary">
-              View Orders
-            </button>
-            <button onClick={() => navigate('/products')} className="btn-tertiary">
-              Back to Products
-            </button>
+                {transactionDetails && (
+                  <div className="mx-auto grid max-w-2xl gap-4 rounded-2xl border bg-muted/20 p-5 text-left sm:grid-cols-2">
+                    <div className="surface-card-muted p-4">
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Order ID</p>
+                      <p className="mt-2 break-all text-sm font-semibold text-foreground">{transactionDetails.orderId}</p>
+                    </div>
+                    <div className="surface-card-muted p-4">
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Transaction ID</p>
+                      <p className="mt-2 break-all text-sm font-semibold text-foreground">
+                        {transactionDetails.merchantTransactionId}
+                      </p>
+                    </div>
+                    <div className="surface-card-muted p-4 sm:col-span-2">
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Amount Paid</p>
+                      <p className="mt-2 text-xl font-semibold text-foreground">
+                        ₹{parseFloat(transactionDetails.amount).toFixed(2)}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex flex-col justify-center gap-3 sm:flex-row">
+                  <button onClick={() => navigate('/orders')} className="store-button-primary">
+                    View My Orders
+                  </button>
+                  <button onClick={() => navigate('/products')} className="store-button-secondary">
+                    Continue Shopping
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {status === 'failed' && (
+              <div className="space-y-8 text-center">
+                <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-rose-50">
+                  <ExclamationTriangleIcon className="h-10 w-10 text-rose-600" />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-semibold text-foreground">Payment could not be confirmed</h2>
+                  <p className="mt-3 text-base leading-7 text-muted-foreground">
+                    {error || 'We could not process your payment. Please try again.'}
+                  </p>
+                </div>
+
+                {transactionDetails?.merchantTransactionId && (
+                  <div className="mx-auto max-w-xl rounded-2xl border bg-muted/20 p-5 text-left">
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Transaction ID</p>
+                    <p className="mt-2 break-all text-sm font-semibold text-foreground">
+                      {transactionDetails.merchantTransactionId}
+                    </p>
+                  </div>
+                )}
+
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-left">
+                  <h3 className="text-sm font-semibold text-amber-900">Need help?</h3>
+                  <p className="mt-2 text-sm leading-6 text-amber-800">
+                    If money was deducted from your account, it is usually refunded automatically within 5-7 business days.
+                  </p>
+                </div>
+
+                <div className="flex flex-col justify-center gap-3 sm:flex-row">
+                  <button onClick={retryPayment} className="store-button-primary">
+                    Try Again
+                  </button>
+                  <button onClick={() => navigate('/orders')} className="store-button-secondary">
+                    View Orders
+                  </button>
+                  <button onClick={() => navigate('/products')} className="store-button-secondary">
+                    Back to Products
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
-    );
-  }
+    </div>
+  );
 }
 
 export default PaymentVerify;

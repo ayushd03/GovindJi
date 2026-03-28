@@ -289,7 +289,8 @@ class DelhiveryGateway extends DeliveryInterface {
       });
 
       // Format as required by Delhivery (form-data format)
-      const formData = `format=json&data=${JSON.stringify(shipmentData)}`;
+      // JSON must be URL-encoded so special characters don't corrupt the form body
+      const formData = `format=json&data=${encodeURIComponent(JSON.stringify(shipmentData))}`;
 
       const response = await axios.post(`${this.baseUrl}/api/cmu/create.json`, formData, {
         headers: {

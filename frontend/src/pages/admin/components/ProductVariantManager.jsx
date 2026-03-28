@@ -1,12 +1,21 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   PlusIcon,
   TrashIcon,
   CheckCircleIcon,
-  XMarkIcon,
-  ArrowsUpDownIcon
+  CubeIcon
 } from '@heroicons/react/24/outline';
 import { productsAPI } from '../../../services/api';
+import {
+  AdminDialog,
+  AdminDialogBody,
+  AdminDialogContent,
+  AdminDialogDescription,
+  AdminDialogFooter,
+  AdminDialogHeader,
+  AdminDialogIconButton,
+  AdminDialogTitle,
+} from '../../../components/AdminDialog';
 
 const ProductVariantManager = ({ isOpen, onClose, product, onSave }) => {
   const [variants, setVariants] = useState([]);
@@ -22,13 +31,7 @@ const ProductVariantManager = ({ isOpen, onClose, product, onSave }) => {
     { value: 'MILLILITERS', label: 'Milliliters (ml)' }
   ];
 
-  useEffect(() => {
-    if (isOpen && product?.id) {
-      fetchVariants();
-    }
-  }, [isOpen, product]);
-
-  const fetchVariants = async () => {
+  const fetchVariants = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -40,7 +43,13 @@ const ProductVariantManager = ({ isOpen, onClose, product, onSave }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [product?.id]);
+
+  useEffect(() => {
+    if (isOpen && product?.id) {
+      fetchVariants();
+    }
+  }, [fetchVariants, isOpen, product?.id]);
 
   const getDefaultVariants = () => [
     {
@@ -48,6 +57,7 @@ const ProductVariantManager = ({ isOpen, onClose, product, onSave }) => {
       size_value: '',
       size_unit: 'GRAMS',
       price: '',
+      stock_quantity: '',
       weight_grams: '',  // Weight for shipping
       is_default: true, // First variant should be default
       is_active: true,
@@ -61,6 +71,7 @@ const ProductVariantManager = ({ isOpen, onClose, product, onSave }) => {
       size_value: '',
       size_unit: 'GRAMS',
       price: '',
+      stock_quantity: '',
       weight_grams: '',  // Weight for shipping
       is_default: variants.length === 0,
       is_active: true,
@@ -159,6 +170,10 @@ const ProductVariantManager = ({ isOpen, onClose, product, onSave }) => {
         setError(`Variant ${i + 1}: Price must be greater than 0`);
         return false;
       }
+      if (variant.stock_quantity === '' || variant.stock_quantity === undefined || parseInt(variant.stock_quantity) < 0) {
+        setError(`Variant ${i + 1}: Stock quantity must be 0 or more`);
+        return false;
+      }
 
       // Validate weight_grams for shipping
       if (!variant.weight_grams || parseFloat(variant.weight_grams) <= 0) {
@@ -209,53 +224,43 @@ const ProductVariantManager = ({ isOpen, onClose, product, onSave }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
-      <div className="flex min-h-screen items-center justify-center p-4">
-        {/* Backdrop */}
-        <div
-          className="fixed inset-0 bg-black/50 transition-opacity"
-          onClick={onClose}
-        />
-
-        {/* Modal */}
-        <div className="relative bg-white rounded-xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-          {/* Header */}
-          <div className="sticky top-0 bg-white border-b px-6 py-4 flex items-center justify-between z-10">
-            <div>
-              <h2 className="text-xl font-semibold text-gray-900">
-                Manage Product Variants
-              </h2>
-              <p className="text-sm text-gray-600 mt-1">
-                {product?.name}
-              </p>
+    <AdminDialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
+      <AdminDialogContent size="lg">
+        <AdminDialogHeader sticky>
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10">
+                <CubeIcon className="h-5 w-5 text-primary" />
+              </div>
+              <div className="space-y-1">
+                <AdminDialogTitle>Manage Product Variants</AdminDialogTitle>
+                <AdminDialogDescription>
+                  Configure pack sizes, pricing, and shipping weight for {product?.name || 'this product'}.
+                </AdminDialogDescription>
+              </div>
             </div>
-            <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 transition-colors"
-            >
-              <XMarkIcon className="w-6 h-6" />
-            </button>
+            <AdminDialogIconButton onClick={onClose} />
           </div>
+        </AdminDialogHeader>
 
-          {/* Content */}
-          <div className="p-6">
+        <AdminDialogBody className="admin-dialog-stack">
             {loading ? (
               <div className="flex items-center justify-center py-12">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                <span className="ml-3 text-gray-600">Loading variants...</span>
+                <span className="ml-3 text-muted-foreground">Loading variants...</span>
               </div>
             ) : (
               <>
                 {error && (
-                  <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+                  <div className="mb-4 rounded-2xl border border-destructive/20 bg-destructive/10 p-4 text-sm text-destructive">
                     {error}
                   </div>
                 )}
 
-                <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg text-blue-800 text-sm">
-                  <p className="font-medium mb-1">💡 Configure size variants for this product</p>
+                <div className="admin-dialog-section-muted text-sm text-muted-foreground">
+                  <p className="mb-1 font-medium text-foreground">Configure customer-facing size variants</p>
                   <p>Add different sizes (e.g., 250g, 500g, 1kg) with individual prices. Customers will see these options when adding to cart.</p>
-                  <p className="mt-2 text-xs"><strong>Shipping Weight:</strong> For GRAMS/KILOGRAMS units, weight is auto-calculated. For other units (PIECES, LITERS), enter the actual weight for shipping purposes.</p>
+                  <p className="mt-2 text-xs"><strong>Shipping weight:</strong> For `GRAMS` and `KILOGRAMS`, weight is auto-calculated. For other units, enter the actual weight used for shipping.</p>
                 </div>
 
                 <div className="space-y-3">
@@ -264,12 +269,12 @@ const ProductVariantManager = ({ isOpen, onClose, product, onSave }) => {
                     return (
                     <div
                       key={index}
-                      className="border rounded-lg p-4 bg-gray-50 hover:bg-gray-100 transition-colors"
+                      className="admin-dialog-section"
                     >
                       <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
                         {/* Variant Name */}
-                        <div className="md:col-span-3">
-                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                        <div className="md:col-span-2">
+                          <label className="admin-dialog-label">
                             Variant Name *
                           </label>
                           <input
@@ -277,14 +282,14 @@ const ProductVariantManager = ({ isOpen, onClose, product, onSave }) => {
                             value={variant.variant_name}
                             onChange={(e) => updateVariant(index, 'variant_name', e.target.value)}
                             placeholder="e.g., 500g Packet"
-                            className="input-field w-full px-3 py-2 border rounded-md text-sm"
+                            className="input-field text-sm"
                           />
                         </div>
 
                         {/* Size Value */}
-                        <div className="md:col-span-2">
-                          <label className="block text-xs font-medium text-gray-700 mb-1">
-                            Size Value *
+                        <div className="md:col-span-1">
+                          <label className="admin-dialog-label">
+                            Size *
                           </label>
                           <input
                             type="number"
@@ -293,20 +298,20 @@ const ProductVariantManager = ({ isOpen, onClose, product, onSave }) => {
                             onChange={(e) => updateVariant(index, 'size_value', e.target.value)}
                             onBlur={() => generateVariantName(index)}
                             placeholder="500"
-                            className="input-field w-full px-3 py-2 border rounded-md text-sm"
+                            className="input-field text-sm"
                           />
                         </div>
 
                         {/* Size Unit */}
                         <div className="md:col-span-2">
-                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                          <label className="admin-dialog-label">
                             Unit *
                           </label>
                           <select
                             value={variant.size_unit}
                             onChange={(e) => updateVariant(index, 'size_unit', e.target.value)}
                             onBlur={() => generateVariantName(index)}
-                            className="input-field w-full px-3 py-2 border rounded-md text-sm"
+                            className="input-field text-sm"
                           >
                             {sizeUnits.map(unit => (
                               <option key={unit.value} value={unit.value}>
@@ -318,7 +323,7 @@ const ProductVariantManager = ({ isOpen, onClose, product, onSave }) => {
 
                         {/* Price */}
                         <div className="md:col-span-2">
-                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                          <label className="admin-dialog-label">
                             Price (₹) *
                           </label>
                           <input
@@ -327,38 +332,49 @@ const ProductVariantManager = ({ isOpen, onClose, product, onSave }) => {
                             value={variant.price}
                             onChange={(e) => updateVariant(index, 'price', e.target.value)}
                             placeholder="499.00"
-                            className="input-field w-full px-3 py-2 border rounded-md text-sm"
+                            className="input-field text-sm"
+                          />
+                        </div>
+
+                        {/* Stock Quantity */}
+                        <div className="md:col-span-2">
+                          <label className="admin-dialog-label">
+                            Stock *
+                          </label>
+                          <input
+                            type="number"
+                            step="1"
+                            min="0"
+                            value={variant.stock_quantity}
+                            onChange={(e) => updateVariant(index, 'stock_quantity', e.target.value)}
+                            placeholder="0"
+                            className="input-field text-sm"
                           />
                         </div>
 
                         {/* Weight for shipping */}
-                        <div className="md:col-span-2">
-                          <label className="block text-xs font-medium text-gray-700 mb-1">
-                            Weight (g) *
-                            {isWeightUnit && <span className="text-green-600 ml-1">✓ Auto</span>}
+                        <div className="md:col-span-1">
+                          <label className="admin-dialog-label">
+                            Wt (g) *
+                            {isWeightUnit && <span className="ml-1 text-emerald-600">Auto</span>}
                           </label>
                           <input
                             type="number"
                             step="1"
                             value={variant.weight_grams}
                             onChange={(e) => updateVariant(index, 'weight_grams', e.target.value)}
-                            placeholder={isWeightUnit ? "Auto-calculated" : "Enter weight in grams"}
+                            placeholder={isWeightUnit ? "Auto" : "grams"}
                             disabled={isWeightUnit}
-                            className={`input-field w-full px-3 py-2 border rounded-md text-sm ${
-                              isWeightUnit ? 'bg-green-50 text-green-700 cursor-not-allowed' : ''
+                            className={`input-field text-sm ${
+                              isWeightUnit ? 'cursor-not-allowed bg-emerald-50 text-emerald-700' : ''
                             }`}
                             title={isWeightUnit ? "Auto-calculated from size" : "Enter actual weight for shipping"}
                           />
-                          {!isWeightUnit && (
-                            <p className="text-xs text-orange-600 mt-1">
-                              Required for shipping
-                            </p>
-                          )}
                         </div>
 
                         {/* Checkboxes */}
-                        <div className="md:col-span-1 flex flex-col gap-2">
-                          <label className="flex items-center text-xs">
+                        <div className="md:col-span-1 flex flex-col gap-2 rounded-xl bg-muted/30 p-3">
+                          <label className="flex items-center text-xs font-medium text-foreground">
                             <input
                               type="checkbox"
                               checked={variant.is_default}
@@ -367,7 +383,7 @@ const ProductVariantManager = ({ isOpen, onClose, product, onSave }) => {
                             />
                             Default
                           </label>
-                          <label className="flex items-center text-xs">
+                          <label className="flex items-center text-xs font-medium text-foreground">
                             <input
                               type="checkbox"
                               checked={variant.is_active}
@@ -379,26 +395,29 @@ const ProductVariantManager = ({ isOpen, onClose, product, onSave }) => {
                         </div>
 
                         {/* Actions */}
-                        <div className="md:col-span-1 flex flex-col gap-1">
+                        <div className="md:col-span-1 flex flex-col gap-2">
                           <button
+                            type="button"
                             onClick={() => moveVariant(index, 'up')}
                             disabled={index === 0}
-                            className="btn-secondary p-1 disabled:opacity-30"
+                            className="rounded-lg border border-border/70 bg-muted/30 px-2 py-1 text-sm font-semibold text-foreground transition hover:bg-muted disabled:opacity-30"
                             title="Move up"
                           >
                             ↑
                           </button>
                           <button
+                            type="button"
                             onClick={() => moveVariant(index, 'down')}
                             disabled={index === variants.length - 1}
-                            className="btn-secondary p-1 disabled:opacity-30"
+                            className="rounded-lg border border-border/70 bg-muted/30 px-2 py-1 text-sm font-semibold text-foreground transition hover:bg-muted disabled:opacity-30"
                             title="Move down"
                           >
                             ↓
                           </button>
                           <button
+                            type="button"
                             onClick={() => removeVariant(index)}
-                            className="btn-destructive p-1"
+                            className="rounded-lg border border-destructive/20 bg-destructive/10 px-2 py-1 text-destructive transition hover:bg-destructive/15"
                             title="Remove"
                           >
                             <TrashIcon className="w-4 h-4" />
@@ -411,29 +430,31 @@ const ProductVariantManager = ({ isOpen, onClose, product, onSave }) => {
                 </div>
 
                 <button
+                  type="button"
                   onClick={addVariant}
-                  className="btn-outline mt-4 inline-flex items-center px-4 py-2 text-sm font-medium rounded-lg"
+                  className="mt-4 inline-flex items-center rounded-xl border border-border/70 bg-card px-4 py-2 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted/30"
                 >
                   <PlusIcon className="w-4 h-4 mr-2" />
                   Add Another Variant
                 </button>
               </>
             )}
-          </div>
+        </AdminDialogBody>
 
-          {/* Footer */}
-          <div className="sticky bottom-0 bg-white border-t px-6 py-4 flex items-center justify-end gap-3">
+          <AdminDialogFooter sticky className="justify-end gap-3">
             <button
+              type="button"
               onClick={onClose}
               disabled={saving}
-              className="btn-secondary px-4 py-2 text-sm font-medium rounded-lg"
+              className="rounded-xl border border-border/70 bg-card px-4 py-2 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted/30"
             >
               Cancel
             </button>
             <button
+              type="button"
               onClick={handleSave}
               disabled={saving || loading}
-              className="btn-primary inline-flex items-center px-4 py-2 text-sm font-medium rounded-lg"
+              className="btn-primary inline-flex items-center px-4 py-2 text-sm font-medium rounded-xl"
             >
               {saving ? (
                 <>
@@ -447,10 +468,9 @@ const ProductVariantManager = ({ isOpen, onClose, product, onSave }) => {
                 </>
               )}
             </button>
-          </div>
-        </div>
-      </div>
-    </div>
+          </AdminDialogFooter>
+      </AdminDialogContent>
+    </AdminDialog>
   );
 };
 

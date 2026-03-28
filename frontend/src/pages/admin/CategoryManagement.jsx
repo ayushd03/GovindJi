@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '../../context/AuthContext';
 import { PermissionGuard } from '../../components/PermissionGuard';
 import { ADMIN_PERMISSIONS } from '../../enums/roles';
 import ImageUploadManager from '../../components/ImageUploadManager';
@@ -12,11 +11,18 @@ import {
   EyeSlashIcon,
   XMarkIcon,
 } from '@heroicons/react/24/outline';
-
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+import {
+  AdminDialog,
+  AdminDialogBody,
+  AdminDialogContent,
+  AdminDialogFooter,
+  AdminDialogHeader,
+  AdminDialogIconButton,
+  AdminDialogTitle,
+} from '../../components/AdminDialog';
+import { API_BASE_URL } from '../../config/apiBaseUrl';
 
 const CategoryManagement = () => {
-  const { user } = useAuth();
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -307,43 +313,47 @@ const CategoryManagement = () => {
       </div>
 
       {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-card rounded-xl max-w-lg w-full max-h-[85vh] overflow-y-auto">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-bold text-foreground">
+        <AdminDialog open={showModal} onOpenChange={(open) => { if (!open) closeModal(); }}>
+          <AdminDialogContent size="lg">
+            <AdminDialogHeader sticky>
+              <div className="flex w-full items-start justify-between gap-3">
+                <AdminDialogTitle>
                   {modalType === 'create' && 'Create New Category'}
                   {modalType === 'edit' && 'Edit Category'}
                   {modalType === 'images' && `Manage Images - ${selectedCategory?.name}`}
-                </h2>
-                <button onClick={closeModal} className="text-muted-foreground hover:text-foreground"><XMarkIcon className="w-6 h-6" /></button>
+                </AdminDialogTitle>
+                <AdminDialogIconButton onClick={closeModal} />
               </div>
-              {modalType !== 'images' ? (
-                <form onSubmit={handleSubmit} className="space-y-4">
+            </AdminDialogHeader>
+            {modalType !== 'images' ? (
+              <form onSubmit={handleSubmit}>
+                <AdminDialogBody className="admin-dialog-stack">
                   <div>
-                    <label className="block text-sm font-medium text-muted-foreground mb-1">Category Name *</label>
+                    <label className="admin-dialog-label">Category Name *</label>
                     <input type="text" required value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className="input-field" placeholder="Enter category name" />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-muted-foreground mb-1">Description</label>
+                    <label className="admin-dialog-label">Description</label>
                     <textarea value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} rows={3} className="input-field" placeholder="Enter category description" />
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-muted-foreground mb-1">Display Order</label>
-                    <input type="number" value={formData.display_order} onChange={(e) => setFormData({ ...formData, display_order: parseInt(e.target.value) || 0 })} className="input-field" placeholder="0" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-muted-foreground mb-2">Background Color</label>
+                  <div className="admin-dialog-grid-2">
+                    <div>
+                      <label className="admin-dialog-label">Display Order</label>
+                      <input type="number" value={formData.display_order} onChange={(e) => setFormData({ ...formData, display_order: parseInt(e.target.value) || 0 })} className="input-field" placeholder="0" />
+                    </div>
+                    <div>
+                      <label className="admin-dialog-label">Background Color</label>
                     <select value={formData.gradient_colors} onChange={(e) => setFormData({ ...formData, gradient_colors: e.target.value })} className="input-field">
                       {gradientOptions.map((option) => (<option key={option.value} value={option.value}>{option.label}</option>))}
                     </select>
+                    </div>
                   </div>
                   <div className="flex items-center">
                     <input type="checkbox" id="is_active" checked={formData.is_active} onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })} className="h-4 w-4 text-primary border-muted rounded focus:ring-primary" />
                     <label htmlFor="is_active" className="ml-2 text-sm text-muted-foreground">Active (visible to customers)</label>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-muted-foreground mb-2">Category Images</label>
+                    <label className="admin-dialog-label">Category Images</label>
                     <ImageUploadManager
                       onFilesSelected={(files, settings) => { setImageFiles(files); setImageProcessingSettings(settings); }}
                       onUrlSubmit={(urlData) => { setUrlImages(prev => [...prev, urlData]); }}
@@ -354,15 +364,17 @@ const CategoryManagement = () => {
                     />
                     {imageFiles.length > 0 && (<p className="text-xs text-primary mt-2">First image will be set as primary display image.</p>)}
                   </div>
-                  <div className="flex justify-end space-x-3 pt-4">
+                </AdminDialogBody>
+                <AdminDialogFooter sticky>
                     <button type="button" onClick={closeModal} className="btn-outline px-4 py-2">Cancel</button>
                     <button type="submit" disabled={uploading} className="btn-primary px-4 py-2 disabled:opacity-50">
                       {uploading ? 'Saving...' : (modalType === 'edit' ? 'Update' : 'Create')}
                     </button>
-                  </div>
-                </form>
-              ) : (
-                <div className="space-y-4">
+                </AdminDialogFooter>
+              </form>
+            ) : (
+              <>
+                <AdminDialogBody className="space-y-4">
                   {selectedCategory?.category_images?.length > 0 ? (
                     <div className="grid grid-cols-2 gap-4">
                       {selectedCategory.category_images.map((image) => (
@@ -378,14 +390,14 @@ const CategoryManagement = () => {
                   ) : (
                     <p className="text-muted-foreground text-center py-8">No images uploaded for this category.</p>
                   )}
-                  <div className="flex justify-end">
-                    <button onClick={closeModal} className="btn-secondary px-4 py-2">Close</button>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
+                </AdminDialogBody>
+                <AdminDialogFooter sticky>
+                  <button onClick={closeModal} className="btn-secondary px-4 py-2">Close</button>
+                </AdminDialogFooter>
+              </>
+            )}
+          </AdminDialogContent>
+        </AdminDialog>
       )}
     </PermissionGuard>
   );

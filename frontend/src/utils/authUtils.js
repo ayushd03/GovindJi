@@ -74,7 +74,11 @@ export const storeAuthData = (session, user) => {
   
   localStorage.setItem('authToken', session.access_token);
   localStorage.setItem('refreshToken', session.refresh_token);
-  localStorage.setItem('userData', JSON.stringify(user));
+  if (user) {
+    localStorage.setItem('userData', JSON.stringify(user));
+  } else {
+    localStorage.removeItem('userData');
+  }
   
   // Use expires_at if available (Unix timestamp), otherwise calculate from expires_in
   let expiryTime;

@@ -33,14 +33,14 @@ const authenticateAdmin = async (req, res, next) => {
       return res.status(401).json({ success: false, error: 'Invalid token' });
     }
 
-    // Check if user is admin
+    // Check if user has admin or manager role
     const { data: userData, error: userError } = await req.supabase
       .from('users')
-      .select('is_admin')
+      .select('role')
       .eq('id', user.id)
       .single();
 
-    if (userError || !userData || !userData.is_admin) {
+    if (userError || !userData || (userData.role !== 'admin' && userData.role !== 'manager')) {
       return res.status(403).json({ success: false, error: 'Admin access required' });
     }
 

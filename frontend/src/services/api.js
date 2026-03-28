@@ -1,7 +1,8 @@
 import axios from 'axios';
+import { API_BASE_URL } from '../config/apiBaseUrl';
 import { clearAuthData, storeAuthData } from '../utils/authUtils';
-
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+import { shouldAutoRefreshAfterAuthError } from '../utils/authInterceptorPolicy';
+import { buildAuthPath } from '../utils/authRouting';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -9,7 +10,8 @@ const api = axios.create({
 
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('authToken');
-  if (token) {
+  config.headers = config.headers || {};
+  if (token && !config.headers.Authorization) {
     config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
@@ -23,14 +25,14 @@ api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
-    
-    if ((error.response?.status === 403 || error.response?.status === 401) && !originalRequest._retry) {
-      // Only handle auth errors for protected routes, not for login/signup/refresh
-      const isAuthRoute = error.config?.url?.includes('/api/auth/');
-      const isRefreshRoute = error.config?.url?.includes('/api/auth/refresh');
-      
-      if (!isAuthRoute || isRefreshRoute) {
+
+    if ((error.response?.status === 403 || error.response?.status === 401) && originalRequest && !originalRequest._retry) {
+      const url = error.config?.url || '';
+      const shouldAttemptRecovery = shouldAutoRefreshAfterAuthError(url);
+
+      if (shouldAttemptRecovery) {
         originalRequest._retry = true;
+        originalRequest.headers = originalRequest.headers || {};
         
         // If already refreshing, wait for that refresh to complete
         if (isRefreshing) {
@@ -66,9 +68,7 @@ api.interceptors.response.use(
                 // Store new tokens using utility
                 const userDataStr = localStorage.getItem('userData');
                 const userData = userDataStr ? JSON.parse(userDataStr) : null;
-                if (userData) {
-                  storeAuthData(session, userData);
-                }
+                storeAuthData(session, userData);
                 
                 // Retry original request with new token
                 originalRequest.headers.Authorization = `Bearer ${session.access_token}`;
@@ -81,11 +81,16 @@ api.interceptors.response.use(
             console.log('API interceptor: Token refresh failed:', refreshError);
             // Refresh failed, clear all auth data
             clearAuthData();
-            
-            // Only redirect if not already on login page
-            if (!window.location.pathname.includes('/login')) {
-              console.log('API interceptor: Redirecting to login');
-              window.location.href = '/login';
+
+            const nextPath = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+
+            if (!window.location.pathname.includes('/auth')) {
+              console.log('API interceptor: Redirecting to auth');
+              window.location.href = buildAuthPath({
+                mode: 'sign-in',
+                reason: 'session-expired',
+                next: nextPath,
+              });
             }
             throw error;
           })
@@ -98,9 +103,15 @@ api.interceptors.response.use(
         } else {
           // No refresh token, clear auth data and redirect
           clearAuthData();
-          
-          if (!window.location.pathname.includes('/login')) {
-            window.location.href = '/login';
+
+          const nextPath = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+
+          if (!window.location.pathname.includes('/auth')) {
+            window.location.href = buildAuthPath({
+              mode: 'sign-in',
+              reason: 'session-expired',
+              next: nextPath,
+            });
           }
         }
       }
@@ -112,6 +123,20 @@ api.interceptors.response.use(
 export const authAPI = {
   signup: (userData) => api.post('/api/auth/signup', userData),
   login: (credentials) => api.post('/api/auth/login', credentials),
+  forgotPassword: (email) => api.post('/api/auth/forgot-password', { email }),
+  resendConfirmation: (email) => api.post('/api/auth/resend-confirmation', { email }),
+  exchangeLinkSession: (payload) => api.post('/api/auth/session-from-link', payload),
+  updatePassword: (password, session = {}) => api.post(
+    '/api/auth/update-password',
+    session?.accessToken || session?.refreshToken
+      ? {
+          password,
+          access_token: session.accessToken || undefined,
+          refresh_token: session.refreshToken || undefined,
+        }
+      : { password },
+    session?.accessToken ? { headers: { Authorization: `Bearer ${session.accessToken}` } } : undefined
+  ),
   validateToken: () => api.get('/api/auth/validate'),
   getProfile: () => api.get('/api/auth/profile'),
   refreshToken: (refreshToken) => api.post('/api/auth/refresh', { refresh_token: refreshToken }),
@@ -141,12 +166,28 @@ export const ordersAPI = {
   createCheckoutSession: (items) => api.post('/api/create-checkout-session', { items }),
 };
 
+export const adminOrdersAPI = {
+  getAll: (params) => api.get('/api/admin/orders', { params }),
+  updateStatus: (orderId, status) => api.put(`/api/admin/orders/${orderId}/status`, { status }),
+  cancel: (orderId) => api.put(`/api/admin/orders/${orderId}/cancel`),
+  markCodCollected: (orderId) => api.put(`/api/admin/orders/${orderId}/mark-cod-collected`),
+  getShipmentReadiness: (orderId) => api.get(`/api/admin/orders/${orderId}/shipment-readiness`),
+};
+
 export const deliveryAPI = {
   // Customer-facing endpoints
   trackOrder: (orderId) => api.get(`/api/delivery/track/${orderId}`),
   checkServiceability: (pincode) => api.get(`/api/delivery/check-serviceability?pincode=${pincode}`),
+  getOptions: (pincode, subtotal = 0) => api.get('/api/delivery/options', {
+    params: {
+      pincode,
+      subtotal,
+    },
+  }),
 
   // Admin endpoints
+  getSettings: () => api.get('/api/admin/delivery/settings'),
+  updateSettings: (settings) => api.put('/api/admin/delivery/settings', settings),
   createShipment: (orderId) => api.post(`/api/admin/delivery/create-shipment/${orderId}`),
   schedulePickup: (pickupData) => api.post('/api/admin/delivery/schedule-pickup', pickupData),
   getShipments: (params) => api.get('/api/admin/delivery/shipments', { params }),

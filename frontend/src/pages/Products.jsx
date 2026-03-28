@@ -1,12 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { MagnifyingGlassIcon, XMarkIcon, ViewColumnsIcon, ListBulletIcon, FunnelIcon } from '@heroicons/react/24/outline';
+import {
+  FunnelIcon,
+  MagnifyingGlassIcon,
+  ViewColumnsIcon,
+  ListBulletIcon,
+  XMarkIcon,
+} from '@heroicons/react/24/outline';
 import ProductCard from '../components/ProductCard';
 import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
 import { productsAPI, categoriesAPI } from '../services/api';
+import { getComparableProductPrice } from '../utils/productPricing';
 
 const Products = () => {
   const [products, setProducts] = useState([]);
@@ -152,10 +159,14 @@ const Products = () => {
     
     // Apply price range filter
     if (filters.priceRange.min) {
-      result = result.filter(product => product.price >= parseFloat(filters.priceRange.min));
+      result = result.filter(product => (
+        getComparableProductPrice(product) >= parseFloat(filters.priceRange.min)
+      ));
     }
     if (filters.priceRange.max) {
-      result = result.filter(product => product.price <= parseFloat(filters.priceRange.max));
+      result = result.filter(product => (
+        getComparableProductPrice(product) <= parseFloat(filters.priceRange.max)
+      ));
     }
     
     // Apply weight range filter
@@ -178,9 +189,9 @@ const Products = () => {
         case 'name-desc':
           return b.name.localeCompare(a.name);
         case 'price':
-          return a.price - b.price;
+          return getComparableProductPrice(a) - getComparableProductPrice(b);
         case 'price-desc':
-          return b.price - a.price;
+          return getComparableProductPrice(b) - getComparableProductPrice(a);
         default:
           return 0;
       }
@@ -261,201 +272,130 @@ const Products = () => {
     setCurrentPage(page);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
+  const activeFiltersCount = getActiveFiltersCount();
+  const resultsSummary = filters.search
+    ? `Showing ${filteredProducts.length} result${filteredProducts.length !== 1 ? 's' : ''} for "${filters.search}"`
+    : `${filteredProducts.length} product${filteredProducts.length !== 1 ? 's' : ''} available`;
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <motion.div
-          animate={{ rotate: 360 }}
-          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-          className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full"
-        />
+      <div className="page-shell-soft py-6">
+        <div className="page-container flex items-center justify-center py-20">
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+            className="h-10 w-10 rounded-full border-[3px] border-[#23442a]/20 border-t-[#23442a]"
+          />
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50">
-      <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8 py-4">
-
-        <div className="lg:grid lg:grid-cols-5 lg:gap-x-4 xl:gap-x-6">
-          {/* Mobile filter toggle */}
-          <div className="lg:hidden mb-3">
+    <div className="page-shell-soft py-6">
+      <div className="page-container">
+        <div className="lg:grid lg:grid-cols-[248px_minmax(0,1fr)] lg:gap-4 xl:gap-5">
+          <div className="mb-3 lg:hidden">
             <Button
               variant="outline"
               onClick={() => setShowMobileFilters(!showMobileFilters)}
-              className="flex items-center justify-center w-full px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-md shadow-sm hover:bg-gray-50 transition-all duration-200"
+              className="flex h-10 w-full items-center justify-center rounded-full border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50"
             >
-              <FunnelIcon className="w-4 h-4 mr-2" />
-              {showMobileFilters ? 'Hide' : 'Show'} Filters & View {getActiveFiltersCount() > 0 && (
-                <Badge className="ml-2 bg-blue-100 text-blue-700 px-2 py-0.5 text-xs rounded-full">
-                  {getActiveFiltersCount()}
+              <FunnelIcon className="mr-2 h-4 w-4" />
+              {showMobileFilters ? 'Hide' : 'Show'} filters
+              {activeFiltersCount > 0 && (
+                <Badge className="ml-2 rounded-full border-0 bg-[#23442a]/10 px-2 py-0.5 text-xs text-[#23442a] shadow-none">
+                  {activeFiltersCount}
                 </Badge>
               )}
             </Button>
           </div>
 
-          {/* Premium Filters Sidebar */}
           <motion.div 
-            className={`${showMobileFilters ? 'block' : 'hidden'} lg:block mb-8 lg:mb-0`}
+            className={`${showMobileFilters ? 'block' : 'hidden'} mb-6 lg:mb-0 lg:block`}
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.5, delay: 0.3 }}
+            transition={{ duration: 0.4, delay: 0.15 }}
           >
-            <Card className="bg-white/80 backdrop-blur-sm border border-gray-200/50 shadow-lg sticky top-8">
-              <CardContent className="p-6">
+            <Card className="sticky top-6 overflow-hidden rounded-[1.45rem] border border-slate-200/80 bg-white shadow-[0_14px_28px_rgba(15,23,42,0.045)]">
+              <CardContent className="p-4">
                 <div className="space-y-4">
-                  {/* Results Summary */}
-                  <div className="pb-3 border-b border-gray-200">
-                    <div className="flex items-center justify-between mb-2">
-                      <p className="text-sm text-gray-600">
-                        {filters.search ? (
-                          <>Showing {filteredProducts.length} result{filteredProducts.length !== 1 ? 's' : ''} for "{filters.search}"</>
-                        ) : (
-                          <>{filteredProducts.length} product{filteredProducts.length !== 1 ? 's' : ''} available</>
-                        )}
-                      </p>
+                  <div className="border-b border-slate-200 pb-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Filters</p>
+                        <p className="mt-1 text-sm leading-6 text-slate-600">Search, categories, price and weight.</p>
+                      </div>
+                      {activeFiltersCount > 0 && (
+                        <Badge className="rounded-full border-0 bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600 shadow-none">
+                          {activeFiltersCount} active
+                        </Badge>
+                      )}
                     </div>
-                    {getActiveFiltersCount() > 0 && (
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-xs text-gray-500">{getActiveFiltersCount()} filter{getActiveFiltersCount() > 1 ? 's' : ''} applied:</span>
-                        {filters.search && (
-                          <Badge variant="secondary" className="text-xs px-2 py-0.5">
-                            Search: "{filters.search}"
-                            <button onClick={() => removeFilter('search')} className="ml-1">
-                              <XMarkIcon className="h-3 w-3" />
-                            </button>
-                          </Badge>
-                        )}
-                        {filters.categories.map(categoryId => {
-                          const category = categories.find(c => c.id === categoryId);
-                          return category ? (
-                            <Badge key={categoryId} variant="secondary" className="text-xs px-2 py-0.5">
-                              {category.name}
-                              <button onClick={() => removeFilter('category', categoryId)} className="ml-1">
-                                <XMarkIcon className="h-3 w-3" />
-                              </button>
-                            </Badge>
-                          ) : null;
-                        })}
-                        {(filters.priceRange.min || filters.priceRange.max) && (
-                          <Badge variant="secondary" className="text-xs px-2 py-0.5">
-                            Price: ₹{filters.priceRange.min || '0'} - ₹{filters.priceRange.max || '∞'}
-                            <button onClick={() => removeFilter('price')} className="ml-1">
-                              <XMarkIcon className="h-3 w-3" />
-                            </button>
-                          </Badge>
-                        )}
-                        {(filters.weightRange.min || filters.weightRange.max) && (
-                          <Badge variant="secondary" className="text-xs px-2 py-0.5">
-                            Weight: {filters.weightRange.min || '0'} - {filters.weightRange.max || '∞'} kg
-                            <button onClick={() => removeFilter('weight')} className="ml-1">
-                              <XMarkIcon className="h-3 w-3" />
-                            </button>
-                          </Badge>
-                        )}
-                        <Button variant="ghost" size="sm" onClick={clearFilters} className="text-xs px-2 py-0.5 h-auto">
+                    {activeFiltersCount > 0 && (
+                      <div className="mt-3 flex items-center justify-between gap-3">
+                        <p className="text-xs text-slate-500">
+                          {activeFiltersCount} filter{activeFiltersCount === 1 ? '' : 's'} applied
+                        </p>
+                        <Button variant="ghost" size="sm" onClick={clearFilters} className="h-auto rounded-full px-2 py-1 text-xs text-[#23442a] hover:bg-[#23442a]/5 hover:text-[#23442a]">
                           Clear all
                         </Button>
                       </div>
                     )}
                   </div>
-                  
-                  {/* View Toggle */}
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-heading font-semibold text-gray-900">View</h3>
-                    <div className="bg-gray-100 border border-gray-200 rounded-md p-0.5">
-                      <Button
-                        variant={viewMode === 'grid' ? 'default' : 'ghost'}
-                        size="sm"
-                        onClick={() => setViewMode('grid')}
-                        className="px-2 py-1.5 rounded-sm transition-all duration-200 h-auto text-xs"
-                      >
-                        <ViewColumnsIcon className="w-3.5 h-3.5 mr-1" />
-                        Grid
-                      </Button>
-                      <Button
-                        variant={viewMode === 'list' ? 'default' : 'ghost'}
-                        size="sm"
-                        onClick={() => setViewMode('list')}
-                        className="px-2 py-1.5 rounded-sm transition-all duration-200 h-auto text-xs"
-                      >
-                        <ListBulletIcon className="w-3.5 h-3.5 mr-1" />
-                        List
-                      </Button>
-                    </div>
-                  </div>
-                  
-                  {/* Filters Header */}
-                  <div className="flex items-center justify-between pt-2 border-t border-gray-200">
-                    <h3 className="text-lg font-heading font-semibold text-gray-900">Filters</h3>
-                    {getActiveFiltersCount() > 0 && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={clearFilters}
-                        className="text-xs text-red-600 hover:text-red-700 hover:bg-red-50 font-medium px-2 py-1 rounded-md transition-colors"
-                      >
-                        Clear ({getActiveFiltersCount()})
-                      </Button>
-                    )}
-                  </div>
                 </div>
 
-                <div className="space-y-6">
-                  {/* Search Input */}
+                <div className="mt-4 space-y-4">
                   <div>
-                    <label className="block text-sm font-heading font-semibold text-gray-900 mb-4 tracking-tight">
+                    <label className="mb-2.5 block text-sm font-semibold tracking-tight text-slate-900">
                       Search Products
                     </label>
                     <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <MagnifyingGlassIcon className="h-4 w-4 text-gray-400" />
-                      </div>
+                      <MagnifyingGlassIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                       <input
                         type="text"
                         placeholder="Search by name or description..."
-                        className="w-full pl-10 pr-4 py-2.5 text-sm border border-gray-200 rounded-lg shadow-sm bg-gray-50/50 focus:border-blue-500 focus:ring-blue-500 focus:bg-white transition-all duration-200 font-body"
+                        className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/70 py-2 pl-10 pr-10 text-sm text-slate-700 shadow-sm transition-all duration-200 focus:border-[#23442a]/35 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#23442a]/15"
                         value={filters.search}
                         onChange={(e) => handleFilterChange('search', e.target.value)}
                       />
                       {filters.search && (
                         <button
+                          type="button"
                           onClick={() => handleFilterChange('search', '')}
-                          className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                          className="absolute right-2 top-1/2 inline-flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
                         >
-                          <XMarkIcon className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+                          <XMarkIcon className="h-4 w-4" />
                         </button>
                       )}
                     </div>
                   </div>
 
-                  {/* Categories Filter - Multiple Selection */}
                   <div>
-                    <label className="block text-sm font-heading font-semibold text-gray-900 mb-4 tracking-tight">
+                    <label className="mb-2.5 block text-sm font-semibold tracking-tight text-slate-900">
                       Categories
                     </label>
-                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                    <div className="max-h-44 space-y-1.5 overflow-y-auto pr-1">
                       {categories.map((category) => {
                         const isSelected = filters.categories.includes(category.id);
                         return (
                           <div 
                             key={category.id} 
-                            className="flex items-center group cursor-pointer p-2 rounded-md hover:bg-gray-50 transition-colors"
+                            className="flex items-center rounded-xl px-2.5 py-2 transition-colors hover:bg-slate-50"
                           >
                             <input
                               type="checkbox"
                               id={`category-${category.id}`}
-                              className="w-4 h-4 rounded border-2 border-gray-300 text-blue-600 shadow-sm focus:border-blue-500 focus:ring-blue-500 transition-colors cursor-pointer"
+                              className="h-4 w-4 cursor-pointer rounded border-2 border-slate-300 text-[#23442a] shadow-sm focus:border-[#23442a] focus:ring-[#23442a]"
                               checked={isSelected}
                               onChange={() => toggleCategoryFilter(category.id)}
                             />
                             <label 
                               htmlFor={`category-${category.id}`}
-                              className={`ml-3 text-sm cursor-pointer leading-tight transition-colors ${
+                              className={`ml-3 cursor-pointer text-sm leading-tight transition-colors ${
                                 isSelected 
-                                  ? 'text-gray-900 font-semibold' 
-                                  : 'text-gray-500 font-light'
+                                  ? 'font-semibold text-slate-900'
+                                  : 'text-slate-500'
                               }`}
                             >
                               {category.name}
@@ -466,32 +406,30 @@ const Products = () => {
                     </div>
                   </div>
 
-                  {/* Price Range Filter */}
                   <div>
-                    <label className="block text-sm font-heading font-semibold text-gray-900 mb-4 tracking-tight">
+                    <label className="mb-2.5 block text-sm font-semibold tracking-tight text-slate-900">
                       Price Range (₹)
                     </label>
                     <div className="grid grid-cols-2 gap-3">
                       <input
                         type="number"
                         placeholder="Min price"
-                        className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg shadow-sm bg-gray-50/50 focus:border-blue-500 focus:ring-blue-500 focus:bg-white transition-all duration-200 font-body"
+                        className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/70 px-3 text-sm shadow-sm transition-all duration-200 focus:border-[#23442a]/35 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#23442a]/15"
                         value={filters.priceRange.min}
                         onChange={(e) => handleFilterChange('priceRange', { ...filters.priceRange, min: e.target.value })}
                       />
                       <input
                         type="number"
                         placeholder="Max price"
-                        className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg shadow-sm bg-gray-50/50 focus:border-blue-500 focus:ring-blue-500 focus:bg-white transition-all duration-200 font-body"
+                        className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/70 px-3 text-sm shadow-sm transition-all duration-200 focus:border-[#23442a]/35 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#23442a]/15"
                         value={filters.priceRange.max}
                         onChange={(e) => handleFilterChange('priceRange', { ...filters.priceRange, max: e.target.value })}
                       />
                     </div>
                   </div>
 
-                  {/* Weight Range Filter */}
                   <div>
-                    <label className="block text-sm font-heading font-semibold text-gray-900 mb-4 tracking-tight">
+                    <label className="mb-2.5 block text-sm font-semibold tracking-tight text-slate-900">
                       Weight Range (kg)
                     </label>
                     <div className="grid grid-cols-2 gap-3">
@@ -499,7 +437,7 @@ const Products = () => {
                         type="number"
                         step="0.1"
                         placeholder="Min weight"
-                        className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg shadow-sm bg-gray-50/50 focus:border-blue-500 focus:ring-blue-500 focus:bg-white transition-all duration-200 font-body"
+                        className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/70 px-3 text-sm shadow-sm transition-all duration-200 focus:border-[#23442a]/35 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#23442a]/15"
                         value={filters.weightRange.min}
                         onChange={(e) => handleFilterChange('weightRange', { ...filters.weightRange, min: e.target.value })}
                       />
@@ -507,63 +445,44 @@ const Products = () => {
                         type="number"
                         step="0.1"
                         placeholder="Max weight"
-                        className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg shadow-sm bg-gray-50/50 focus:border-blue-500 focus:ring-blue-500 focus:bg-white transition-all duration-200 font-body"
+                        className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/70 px-3 text-sm shadow-sm transition-all duration-200 focus:border-[#23442a]/35 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#23442a]/15"
                         value={filters.weightRange.max}
                         onChange={(e) => handleFilterChange('weightRange', { ...filters.weightRange, max: e.target.value })}
                       />
                     </div>
-                  </div>
-
-                  {/* Sort By */}
-                  <div>
-                    <label className="block text-sm font-heading font-semibold text-gray-900 mb-4 tracking-tight">
-                      Sort By
-                    </label>
-                    <select
-                      className="block w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg shadow-sm bg-gray-50/50 focus:border-blue-500 focus:ring-blue-500 focus:bg-white transition-all duration-200 font-body"
-                      value={filters.sortBy}
-                      onChange={(e) => handleFilterChange('sortBy', e.target.value)}
-                    >
-                      {sortOptions.map((option) => (
-                        <option key={option.id} value={option.id}>
-                          {option.name}
-                        </option>
-                      ))}
-                    </select>
                   </div>
                 </div>
               </CardContent>
             </Card>
           </motion.div>
 
-          {/* Products Section */}
-          <div className="lg:col-span-4">
+          <div>
             {error ? (
               <motion.div 
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="bg-white/80 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200 p-12 text-center"
+                className="rounded-[1.6rem] border border-slate-200 bg-white p-10 text-center shadow-[0_14px_34px_rgba(15,23,42,0.05)]"
               >
-                <div className="text-red-600 text-lg font-medium mb-2">{error}</div>
-                <p className="text-gray-500">Please try again later or contact support.</p>
+                <div className="mb-2 text-lg font-medium text-rose-600">{error}</div>
+                <p className="text-slate-500">Please try again later or contact support.</p>
               </motion.div>
             ) : currentProducts.length === 0 ? (
               <motion.div 
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="bg-white/80 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200 p-12 text-center"
+                className="rounded-[1.6rem] border border-slate-200 bg-white p-10 text-center shadow-[0_14px_34px_rgba(15,23,42,0.05)]"
               >
-                <div className="text-gray-500 text-xl font-medium mb-4">No products found</div>
-                <p className="text-gray-400 mb-6 font-body">
-                  {getActiveFiltersCount() > 0 
-                    ? "Try adjusting your filters to see more results." 
+                <div className="mb-3 text-xl font-medium text-slate-700">No products found</div>
+                <p className="mb-6 text-slate-500">
+                  {activeFiltersCount > 0
+                    ? "Try adjusting your filters to see more results."
                     : "Check back later for new products."
                   }
                 </p>
-                {getActiveFiltersCount() > 0 && (
+                {activeFiltersCount > 0 && (
                   <Button
                     onClick={clearFilters}
-                    className="bg-blue-600 hover:bg-blue-700 text-white font-medium px-6 py-2 rounded-lg shadow-sm transition-colors"
+                    className="rounded-full bg-[#23442a] px-5 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-[#1d3722]"
                   >
                     Clear all filters
                   </Button>
@@ -571,15 +490,116 @@ const Products = () => {
               </motion.div>
             ) : (
               <>
+                <div className="mb-4 rounded-[1.4rem] border border-slate-200/80 bg-white px-4 py-3 shadow-sm">
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Catalogue</p>
+                      <p className="mt-1 text-sm font-semibold text-slate-900">{resultsSummary}</p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        Page {currentPage} of {Math.max(totalPages, 1)}
+                      </p>
+                    </div>
 
-                {/* Premium Products Grid */}
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                      <select
+                        className="h-10 rounded-full border border-slate-200 bg-slate-50/70 px-4 text-sm text-slate-700 shadow-sm transition-all duration-200 focus:border-[#23442a]/35 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#23442a]/15"
+                        value={filters.sortBy}
+                        onChange={(e) => handleFilterChange('sortBy', e.target.value)}
+                      >
+                        {sortOptions.map((option) => (
+                          <option key={option.id} value={option.id}>
+                            {option.name}
+                          </option>
+                        ))}
+                      </select>
+
+                      <div className="rounded-full border border-slate-200 bg-slate-100 p-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setViewMode('grid')}
+                          className={`h-auto rounded-full px-3 py-1.5 text-xs ${
+                            viewMode === 'grid'
+                              ? 'bg-[#23442a] text-white hover:bg-[#1d3722] hover:text-white'
+                              : 'text-slate-600 hover:bg-white hover:text-slate-900'
+                          }`}
+                        >
+                          <ViewColumnsIcon className="mr-1 h-3.5 w-3.5" />
+                          Grid
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setViewMode('list')}
+                          className={`h-auto rounded-full px-3 py-1.5 text-xs ${
+                            viewMode === 'list'
+                              ? 'bg-[#23442a] text-white hover:bg-[#1d3722] hover:text-white'
+                              : 'text-slate-600 hover:bg-white hover:text-slate-900'
+                          }`}
+                        >
+                          <ListBulletIcon className="mr-1 h-3.5 w-3.5" />
+                          List
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {activeFiltersCount > 0 && (
+                    <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3">
+                      {filters.search && (
+                        <Badge variant="secondary" className="rounded-full px-2.5 py-1 text-xs">
+                          Search: "{filters.search}"
+                          <button onClick={() => removeFilter('search')} className="ml-1">
+                            <XMarkIcon className="h-3 w-3" />
+                          </button>
+                        </Badge>
+                      )}
+                      {filters.categories.map(categoryId => {
+                        const category = categories.find(c => c.id === categoryId);
+                        return category ? (
+                          <Badge key={categoryId} variant="secondary" className="rounded-full px-2.5 py-1 text-xs">
+                            {category.name}
+                            <button onClick={() => removeFilter('category', categoryId)} className="ml-1">
+                              <XMarkIcon className="h-3 w-3" />
+                            </button>
+                          </Badge>
+                        ) : null;
+                      })}
+                      {(filters.priceRange.min || filters.priceRange.max) && (
+                        <Badge variant="secondary" className="rounded-full px-2.5 py-1 text-xs">
+                          Price: ₹{filters.priceRange.min || '0'} - ₹{filters.priceRange.max || '∞'}
+                          <button onClick={() => removeFilter('price')} className="ml-1">
+                            <XMarkIcon className="h-3 w-3" />
+                          </button>
+                        </Badge>
+                      )}
+                      {(filters.weightRange.min || filters.weightRange.max) && (
+                        <Badge variant="secondary" className="rounded-full px-2.5 py-1 text-xs">
+                          Weight: {filters.weightRange.min || '0'} - {filters.weightRange.max || '∞'} kg
+                          <button onClick={() => removeFilter('weight')} className="ml-1">
+                            <XMarkIcon className="h-3 w-3" />
+                          </button>
+                        </Badge>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={clearFilters}
+                        className="h-auto rounded-full px-2 py-1 text-xs text-[#23442a] hover:bg-[#23442a]/5 hover:text-[#23442a]"
+                      >
+                        Clear all
+                      </Button>
+                    </div>
+                  )}
+                </div>
+
                 <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  transition={{ duration: 0.6, delay: 0.5 }}
+                  transition={{ duration: 0.45, delay: 0.2 }}
                 >
                   {viewMode === 'list' ? (
-                    <div className="space-y-4">
+                    <div className="space-y-3">
                       {currentProducts.map((product, index) => (
                         <motion.div
                           key={product.id}
@@ -592,7 +612,7 @@ const Products = () => {
                       ))}
                     </div>
                   ) : (
-                    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4">
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
                       {currentProducts.map((product, index) => (
                         <motion.div
                           key={product.id}
@@ -610,27 +630,27 @@ const Products = () => {
                 {/* Pagination */}
                 {totalPages > 1 && (
                   <motion.div 
-                    className="mt-8"
+                    className="mt-6 border-t border-slate-200/80 pt-4"
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
-                    transition={{ duration: 0.4, delay: 0.7 }}
+                    transition={{ duration: 0.35, delay: 0.3 }}
                   >
-                    <div className="flex items-center justify-between">
-                      <div className="text-sm text-gray-500">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="text-sm text-slate-500">
                         Showing {startIndex + 1} to {Math.min(endIndex, filteredProducts.length)} of {filteredProducts.length} products
                       </div>
-                      <div className="flex items-center space-x-2">
+                      <div className="flex items-center gap-2">
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => handlePageChange(currentPage - 1)}
                           disabled={currentPage === 1}
-                          className="px-3 py-1.5 text-sm"
+                          className="rounded-full px-3 py-1.5 text-sm"
                         >
                           Previous
                         </Button>
                         
-                        <div className="flex items-center space-x-1">
+                        <div className="flex items-center gap-1">
                           {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                             let pageNum;
                             if (totalPages <= 5) {
@@ -646,10 +666,14 @@ const Products = () => {
                             return (
                               <Button
                                 key={pageNum}
-                                variant={currentPage === pageNum ? "default" : "outline"}
+                                variant="outline"
                                 size="sm"
                                 onClick={() => handlePageChange(pageNum)}
-                                className="px-3 py-1.5 text-sm min-w-[2.5rem]"
+                                className={`min-w-[2.25rem] rounded-full px-3 py-1.5 text-sm ${
+                                  currentPage === pageNum
+                                    ? 'border-[#23442a] bg-[#23442a] text-white hover:bg-[#1d3722] hover:text-white'
+                                    : 'border-slate-200 text-slate-700 hover:bg-slate-50'
+                                }`}
                               >
                                 {pageNum}
                               </Button>
@@ -662,7 +686,7 @@ const Products = () => {
                           size="sm"
                           onClick={() => handlePageChange(currentPage + 1)}
                           disabled={currentPage === totalPages}
-                          className="px-3 py-1.5 text-sm"
+                          className="rounded-full px-3 py-1.5 text-sm"
                         >
                           Next
                         </Button>

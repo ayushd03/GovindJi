@@ -1,44 +1,41 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ShoppingCart, Star, Heart, Eye, ArrowRight } from 'lucide-react';
-import { Card, CardContent, CardFooter } from './ui/card';
+import { ShoppingCart } from 'lucide-react';
+import { Card, CardContent } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { useCart } from '../context/CartContext';
 import { useProductImage } from '../hooks/useProductImage';
 import { handleImageError } from '../utils/imageUtils';
+import { buildCartItem, getProductPricing } from '../utils/productPricing';
 import { cn } from '../lib/utils';
 import SizeSelectionDialog from './SizeSelectionDialog';
 
 const ProductCard = ({ product, className, viewMode = "grid" }) => {
   const { getProductCartInfo, addToCart } = useCart();
   const { primaryImage, loading: imageLoading } = useProductImage(product.id, product.image_url);
-  const [isHovered, setIsHovered] = useState(false);
-  const [isFavorited, setIsFavorited] = useState(false);
   const [showSizeDialog, setShowSizeDialog] = useState(false);
 
   const productCartInfo = getProductCartInfo(product.id);
   const currentQuantity = productCartInfo.totalQuantity;
+  const pricing = getProductPricing(product);
+  const displayPrice = pricing.hasPriceRange ? pricing.minPrice : pricing.selectedPrice;
+  const isInStock = pricing.isPurchasable;
+  const actionLabel = !isInStock ? 'Sold out' : pricing.hasVariants ? 'Select pack' : 'Add to cart';
 
   const handleAddToCart = (e) => {
     e.preventDefault();
     e.stopPropagation();
 
     // Check if product has variants configured
-    if (product.variants && product.variants.length > 0) {
+    if (pricing.hasVariants) {
       // Show size selection dialog for products with variants
       setShowSizeDialog(true);
     } else {
       // Add directly to cart for products without variants
-      addToCart(product, 1);
+      addToCart(buildCartItem(product), 1);
     }
-  };
-
-  const handleFavoriteToggle = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsFavorited(!isFavorited);
   };
 
   const getCartLabel = () => {
@@ -54,234 +51,137 @@ const ProductCard = ({ product, className, viewMode = "grid" }) => {
     return null;
   };
 
-  const rating = 4.5;
   const discount = product.discount || 0;
-
-  // Handle different view modes
-  const cardClasses = viewMode === "list" 
-    ? "group relative w-full flex items-center p-4 border rounded-lg hover:shadow-md transition-shadow" 
-    : "group relative w-full";
-
-  const cardLayoutClasses = viewMode === "list"
-    ? "overflow-hidden border-0 bg-white relative flex flex-row rounded-xl"
-    : "overflow-hidden border-0 bg-white relative h-full flex flex-col rounded-xl";
+  const cartLabel = getCartLabel();
+  const description = product.description?.trim();
+  const truncatedDescription = description
+    ? description.length > (viewMode === 'list' ? 120 : 84)
+      ? `${description.substring(0, viewMode === 'list' ? 120 : 84)}...`
+      : description
+    : 'Carefully packed dry fruits for everyday snacking and gifting.';
+  const detailLine = pricing.hasVariants
+    ? `${pricing.variants.length} pack option${pricing.variants.length === 1 ? '' : 's'}`
+    : product.weight
+      ? `${product.weight} ${product.unit || 'kg'}`
+      : 'Standard pack';
 
   return (
     <>
       <motion.div
-        className={cn(cardClasses, className)}
-        whileHover={{ y: viewMode === "list" ? 0 : -8 }}
+        className={cn('group h-full', className)}
+        whileHover={{ y: viewMode === 'list' ? -2 : -4 }}
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6, ease: "easeOut" }}
-        onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
+        transition={{ duration: 0.35, ease: 'easeOut' }}
       >
-        <Card className={cardLayoutClasses}>
-          {/* Premium card shadow and border effects */}
-          <div className="absolute inset-0 bg-gradient-to-br from-slate-50/30 via-white to-gray-50/30 rounded-xl" />
-          <div 
-            className="absolute inset-0 rounded-xl border border-gray-100/80 shadow-[0_2px_8px_rgba(0,0,0,0.04),0_4px_16px_rgba(0,0,0,0.06)] group-hover:shadow-[0_8px_32px_rgba(0,0,0,0.12),0_2px_8px_rgba(0,0,0,0.08)] transition-all duration-700 ease-out"
-            style={{
-              background: 'linear-gradient(145deg, #ffffff 0%, #fdfdfd 100%)',
-            }}
-          />
-          
-          {/* Premium inner border glow */}
-          <div className="absolute inset-0.5 rounded-xl border border-white/60 pointer-events-none" />
-          
-          {/* Sophisticated hover glow */}
-          <motion.div
-            className="absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"
-            style={{
-              background: 'linear-gradient(145deg, rgba(99, 102, 241, 0.02) 0%, rgba(168, 85, 247, 0.02) 50%, rgba(236, 72, 153, 0.02) 100%)'
-            }}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: isHovered ? 1 : 0 }}
-          />
-          {/* Discount Badge */}
-          {discount > 0 && (
-            <motion.div
-              initial={{ scale: 0, rotate: -12 }}
-              animate={{ scale: 1, rotate: -12 }}
-              transition={{ delay: 0.2, type: "spring", stiffness: 300 }}
-              className="absolute top-3 left-3 z-50"
-            >
-              <Badge 
-                className="text-xs font-bold shadow-lg bg-gradient-to-r from-red-500 to-red-600 text-white border-0 px-2.5 py-1 rounded-md"
-              >
-                {discount}% OFF
-              </Badge>
-            </motion.div>
+        <Card
+          className={cn(
+            'h-full overflow-hidden rounded-[1.45rem] border border-slate-200/80 bg-white shadow-[0_14px_30px_rgba(15,23,42,0.045)] transition-all duration-300 group-hover:shadow-[0_18px_36px_rgba(15,23,42,0.08)]',
+            viewMode === 'list' && 'rounded-[1.3rem]'
           )}
-
-          {/* Cart Status Badge */}
-          {currentQuantity > 0 && (
-            <motion.div
-              initial={{ scale: 0, y: -10 }}
-              animate={{ scale: 1, y: 0 }}
-              transition={{ type: "spring", stiffness: 300 }}
-              className="absolute top-3 left-1/2 transform -translate-x-1/2 z-50"
-            >
-              <Badge 
-                className="bg-emerald-500 text-white shadow-md border-0 px-2.5 py-1 text-xs font-semibold rounded-md"
-              >
-                {getCartLabel()}
-              </Badge>
-            </motion.div>
-          )}
-
-          {/* Favorite Button */}
-          <motion.div
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
-            className="absolute top-3 right-3 z-50"
-          >
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleFavoriteToggle}
-              className="h-9 w-9 bg-white/90 backdrop-blur-sm hover:bg-white shadow-md border border-gray-200/50 hover:border-red-200 rounded-lg transition-all duration-300"
-            >
-              <Heart 
+        >
+          <div className={cn('flex h-full flex-col', viewMode === 'list' && 'lg:flex-row')}>
+            <Link to={`/products/${product.id}`} className={cn('flex min-w-0 flex-1 flex-col', viewMode === 'list' && 'lg:flex-row')}>
+              <div
                 className={cn(
-                  "h-4 w-4 transition-all duration-300",
-                  isFavorited 
-                    ? "text-red-500 fill-red-500" 
-                    : "text-gray-500 hover:text-red-500"
+                  'relative overflow-hidden bg-[#f5f1e8]',
+                  viewMode === 'list'
+                    ? 'aspect-[5/4] w-full lg:min-h-full lg:w-56 lg:flex-none'
+                    : 'aspect-[4/4.35] w-full'
                 )}
-              />
-            </Button>
-          </motion.div>
-
-          <Link to={`/products/${product.id}`} className="block relative z-10">
-            {/* Product Image */}
-            <div className="relative h-56 bg-gradient-to-br from-gray-50 to-gray-100 overflow-hidden rounded-t-xl">
-              {imageLoading ? (
-                <div className="w-full h-full bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 bg-[length:200%_100%] animate-pulse" />
-              ) : primaryImage || product.image_url ? (
-                <motion.img
-                  src={primaryImage || product.image_url}
-                  alt={product.name}
-                  className="w-full h-full object-cover transition-all duration-500 group-hover:scale-105"
-                  whileHover={{ scale: 1.05 }}
-                  transition={{ duration: 0.5, ease: "easeOut" }}
-                  onError={(e) => handleImageError(e, 'product')}
-                />
-              ) : (
-                <div className="w-full h-full bg-gray-100 flex items-center justify-center">
-                  <div className="text-gray-400 text-center">
-                    <div className="text-4xl mb-2">📦</div>
-                    <div className="text-sm">No image</div>
-                  </div>
-                </div>
-              )}
-              
-              {/* Subtle overlay for better text readability */}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/5 via-transparent to-transparent opacity-50 group-hover:opacity-30 transition-opacity duration-300" />
-              
-              {/* Quick view overlay */}
-              <motion.div 
-                className="absolute inset-0 bg-black/20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: isHovered ? 1 : 0 }}
               >
-                <motion.div
-                  initial={{ scale: 0.8, opacity: 0 }}
-                  animate={{ 
-                    scale: isHovered ? 1 : 0.8, 
-                    opacity: isHovered ? 1 : 0 
-                  }}
-                  transition={{ delay: 0.1, type: "spring", stiffness: 300 }}
-                >
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    className="bg-white/95 backdrop-blur-sm hover:bg-white text-gray-800 hover:text-gray-900 shadow-lg border border-white/50 px-4 py-2 rounded-lg font-medium text-sm"
-                  >
-                    <Eye className="h-4 w-4 mr-2" />
-                    Quick View
-                  </Button>
-                </motion.div>
-              </motion.div>
-              
-              {/* Premium shimmer effect */}
-              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -skew-x-12 translate-x-full group-hover:translate-x-[-200%] transition-transform duration-1000 ease-out" />
-            </div>
-
-            <CardContent className="p-5 relative flex-1 flex flex-col">
-              <div className="relative z-10 flex-1 flex flex-col">
-                {/* Rating */}
-                <div className="flex items-center gap-1 mb-3">
-                  <div className="flex items-center">
-                    {[...Array(5)].map((_, i) => (
-                      <Star
-                        key={i}
-                        className={cn(
-                          "h-3.5 w-3.5 transition-all duration-200",
-                          i < Math.floor(rating) 
-                            ? "text-amber-400 fill-amber-400" 
-                            : "text-gray-300"
-                        )}
-                      />
-                    ))}
+                {imageLoading ? (
+                  <div className="h-full w-full animate-pulse bg-gradient-to-r from-[#ece7dc] via-[#f7f4ed] to-[#ece7dc] bg-[length:200%_100%]" />
+                ) : primaryImage || product.image_url ? (
+                  <motion.img
+                    src={primaryImage || product.image_url}
+                    alt={product.name}
+                    className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+                    transition={{ duration: 0.45, ease: 'easeOut' }}
+                    onError={(e) => handleImageError(e, 'product')}
+                  />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center bg-[#f1ece2] text-center text-sm font-medium text-slate-500">
+                    No image
                   </div>
-                  <span className="text-xs text-gray-600 ml-1.5 font-medium">
-                    ({rating})
-                  </span>
-                </div>
+                )}
 
-                {/* Product Name */}
-                <h3 className="font-heading font-semibold text-base text-gray-900 mb-2 line-clamp-2 group-hover:text-blue-600 transition-colors duration-300 leading-tight tracking-tight">
+                <div className="absolute left-3 top-3 flex max-w-[calc(100%-1.5rem)] flex-wrap gap-2">
+                  {discount > 0 && (
+                    <Badge className="rounded-full border-0 bg-slate-900/88 px-2.5 py-1 text-[10px] font-semibold text-white shadow-sm">
+                      {discount}% off
+                    </Badge>
+                  )}
+                </div>
+              </div>
+
+              <CardContent className={cn('flex flex-1 flex-col p-4', viewMode === 'list' && 'lg:p-5')}>
+                {product.category_name && (
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                    {product.category_name}
+                  </p>
+                )}
+
+                <h3 className="mt-2 line-clamp-2 font-heading text-[1.02rem] font-semibold leading-snug tracking-tight text-slate-900 transition-colors duration-200 group-hover:text-[#23442a]">
                   {product.name}
                 </h3>
 
-                {/* Product Description */}
-                <p className="text-sm text-gray-600 mb-4 line-clamp-2 leading-relaxed flex-1 font-body">
-                  {product.description && product.description.length > 85
-                    ? `${product.description.substring(0, 85)}...`
-                    : product.description
-                  }
+                <p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-600">
+                  {truncatedDescription}
                 </p>
 
-                {/* Price Section */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-xl font-bold text-gray-900 font-heading tracking-tight">
-                      ₹{parseFloat(product.price).toFixed(2)}
-                    </span>
-                    {discount > 0 && (
-                      <span className="text-sm text-gray-500 line-through font-medium">
-                        ₹{(parseFloat(product.price) * (1 + discount / 100)).toFixed(2)}
-                      </span>
-                    )}
-                  </div>
-                  <Badge className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-1 text-xs font-semibold rounded-md hover:bg-emerald-100 transition-colors tracking-wide">
-                    ✓ In Stock
-                  </Badge>
-                </div>
-              </div>
-            </CardContent>
-          </Link>
+                <div className="mt-auto border-t border-slate-100 pt-3">
+                  <div className="flex items-end justify-between gap-3">
+                    <div className="min-w-0">
+                      {pricing.hasPriceRange && (
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                          From
+                        </p>
+                      )}
+                      <div className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                        <span className="font-heading text-[1.28rem] font-semibold tracking-tight text-slate-900">
+                          ₹{displayPrice.toFixed(2)}
+                        </span>
+                        {discount > 0 && (
+                          <span className="text-sm font-medium text-slate-400 line-through">
+                            ₹{(displayPrice * (1 + discount / 100)).toFixed(2)}
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-1 text-xs text-slate-500">
+                        {detailLine}
+                        {cartLabel ? ` • ${cartLabel}` : ''}
+                      </p>
+                    </div>
 
-          <CardFooter className="p-5 pt-0 relative">
-            <motion.div
-              className="w-full relative z-10"
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              transition={{ type: "spring", stiffness: 300, damping: 20 }}
+                    <p className={cn('shrink-0 text-xs font-medium', isInStock ? 'text-emerald-700' : 'text-rose-700')}>
+                      {isInStock ? 'In stock' : 'Sold out'}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Link>
+
+            <div
+              className={cn(
+                'px-4 pb-4 pt-0',
+                viewMode === 'list' && 'lg:flex lg:w-[178px] lg:flex-none lg:items-end lg:border-l lg:border-slate-100 lg:p-5'
+              )}
             >
               <Button
                 onClick={handleAddToCart}
-                className="w-full h-11 bg-gray-900 hover:bg-gray-800 text-white font-heading font-semibold text-sm rounded-lg shadow-md hover:shadow-lg transition-all duration-300 border-0 group/btn tracking-wide"
+                disabled={!isInStock}
+                className={cn(
+                  'h-10 w-full rounded-xl bg-[#1f3425] px-4 text-sm font-semibold text-white shadow-sm transition-all hover:bg-[#16271b] disabled:cursor-not-allowed disabled:opacity-50',
+                  viewMode === 'list' && 'lg:rounded-full'
+                )}
                 size="lg"
               >
-                <ShoppingCart className="h-4 w-4 mr-2 group-hover/btn:scale-110 transition-transform duration-200" />
-                <span className="tracking-wide">Add to Cart</span>
-                <ArrowRight className="h-4 w-4 ml-2 opacity-0 group-hover/btn:opacity-100 group-hover/btn:translate-x-1 transition-all duration-200" />
+                <ShoppingCart className="mr-2 h-4 w-4" />
+                {actionLabel}
               </Button>
-            </motion.div>
-          </CardFooter>
+            </div>
+          </div>
         </Card>
       </motion.div>
 

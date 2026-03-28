@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useToast } from '../../hooks/useToast';
 import { PermissionGuard } from '../../components/PermissionGuard';
 import { ADMIN_PERMISSIONS } from '../../enums/roles';
@@ -19,14 +19,12 @@ import {
   IdentificationIcon,
   MapPinIcon,
   ClipboardDocumentListIcon,
-  CreditCardIcon,
   EyeIcon,
   BanknotesIcon,
   ReceiptPercentIcon,
   CalendarIcon,
   DocumentDuplicateIcon,
   ClockIcon,
-  CheckCircleIcon,
   ArchiveBoxIcon,
   ExclamationTriangleIcon,
   ArrowPathIcon,
@@ -43,6 +41,7 @@ import {
   getTransactionAmountText, 
   getTransactionSubText 
 } from '../../utils/financeColors';
+import { API_BASE_URL } from '../../config/apiBaseUrl';
 
 const PARTY_CATEGORIES = [
   'Raw Materials',
@@ -58,11 +57,6 @@ const GST_TYPES = [
   'Registered',
   'Composition',
   'Overseas'
-];
-
-const CREDIT_LIMIT_TYPES = [
-  { value: 'no_limit', label: 'No Limit' },
-  { value: 'custom_limit', label: 'Custom Limit' }
 ];
 
 const INDIAN_STATES = [
@@ -113,32 +107,25 @@ const PartyManagement = () => {
   
   // Removed formData state - now handled by AddVendorModal component
 
-  const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
-
-  const showSuccess = (message) => {
+  const showSuccess = useCallback((message) => {
     toast({
       title: "Success",
       description: message,
       variant: "success",
       duration: 3000,
     });
-  };
+  }, [toast]);
 
-  const showError = (message) => {
+  const showError = useCallback((message) => {
     toast({
       title: "Error",
       description: message,
       variant: "destructive",
       duration: 5000,
     });
-  };
+  }, [toast]);
 
-  useEffect(() => {
-    // Only fetch initial active parties data on component mount
-    fetchParties(1);
-  }, []);
-
-  const fetchParties = async (page = 1, limit = itemsPerPage) => {
+  const fetchParties = useCallback(async (page = 1, limit = itemsPerPage) => {
     if (page === 1) setLoading(true);
     try {
       const token = localStorage.getItem('authToken');
@@ -170,9 +157,9 @@ const PartyManagement = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [itemsPerPage, searchTerm, selectedCategory, selectedGstType, selectedState, showError]);
 
-  const fetchArchivedParties = async (page = 1, limit = itemsPerPage) => {
+  const fetchArchivedParties = useCallback(async (page = 1, limit = itemsPerPage) => {
     if (page === 1) setLoadingArchived(true);
     try {
       const token = localStorage.getItem('authToken');
@@ -204,7 +191,11 @@ const PartyManagement = () => {
     } finally {
       setLoadingArchived(false);
     }
-  };
+  }, [itemsPerPage, searchTerm, selectedCategory, selectedGstType, selectedState, showError]);
+
+  useEffect(() => {
+    fetchParties(1);
+  }, [fetchParties]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -220,7 +211,7 @@ const PartyManagement = () => {
     }, 500);
 
     return () => clearTimeout(timer);
-  }, [searchTerm, selectedCategory, selectedGstType, selectedState]);
+  }, [currentPage, fetchArchivedParties, fetchParties, searchTerm, selectedCategory, selectedGstType, selectedState, viewMode]);
 
   const currentTotal = viewMode === 'active' ? totalParties : totalArchivedParties;
   const currentPartiesList = viewMode === 'active' ? parties : archivedParties;
@@ -353,28 +344,9 @@ const PartyManagement = () => {
     setEditingParty(null);
   };
 
-  const handleVendorAdded = (vendor) => {
+  const handleVendorAdded = () => {
     // Refresh the parties list when a vendor is added/updated
     fetchParties();
-  };
-
-  const fetchPartyDetails = async (partyId) => {
-    try {
-      const token = localStorage.getItem('authToken');
-      const response = await fetch(`${API_BASE_URL}/api/admin/parties/${partyId}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (!response.ok) throw new Error('Failed to fetch party details');
-
-      const data = await response.json();
-      setShowPartyDetails(data);
-    } catch (err) {
-      showError('Failed to load party details');
-    }
   };
 
   const fetchVendorDetails = async (partyId) => {
@@ -675,15 +647,15 @@ const PartyManagement = () => {
           <CardContent className="pt-0">
             <div className="mb-4 md:hidden">
               <div className="relative">
-                <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                <input type="text" placeholder="Search parties..." className="input-field w-full pl-10" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                <MagnifyingGlassIcon className="input-icon-left" />
+                <input type="text" placeholder="Search parties..." className="input-field input-with-left-icon w-full" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
               </div>
             </div>
             <div className={`${showFilters ? 'block' : 'hidden'} md:block`}>
               <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-4">
                 <div className="relative hidden md:block">
-                  <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                  <input type="text" placeholder="Search parties..." className="input-field w-full pl-10" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                  <MagnifyingGlassIcon className="input-icon-left" />
+                  <input type="text" placeholder="Search parties..." className="input-field input-with-left-icon w-full" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
                 </div>
                 <select className="input-field" value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)}>
                   <option value="">All Categories</option>
@@ -867,16 +839,16 @@ const PartyManagement = () => {
 
         {/* Party Details Modal */}
         {showPartyDetails && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-2 sm:p-4 z-50">
-            <div className="bg-card rounded-xl shadow-xl w-full max-w-4xl max-h-[95vh] sm:max-h-[90vh] overflow-y-auto">
-              <div className="p-4 sm:p-6 border-b">
+          <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-[2px] flex items-center justify-center p-3 sm:p-6">
+            <div className="w-full max-w-4xl max-h-[95vh] sm:max-h-[90vh] overflow-y-auto rounded-3xl border bg-card shadow-2xl">
+              <div className="admin-dialog-header admin-dialog-header-sticky">
                 <div className="flex items-center justify-between">
-                  <h2 className="text-lg sm:text-xl font-semibold text-foreground">Party Details - {showPartyDetails.party.name}</h2>
-                  <button onClick={() => setShowPartyDetails(null)} className="p-2 text-muted-foreground hover:text-foreground rounded-lg"><XMarkIcon className="w-5 h-5" /></button>
+                  <h2 className="admin-dialog-title">Party Details - {showPartyDetails.party.name}</h2>
+                  <button onClick={() => setShowPartyDetails(null)} className="admin-dialog-close"><XMarkIcon className="w-5 h-5" /></button>
                 </div>
               </div>
               
-              <div className="p-4 sm:p-6 space-y-6">
+              <div className="admin-dialog-body space-y-6">
                 {/* Party Information */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <Card>
@@ -1263,18 +1235,18 @@ const PartyManagement = () => {
 
         {/* Vendor Payment Modal */}
         {showPaymentModal && showVendorDetailsModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-2 sm:p-4 z-50">
-            <div className="bg-card rounded-xl shadow-xl w-full max-w-4xl h-[90vh] flex flex-col">
-              <div className="p-4 sm:p-6 border-b flex items-center justify-between sticky top-0 bg-card z-10">
-                <h2 className="text-lg sm:text-xl font-semibold text-foreground">
+          <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-[2px] flex items-center justify-center p-3 sm:p-6">
+            <div className="flex h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-3xl border bg-card shadow-2xl">
+              <div className="admin-dialog-header admin-dialog-header-sticky">
+                <h2 className="admin-dialog-title">
                   Add Payment - {showVendorDetailsModal.name}
                 </h2>
-                <button onClick={() => setShowPaymentModal(false)} className="p-2 text-muted-foreground hover:text-foreground rounded-lg">
+                <button onClick={() => setShowPaymentModal(false)} className="admin-dialog-close">
                   <XMarkIcon className="w-5 h-5" />
                 </button>
               </div>
-              <div className="p-0 sm:p-0 flex-1 overflow-hidden">
-                <div className="p-4 sm:p-6 h-full overflow-y-auto">
+              <div className="flex-1 overflow-hidden">
+                <div className="admin-dialog-body h-full">
                   <UnifiedVendorPaymentForm
                     ref={paymentFormRef}
                     preSelectedParty={{ id: showVendorDetailsModal.id, name: showVendorDetailsModal.name, party_type: 'vendor' }}
@@ -1288,7 +1260,7 @@ const PartyManagement = () => {
                   />
                 </div>
               </div>
-              <div className="border-t p-3 sm:p-4 flex items-center justify-end gap-2">
+              <div className="admin-dialog-footer admin-dialog-footer-sticky">
                 <Button variant="outline" onClick={() => setShowPaymentModal(false)}>Cancel</Button>
                 <Button className="btn-primary" onClick={() => paymentFormRef.current?.submit()}>Save Payments</Button>
               </div>
@@ -1299,8 +1271,8 @@ const PartyManagement = () => {
 
         {/* Enhanced Delete/Archive Confirmation Modal */}
         {deleteConfirm && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-card rounded-xl shadow-xl max-w-lg w-full p-4 sm:p-6">
+          <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-[2px] flex items-center justify-center p-3 sm:p-6">
+            <div className="w-full max-w-lg rounded-3xl border bg-card p-4 shadow-2xl sm:p-6">
               {deleteConfirm.showArchiveOption ? (
                 <>
                   {/* Archive Option UI */}

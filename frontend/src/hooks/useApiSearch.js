@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { API_BASE_URL } from '../config/apiBaseUrl';
 import { useDebounced } from './useDebounced';
 
 /**
@@ -15,7 +16,6 @@ const buildCacheKey = ({ endpoint, term = '', filters = {}, limit = 10, offset =
 
 const apiCall = async (endpoint, queryParams = {}) => {
   const token = localStorage.getItem('authToken');
-  const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
   const searchParams = new URLSearchParams(queryParams);
   const url = `${API_BASE_URL}${endpoint}?${searchParams}`;

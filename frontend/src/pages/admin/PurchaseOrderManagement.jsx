@@ -1,11 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { PermissionGuard } from '../../components/PermissionGuard';
 import { ADMIN_PERMISSIONS } from '../../enums/roles';
 import {
   ClipboardDocumentListIcon,
   PlusIcon,
   PencilIcon,
-  TrashIcon,
   MagnifyingGlassIcon,
   EyeIcon,
   TruckIcon,
@@ -13,23 +12,15 @@ import {
   ClockIcon,
   XCircleIcon,
   XMarkIcon,
-  ChevronLeftIcon,
-  ChevronRightIcon,
   AdjustmentsHorizontalIcon,
   CurrencyRupeeIcon,
-  CubeIcon,
-  ChevronDownIcon,
-  ChevronUpIcon,
-  DocumentTextIcon,
-  CalculatorIcon,
-  TagIcon,
 } from '@heroicons/react/24/outline';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { useToast } from '../../hooks/useToast';
 import { Toaster } from '../../components/ui/toaster';
-import { categoriesAPI } from '../../services/api';
 import UnifiedVendorOrderForm from './components/UnifiedVendorOrderForm';
+import { API_BASE_URL } from '../../config/apiBaseUrl';
 
 const PO_STATUSES = [
   { value: 'draft', label: 'Draft', icon: PencilIcon, color: 'bg-gray-100 text-gray-800' },
@@ -43,7 +34,6 @@ const PurchaseOrderManagement = () => {
   const { toast } = useToast();
   const [purchaseOrders, setPurchaseOrders] = useState([]);
   const [parties, setParties] = useState([]);
-  const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   
@@ -59,59 +49,33 @@ const PurchaseOrderManagement = () => {
   const [showFilters, setShowFilters] = useState(false);
   
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingPO, setEditingPO] = useState(null);
   const [showPODetails, setShowPODetails] = useState(null);
   const [showReceiveModal, setShowReceiveModal] = useState(null);
-  
-  const [formData, setFormData] = useState({
-    party_id: '',
-    order_date: new Date().toISOString(),
-    expected_delivery_date: '',
-    payment_terms: '',
-    delivery_address: '',
-    notes: '',
-    items: []
-  });
-
-  const [categories, setCategories] = useState([]);
 
   const [receiveData, setReceiveData] = useState({
     received_items: [],
     notes: ''
   });
 
-  const [expandedItems, setExpandedItems] = useState(new Set());
-  const [activeTab, setActiveTab] = useState('basic');
-  const [autocompleteStates, setAutocompleteStates] = useState({});
-
-  const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
-
-  const showSuccess = (message) => {
+  const showSuccess = useCallback((message) => {
     toast({
       title: "Success",
       description: message,
       variant: "success",
       duration: 3000,
     });
-  };
+  }, [toast]);
 
-  const showError = (message) => {
+  const showError = useCallback((message) => {
     toast({
       title: "Error",
       description: message,
       variant: "destructive",
       duration: 5000,
     });
-  };
+  }, [toast]);
 
-  useEffect(() => {
-    fetchPurchaseOrders(1);
-    fetchParties();
-    fetchProducts();
-    fetchCategories();
-  }, []);
-
-  const fetchPurchaseOrders = async (page = 1, limit = itemsPerPage) => {
+  const fetchPurchaseOrders = useCallback(async (page = 1, limit = itemsPerPage) => {
     try {
       const token = localStorage.getItem('authToken');
       const queryParams = new URLSearchParams({
@@ -142,9 +106,9 @@ const PurchaseOrderManagement = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [itemsPerPage, searchTerm, selectedStatus, selectedParty, startDate, endDate, showError]);
 
-  const fetchParties = async () => {
+  const fetchParties = useCallback(async () => {
     try {
       const token = localStorage.getItem('authToken');
       const response = await fetch(`${API_BASE_URL}/api/admin/parties?party_type=vendor&limit=1000`, {
@@ -161,43 +125,12 @@ const PurchaseOrderManagement = () => {
     } catch (err) {
       console.error('Error fetching parties:', err);
     }
-  };
+  }, []);
 
-  const fetchProducts = async () => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/products`);
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch products: ${response.status}`);
-      }
-
-      const data = await response.json();
-      const productsArray = Array.isArray(data) ? data : (data.products || []);
-      setProducts(productsArray);
-    } catch (err) {
-      console.error('Error fetching products:', err);
-      showError('Failed to load products: ' + err.message);
-    }
-  };
-
-  const fetchCategories = async () => {
-    try {
-      const response = await categoriesAPI.getAll();
-      const data = response.data;
-      const activeCategories = data.filter(category => category.is_active !== false);
-      setCategories(activeCategories);
-    } catch (err) {
-      console.error('Error fetching categories:', err);
-      showError('Failed to load categories, using fallback data');
-      // Fallback categories
-      setCategories([
-        { id: '1', name: 'Nuts' },
-        { id: '2', name: 'Dried Fruits' },
-        { id: '3', name: 'Seeds' },
-        { id: '4', name: 'Spices' }
-      ]);
-    }
-  };
+  useEffect(() => {
+    fetchPurchaseOrders(1);
+    fetchParties();
+  }, [fetchParties, fetchPurchaseOrders]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -209,7 +142,7 @@ const PurchaseOrderManagement = () => {
     }, 500);
 
     return () => clearTimeout(timer);
-  }, [searchTerm, selectedStatus, selectedParty, startDate, endDate]);
+  }, [currentPage, endDate, fetchPurchaseOrders, searchTerm, selectedParty, selectedStatus, startDate]);
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('en-IN', {
@@ -377,50 +310,12 @@ const PurchaseOrderManagement = () => {
     }
   };
 
-  const handleOpenModal = (po = null) => {
-    if (po) {
-      setEditingPO(po);
-      setFormData({
-        party_id: po.party_id || '',
-        order_date: po.order_date || new Date().toISOString(),
-        expected_delivery_date: po.expected_delivery_date || '',
-        payment_terms: po.payment_terms || '',
-        delivery_address: po.delivery_address || '',
-        notes: po.notes || '',
-        items: (po.purchase_order_items || []).map(item => ({
-          ...item,
-          has_miscellaneous_expenses: item.has_miscellaneous_expenses || false,
-          miscellaneous_amount: item.miscellaneous_amount || 0,
-          miscellaneous_note: item.miscellaneous_note || ''
-        }))
-      });
-    } else {
-      setEditingPO(null);
-      setFormData({
-        party_id: '',
-        order_date: new Date().toISOString(),
-        expected_delivery_date: '',
-        payment_terms: '',
-        delivery_address: '',
-        notes: '',
-        items: []
-      });
-    }
+  const handleOpenModal = () => {
     setIsModalOpen(true);
   };
 
   const handleCloseModal = () => {
     setIsModalOpen(false);
-    setEditingPO(null);
-    setFormData({
-      party_id: '',
-      order_date: new Date().toISOString().split('T')[0],
-      expected_delivery_date: '',
-      payment_terms: '',
-      delivery_address: '',
-      notes: '',
-      items: []
-    });
   };
 
   const handleOpenReceiveModal = (po) => {
@@ -451,10 +346,30 @@ const PurchaseOrderManagement = () => {
 
   return (
     <PermissionGuard permission={ADMIN_PERMISSIONS.VIEW_VENDORS}>
-      <div className="space-y-6">
-        {/* Header with Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card>
+      <div className="admin-page">
+        <div className="admin-page-header">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="space-y-1">
+              <h1 className="admin-page-title">Purchase Orders</h1>
+              <p className="admin-page-description">Create, track, and receive vendor purchase orders without leaving the admin flow.</p>
+            </div>
+            <div className="flex items-center gap-3">
+              <Button variant="outline" size="sm" onClick={() => setShowFilters(!showFilters)} className="md:hidden">
+                <AdjustmentsHorizontalIcon className="w-4 h-4 mr-2" />
+                Filters
+              </Button>
+              <PermissionGuard permission={ADMIN_PERMISSIONS.MANAGE_VENDORS}>
+                <Button onClick={() => handleOpenModal()} className="btn-primary">
+                  <PlusIcon className="w-4 h-4 mr-2" />
+                  Create PO
+                </Button>
+              </PermissionGuard>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <Card className="admin-stat-card">
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
@@ -466,7 +381,7 @@ const PurchaseOrderManagement = () => {
             </CardContent>
           </Card>
           
-          <Card>
+          <Card className="admin-stat-card">
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
@@ -480,7 +395,7 @@ const PurchaseOrderManagement = () => {
             </CardContent>
           </Card>
           
-          <Card>
+          <Card className="admin-stat-card">
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
@@ -494,7 +409,7 @@ const PurchaseOrderManagement = () => {
             </CardContent>
           </Card>
           
-          <Card>
+          <Card className="admin-stat-card">
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
@@ -509,30 +424,21 @@ const PurchaseOrderManagement = () => {
           </Card>
         </div>
 
-        <Card>
+        <Card className="admin-section">
           <CardHeader className="pb-4">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <div className="flex items-center gap-4">
-                <CardTitle className="text-lg">Purchase Orders</CardTitle>
-                <Button variant="outline" size="sm" onClick={() => setShowFilters(!showFilters)} className="md:hidden">
-                  <AdjustmentsHorizontalIcon className="w-4 h-4 mr-2" />
-                  Filters
-                </Button>
+              <div>
+                <CardTitle className="text-lg">PO List</CardTitle>
+                <p className="text-sm text-muted-foreground">Filter by vendor, status, and date range to review pending purchasing work.</p>
               </div>
-              <PermissionGuard permission={ADMIN_PERMISSIONS.MANAGE_VENDORS}>
-                <Button onClick={() => handleOpenModal()} className="btn-primary">
-                  <PlusIcon className="w-4 h-4 mr-2" />
-                  Create PO
-                </Button>
-              </PermissionGuard>
             </div>
           </CardHeader>
           <CardContent className="pt-0">
             <div className={`${showFilters ? 'block' : 'hidden'} md:block`}>
               <div className="grid grid-cols-1 md:grid-cols-6 gap-4 mb-4">
                 <div className="relative">
-                  <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                  <input type="text" placeholder="Search POs..." className="input-field w-full pl-10" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                  <MagnifyingGlassIcon className="input-icon-left" />
+                  <input type="text" placeholder="Search POs..." className="input-field input-with-left-icon w-full" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
                 </div>
                 <select className="input-field" value={selectedStatus} onChange={(e) => setSelectedStatus(e.target.value)}>
                   <option value="">All Statuses</option>
@@ -552,7 +458,7 @@ const PurchaseOrderManagement = () => {
 
         {error && (<div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4"><p className="text-destructive-foreground">{error}</p></div>)}
 
-        <Card>
+        <Card className="admin-section overflow-hidden">
           <CardContent className="p-0">
             {purchaseOrders.length === 0 ? (
               <div className="p-12 text-center">
@@ -605,11 +511,6 @@ const PurchaseOrderManagement = () => {
                                     <TruckIcon className="w-4 h-4" />
                                   </Button>
                                 )}
-                                {po.status === 'draft' && (
-                                  <Button variant="ghost" size="icon" onClick={() => handleOpenModal(po)} className="h-9 w-9 text-muted-foreground hover:text-primary" title="Edit PO">
-                                    <PencilIcon className="w-4 h-4" />
-                                  </Button>
-                                )}
                               </div>
                             </PermissionGuard>
                           </div>
@@ -622,11 +523,6 @@ const PurchaseOrderManagement = () => {
                             {['confirmed', 'partial_received'].includes(po.status) && (
                               <Button variant="outline" size="sm" onClick={() => handleOpenReceiveModal(po)} className="flex-1">
                                 <TruckIcon className="w-4 h-4 mr-2" />Receive
-                              </Button>
-                            )}
-                            {po.status === 'draft' && (
-                              <Button variant="outline" size="sm" onClick={() => handleOpenModal(po)} className="flex-1">
-                                <PencilIcon className="w-4 h-4 mr-2" />Edit
                               </Button>
                             )}
                           </div>
@@ -642,20 +538,20 @@ const PurchaseOrderManagement = () => {
 
         {/* Purchase Order Form Modal - Using Unified Component */}
         {isModalOpen && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-2 sm:p-4 z-50">
-            <div className="bg-card rounded-xl shadow-xl w-full max-w-6xl max-h-[95vh] overflow-y-auto">
-              <div className="p-4 sm:p-6 border-b">
+          <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-[2px] flex items-center justify-center p-3 sm:p-6">
+            <div className="w-full max-w-6xl max-h-[95vh] overflow-y-auto rounded-3xl border bg-card shadow-2xl">
+              <div className="admin-dialog-header admin-dialog-header-sticky">
                 <div className="flex items-center justify-between">
-                  <h2 className="text-lg sm:text-xl font-semibold text-foreground">
+                  <h2 className="admin-dialog-title">
                     Create Purchase Orders
                   </h2>
-                  <button onClick={handleCloseModal} className="p-2 text-muted-foreground hover:text-foreground rounded-lg">
+                  <button onClick={handleCloseModal} className="admin-dialog-close">
                     <XMarkIcon className="w-5 h-5" />
                   </button>
                 </div>
               </div>
 
-              <div className="p-4 sm:p-6">
+              <div className="admin-dialog-body">
                 <UnifiedVendorOrderForm
                   mode="create"
                   onSubmit={handleSubmitUnifiedForm}
@@ -668,22 +564,100 @@ const PurchaseOrderManagement = () => {
 
         {/* Receive Items Modal */}
         {showReceiveModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-2 sm:p-4 z-50">
-            <div className="bg-card rounded-xl shadow-xl w-full max-w-4xl max-h-[95vh] overflow-y-auto">
-              <div className="p-4 sm:p-6 border-b">
+          <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-[2px] flex items-center justify-center p-3 sm:p-6">
+            <div className="w-full max-w-4xl max-h-[95vh] overflow-y-auto rounded-3xl border bg-card shadow-2xl">
+              <div className="admin-dialog-header admin-dialog-header-sticky">
                 <div className="flex items-center justify-between">
-                  <h2 className="text-lg sm:text-xl font-semibold text-foreground">
+                  <h2 className="admin-dialog-title">
                     Receive Items - {showReceiveModal.po_number}
                   </h2>
-                  <button onClick={() => setShowReceiveModal(null)} className="p-2 text-muted-foreground hover:text-foreground rounded-lg">
+                  <button onClick={() => setShowReceiveModal(null)} className="admin-dialog-close">
                     <XMarkIcon className="w-5 h-5" />
                   </button>
                 </div>
               </div>
 
-              {/* Receive modal content will go here - placeholder for now */}
-              <div className="p-4 sm:p-6">
-                <p className="text-muted-foreground">Receive items functionality coming soon...</p>
+              <div className="admin-dialog-body space-y-6">
+                <div className="grid gap-3 rounded-2xl border border-border/70 bg-muted/20 p-4 text-sm text-muted-foreground sm:grid-cols-3">
+                  <div>
+                    <span className="font-medium text-foreground">Vendor:</span> {showReceiveModal.party?.name || 'N/A'}
+                  </div>
+                  <div>
+                    <span className="font-medium text-foreground">Status:</span> {getStatusInfo(showReceiveModal.status).label}
+                  </div>
+                  <div>
+                    <span className="font-medium text-foreground">Expected:</span> {showReceiveModal.expected_delivery_date ? new Date(showReceiveModal.expected_delivery_date).toLocaleDateString() : 'N/A'}
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  {receiveData.received_items.length === 0 ? (
+                    <div className="admin-empty-state py-10">
+                      <TruckIcon className="mx-auto mb-3 h-10 w-10 text-muted-foreground/50" />
+                      <p className="text-sm text-muted-foreground">No receivable items are available for this purchase order.</p>
+                    </div>
+                  ) : (
+                    receiveData.received_items.map((item) => (
+                      <div key={item.item_id} className="rounded-2xl border border-border/70 bg-card p-4">
+                        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                          <div className="space-y-1">
+                            <h3 className="font-medium text-foreground">{item.item_name}</h3>
+                            <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
+                              <span>Ordered: {item.ordered_quantity}</span>
+                              <span>Received: {item.received_quantity}</span>
+                              <span>Pending: {item.pending_quantity}</span>
+                            </div>
+                          </div>
+                          <div className="w-full lg:w-48">
+                            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                              Receive Now
+                            </label>
+                            <input
+                              type="number"
+                              min="0"
+                              max={item.pending_quantity}
+                              value={item.receive_now}
+                              onChange={(e) => {
+                                const nextValue = Math.max(0, Math.min(item.pending_quantity, Number(e.target.value) || 0));
+                                setReceiveData((prev) => ({
+                                  ...prev,
+                                  received_items: prev.received_items.map((entry) => (
+                                    entry.item_id === item.item_id ? { ...entry, receive_now: nextValue } : entry
+                                  ))
+                                }));
+                              }}
+                              className="input-field"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-foreground">Receiving Notes</label>
+                  <textarea
+                    rows={3}
+                    value={receiveData.notes}
+                    onChange={(e) => setReceiveData((prev) => ({ ...prev, notes: e.target.value }))}
+                    className="input-field"
+                    placeholder="Add any receiving notes for this delivery"
+                  />
+                </div>
+
+                <div className="admin-dialog-footer admin-dialog-footer-sticky">
+                  <Button variant="outline" onClick={() => setShowReceiveModal(null)}>
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handleReceiveItems}
+                    className="btn-primary"
+                    disabled={!receiveData.received_items.some((item) => item.receive_now > 0)}
+                  >
+                    Confirm Receipt
+                  </Button>
+                </div>
               </div>
             </div>
           </div>
@@ -691,20 +665,20 @@ const PurchaseOrderManagement = () => {
 
         {/* PO Details Modal */}
         {showPODetails && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-2 sm:p-4 z-50">
-            <div className="bg-card rounded-xl shadow-xl w-full max-w-6xl max-h-[95vh] overflow-y-auto">
-              <div className="p-4 sm:p-6 border-b">
+          <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-[2px] flex items-center justify-center p-3 sm:p-6">
+            <div className="w-full max-w-6xl max-h-[95vh] overflow-y-auto rounded-3xl border bg-card shadow-2xl">
+              <div className="admin-dialog-header admin-dialog-header-sticky">
                 <div className="flex items-center justify-between">
-                  <h2 className="text-lg sm:text-xl font-semibold text-foreground">
+                  <h2 className="admin-dialog-title">
                     Purchase Order Details - {showPODetails.po_number}
                   </h2>
-                  <button onClick={() => setShowPODetails(null)} className="p-2 text-muted-foreground hover:text-foreground rounded-lg">
+                  <button onClick={() => setShowPODetails(null)} className="admin-dialog-close">
                     <XMarkIcon className="w-5 h-5" />
                   </button>
                 </div>
               </div>
 
-              <div className="p-4 sm:p-6 space-y-6">
+              <div className="admin-dialog-body space-y-6">
                 {/* PO Header Info */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <Card>

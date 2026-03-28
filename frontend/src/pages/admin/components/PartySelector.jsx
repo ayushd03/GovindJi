@@ -11,6 +11,7 @@ import { cn } from '../../../lib/utils';
 import { useApiSearch, prefetchApiSearch } from '../../../hooks/useApiSearch';
 import AddVendorModal from './AddVendorModal';
 import { getBalanceTextColor } from '../../../utils/financeColors';
+import { API_BASE_URL } from '../../../config/apiBaseUrl';
 
 const PartySelector = ({ 
   selectedParty, 
@@ -25,8 +26,6 @@ const PartySelector = ({
   const [isModalOpen, setIsModalOpen] = useState(false);
   const dropdownRef = useRef(null);
   const searchInputRef = useRef(null);
-
-  const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
   // Prefetch initial parties (vendors/customers) on mount for instant dropdown open
   useEffect(() => {
@@ -125,19 +124,19 @@ const PartySelector = ({
       {/* Selected Party Display / Search Input */}
       <div
         className={cn(
-          "w-full px-2 py-1.5 border rounded-md cursor-pointer transition-colors text-sm",
+          "w-full px-2.5 py-1.5 border rounded-md cursor-pointer transition-colors text-sm",
           "focus-within:outline-none focus-within:ring-2 focus-within:ring-primary",
           error ? "border-red-500" : "border-border hover:border-primary/50",
           isOpen && "ring-2 ring-primary"
         )}
         onClick={() => setIsOpen(!isOpen)}
       >
-        <div className="flex items-center space-x-2">
-          <MagnifyingGlassIcon className="w-4 h-4 text-muted-foreground" />
+        <div className="flex items-center gap-2">
+          <MagnifyingGlassIcon className="w-4 h-4 flex-shrink-0 text-muted-foreground" />
           <input
             ref={searchInputRef}
             type="text"
-            className="flex-1 bg-transparent outline-none placeholder:text-muted-foreground"
+            className="min-w-0 flex-1 bg-transparent text-[13px] outline-none placeholder:text-muted-foreground"
             placeholder={selectedParty ? selectedParty.name : placeholder}
             value={isOpen ? searchTerm : (selectedParty?.name || '')}
             onChange={(e) => {
@@ -153,7 +152,7 @@ const PartySelector = ({
                 e.stopPropagation();
                 handleClearSelection();
               }}
-              className="text-muted-foreground hover:text-foreground p-1"
+              className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-muted/50 hover:text-foreground"
             >
               ×
             </button>

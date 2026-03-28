@@ -5,11 +5,15 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
-const { createClient } = require('@supabase/supabase-js');
 const storageService = require('./services/StorageService');
 const roleMiddleware = require('./middleware/roleMiddleware');
+const { authenticateToken: authenticateScopedAuthToken } = require('./middleware/authMiddleware');
 const { validateProduct } = require('./middleware/validateProduct');
 const { errorHandler, notFoundHandler, requestId, asyncHandler, logger, sendSuccess, sendError } = require('./middleware/errorHandler');
+const {
+    createBackendSupabaseClient,
+    getSupabaseServiceRoleKey
+} = require('./config/supabaseClient');
 
 // Import expense routes
 const expenseRoutes = require('./routes/expenseRoutes');
@@ -28,9 +32,121 @@ const app = express();
 const port = process.env.PORT || 3001;
 
 // Initialize Supabase client
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_ANON_KEY;
-const supabase = createClient(supabaseUrl, supabaseKey);
+const supabase = createBackendSupabaseClient();
+const supabaseServiceRoleKey = getSupabaseServiceRoleKey();
+const supabaseAdmin = supabaseServiceRoleKey
+    ? createBackendSupabaseClient({
+        preferServiceRole: true,
+        allowAnonFallback: false,
+        options: {
+            auth: {
+                autoRefreshToken: false,
+                persistSession: false,
+                detectSessionInUrl: false
+            }
+        }
+    })
+    : null;
+
+const PASSWORD_POLICY_MESSAGE = 'Password must be at least 8 characters and contain uppercase, lowercase, numbers, and special characters';
+
+const isStrongPassword = (password = '') => (
+    typeof password === 'string' &&
+    password.length >= 8 &&
+    /[A-Z]/.test(password) &&
+    /[a-z]/.test(password) &&
+    /\d/.test(password) &&
+    /[^A-Za-z0-9]/.test(password)
+);
+
+const getFrontendBaseUrl = () => (
+    process.env.FRONTEND_URL ||
+    process.env.CLIENT_URL ||
+    'http://localhost:3000'
+);
+
+const buildFrontendAuthUrl = (query = {}) => {
+    const url = new URL('/auth', getFrontendBaseUrl());
+    Object.entries(query).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+            url.searchParams.set(key, value);
+        }
+    });
+    return url.toString();
+};
+
+const mapAuthFailure = (error, fallbackMessage = 'Invalid login credentials') => {
+    const code = error?.code;
+    const message = (error?.message || '').toLowerCase();
+
+    if (code === 'email_not_confirmed' || message.includes('email not confirmed')) {
+        return {
+            status: 403,
+            body: {
+                success: false,
+                error: 'Please confirm your email before signing in',
+                code: 'email_not_confirmed'
+            }
+        };
+    }
+
+    if (code === 'weak_password' || message.includes('password')) {
+        return {
+            status: 400,
+            body: {
+                success: false,
+                error: PASSWORD_POLICY_MESSAGE,
+                code: 'weak_password'
+            }
+        };
+    }
+
+    if (code === 'user_already_exists' || message.includes('already registered')) {
+        return {
+            status: 409,
+            body: {
+                success: false,
+                error: 'An account with this email already exists. Please sign in instead.',
+                code: 'user_already_exists'
+            }
+        };
+    }
+
+    if (message.includes('rate limit')) {
+        return {
+            status: 429,
+            body: {
+                success: false,
+                error: 'Too many attempts. Please wait a moment and try again.',
+                code: 'rate_limited'
+            }
+        };
+    }
+
+    return {
+        status: 401,
+        body: {
+            success: false,
+            error: fallbackMessage,
+            code: 'invalid_credentials'
+        }
+    };
+};
+
+const createServerAuthClient = (accessToken) => createBackendSupabaseClient({
+    options: {
+        auth: {
+            autoRefreshToken: false,
+            persistSession: false,
+            detectSessionInUrl: false
+        },
+        global: accessToken ? {
+            headers: {
+                Authorization: `Bearer ${accessToken}`
+            }
+        } : undefined
+    }
+});
 
 // Add request ID middleware first
 app.use(requestId);
@@ -170,17 +286,18 @@ const authenticateAdmin = asyncHandler(async (req, res, next) => {
         return res.sendStatus(403);
     }
 
-    // Check if user is admin
+    // Check if user has admin or manager role
     const { data: userData, error: userError } = await supabase
         .from('users')
-        .select('is_admin, role')
+        .select('role')
         .eq('id', user.id)
         .single();
 
-    if (userError || !userData || !userData.is_admin) {
+    if (userError || !userData || (userData.role !== 'admin' && userData.role !== 'manager')) {
         logger.warn('Non-admin user attempted to access admin route', {
             userId: user.id,
             userEmail: user.email,
+            userRole: userData?.role,
             path: req.originalUrl,
             ip: req.ip
         });
@@ -188,7 +305,7 @@ const authenticateAdmin = asyncHandler(async (req, res, next) => {
     }
 
     req.user = user;
-    req.userRole = userData;
+    req.userRole = userData.role;
     next();
 });
 
@@ -360,6 +477,17 @@ function calculateVariantWeightGrams(sizeValue, sizeUnit, explicitWeightGrams = 
 // ============================================================================
 // Admin Product Management
 // ============================================================================
+
+// Admin-only: returns ALL products including inactive ones
+app.get('/api/admin/products', authenticateAdmin, asyncHandler(async (req, res) => {
+    const { data: products, error: productsError } = await supabase
+        .from('products')
+        .select('*')
+        .order('name', { ascending: true });
+
+    if (productsError) throw productsError;
+    res.json(products || []);
+}));
 
 app.post('/api/admin/products', authenticateAdmin, validateProduct, asyncHandler(async (req, res) => {
     const {
@@ -558,6 +686,21 @@ app.put('/api/admin/products/:id', authenticateAdmin, validateProduct, asyncHand
     res.json(product);
 }));
 
+app.patch('/api/admin/products/:id/status', authenticateAdmin, asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const { is_active } = req.body;
+
+    const { data: product, error } = await supabase
+        .from('products')
+        .update({ is_active, updated_at: new Date().toISOString() })
+        .eq('id', id)
+        .select()
+        .single();
+
+    if (error) throw error;
+    res.json(product);
+}));
+
 app.delete('/api/admin/products/:id', authenticateAdmin, asyncHandler(async (req, res) => {
     const { id } = req.params;
 
@@ -603,14 +746,19 @@ app.get('/api/admin/orders', authenticateAdmin, asyncHandler(async (req, res) =>
             users (name, email),
             order_items (
                 *,
-                products (name, price)
+                products (name, price),
+                product_variants (variant_name, size_value, size_unit)
             )
         `)
         .order('created_at', { ascending: false })
         .range(offset, offset + limit - 1);
 
     if (status) {
-        query = query.eq('status', status);
+        if (status === 'completed' || status === 'delivered') {
+            query = query.in('status', ['completed', 'delivered']);
+        } else {
+            query = query.eq('status', status);
+        }
     }
 
     const { data, error } = await query;
@@ -756,10 +904,11 @@ app.get('/api/admin/orders/:id/shipment-readiness', authenticateAdmin, asyncHand
 app.put('/api/admin/orders/:id/status', authenticateAdmin, asyncHandler(async (req, res) => {
     const { id } = req.params;
     const { status } = req.body;
+    const normalizedStatus = status === 'delivered' ? 'completed' : status;
 
     const { data, error } = await supabase
         .from('orders')
-        .update({ status, updated_at: new Date().toISOString() })
+        .update({ status: normalizedStatus, updated_at: new Date().toISOString() })
         .eq('id', id)
         .select()
         .single();
@@ -772,22 +921,23 @@ app.put('/api/admin/orders/:id/status', authenticateAdmin, asyncHandler(async (r
         action: 'UPDATE_ORDER_STATUS',
         entity_type: 'order',
         entity_id: id,
-        details: { new_status: status }
+        details: { new_status: normalizedStatus }
     }]);
 
     logger.info('Order status updated successfully', {
         userId: req.user?.id,
         orderId: id,
-        newStatus: status
+        newStatus: normalizedStatus
     });
 
-    // Auto-create shipment when order status changes to 'processing'
-    if (status === 'processing' && !data.has_shipment) {
+    // Auto-create shipment and schedule pickup when order status changes to processing
+    if (normalizedStatus === 'processing') {
         try {
-            const shipmentResult = await deliveryService.autoCreateShipment(id);
-            logger.info('Shipment auto-created successfully', {
+            const fulfillmentResult = await deliveryService.processOrderForFulfillment(id);
+            logger.info('Order fulfillment automation completed', {
                 orderId: id,
-                awbNumber: shipmentResult.awb_number
+                shipmentCreated: fulfillmentResult.shipment_created,
+                pickupScheduled: fulfillmentResult.pickup_scheduled
             });
         } catch (shipmentError) {
             // Log error but don't fail the status update
@@ -801,42 +951,254 @@ app.put('/api/admin/orders/:id/status', authenticateAdmin, asyncHandler(async (r
     res.json(data);
 }));
 
-// Admin Stock Management
-app.put('/api/admin/products/:id/stock', authenticateAdmin, asyncHandler(async (req, res) => {
+// Cancel an order: restores stock, cancels Delhivery shipment if any
+app.put('/api/admin/orders/:id/cancel', authenticateAdmin, asyncHandler(async (req, res) => {
     const { id } = req.params;
-    const { quantity, movement_type, reason } = req.body;
 
-    // Get current stock
-    const { data: product, error: productError } = await supabase
-        .from('products')
-        .select('stock_quantity')
+    const [{ data: order, error: fetchError }, { data: shipment }] = await Promise.all([
+        supabase
+            .from('orders')
+            .select(`*, order_items (product_id, variant_id, quantity)`)
+            .eq('id', id)
+            .single(),
+        supabase
+            .from('shipments')
+            .select('id, awb_number, status')
+            .eq('order_id', id)
+            .single(),
+    ]);
+
+    if (fetchError || !order) return res.status(404).json({ error: 'Order not found' });
+    if (order.status === 'cancelled') return res.status(400).json({ error: 'Order already cancelled' });
+    if (order.status === 'delivered' || order.status === 'completed') {
+        return res.status(400).json({ error: 'Cannot cancel a delivered order' });
+    }
+
+    if (shipment && !['DELIVERED', 'CANCELLED'].includes(shipment.status)) {
+        try {
+            await deliveryService.cancelShipment(shipment.awb_number);
+        } catch (deliveryErr) {
+            // Log but don't block the cancellation
+            logger.error('Delhivery shipment cancel failed during order cancel', deliveryErr, {
+                orderId: id,
+                awbNumber: shipment.awb_number
+            });
+        }
+    }
+
+    const restoreResults = await Promise.all(
+        (order.order_items || []).map(item =>
+            supabase.rpc('restore_stock', {
+                p_product_id: item.product_id,
+                p_quantity: item.quantity,
+                p_variant_id: item.variant_id || null,
+            }).then(r => ({ ...r, product_id: item.product_id }))
+        )
+    );
+    for (const r of restoreResults) {
+        if (r.error) {
+            logger.error('Stock restore failed during order cancel', r.error, {
+                orderId: id,
+                productId: r.product_id,
+            });
+        }
+    }
+
+    const { data: updated, error: updateError } = await supabase
+        .from('orders')
+        .update({ status: 'cancelled', updated_at: new Date().toISOString() })
+        .eq('id', id)
+        .select()
+        .single();
+
+    if (updateError) throw updateError;
+
+    await supabase.from('admin_logs').insert([{
+        admin_id: req.user.id,
+        action: 'CANCEL_ORDER',
+        entity_type: 'order',
+        entity_id: id,
+        details: { previous_status: order.status }
+    }]);
+
+    logger.info('Order cancelled', { orderId: id, userId: req.user.id, previousStatus: order.status });
+    res.json(updated);
+}));
+
+// Cleanup abandoned PhonePe orders: orders that were created but never paid
+// within the timeout window. Stock was reserved at order creation time; this
+// restores it so the inventory doesn't silently shrink from abandoned carts.
+app.post('/api/admin/cleanup-abandoned-orders', authenticateAdmin, asyncHandler(async (req, res) => {
+    const TIMEOUT_MINUTES = 30;
+    const cutoff = new Date(Date.now() - TIMEOUT_MINUTES * 60 * 1000).toISOString();
+
+    const { data: abandonedOrders, error } = await supabase
+        .from('orders')
+        .select('id, order_items(product_id, variant_id, quantity)')
+        .eq('status', 'pending')
+        .eq('payment_status', 'PENDING')
+        .lt('created_at', cutoff);
+
+    if (error) throw error;
+
+    let cleaned = 0;
+    for (const order of (abandonedOrders || [])) {
+        // Restore stock for each line item
+        await Promise.all(
+            (order.order_items || []).map(item =>
+                supabase.rpc('restore_stock', {
+                    p_product_id: item.product_id,
+                    p_quantity: item.quantity,
+                    p_variant_id: item.variant_id || null,
+                })
+            )
+        );
+        // Mark as cancelled with EXPIRED payment status
+        await supabase
+            .from('orders')
+            .update({
+                status: 'cancelled',
+                payment_status: 'EXPIRED',
+                updated_at: new Date().toISOString(),
+            })
+            .eq('id', order.id);
+        cleaned++;
+    }
+
+    logger.info('Abandoned order cleanup completed', { cleaned, cutoffMinutes: TIMEOUT_MINUTES });
+    res.json({ cleaned, message: `Cleaned up ${cleaned} abandoned order(s)` });
+}));
+
+// Mark COD payment as collected
+app.put('/api/admin/orders/:id/mark-cod-collected', authenticateAdmin, asyncHandler(async (req, res) => {
+    const { id } = req.params;
+
+    const { data: order, error: fetchError } = await supabase
+        .from('orders')
+        .select('payment_method, payment_status, status')
         .eq('id', id)
         .single();
 
-    if (productError) throw productError;
+    if (fetchError || !order) return res.status(404).json({ error: 'Order not found' });
+    if (order.payment_method !== 'COD') return res.status(400).json({ error: 'Not a COD order' });
+    if (order.payment_status === 'PAID') return res.status(400).json({ error: 'Already marked as collected' });
 
-    let newStock;
-    if (movement_type === 'in') {
-        newStock = product.stock_quantity + quantity;
-    } else if (movement_type === 'out') {
-        newStock = product.stock_quantity - quantity;
-    } else {
-        newStock = quantity; // direct adjustment
-    }
-
-    // Update product stock
     const { data, error } = await supabase
-        .from('products')
-        .update({ stock_quantity: newStock, updated_at: new Date().toISOString() })
+        .from('orders')
+        .update({ payment_status: 'PAID', updated_at: new Date().toISOString() })
         .eq('id', id)
         .select()
         .single();
 
     if (error) throw error;
 
-    // Record stock movement
+    await supabase.from('admin_logs').insert([{
+        admin_id: req.user.id,
+        action: 'MARK_COD_COLLECTED',
+        entity_type: 'order',
+        entity_id: id
+    }]);
+
+    logger.info('COD payment marked as collected', { orderId: id, userId: req.user.id });
+    res.json(data);
+}));
+
+// Admin Stock Management
+// Accepts optional variant_id to adjust a specific variant's stock.
+// For variant products the sync trigger keeps products.stock_quantity updated.
+app.put('/api/admin/products/:id/stock', authenticateAdmin, asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const { quantity, movement_type, reason, variant_id } = req.body;
+
+    if (!quantity || isNaN(quantity) || quantity <= 0) {
+        return res.status(400).json({ error: 'quantity must be a positive number' });
+    }
+    if (!['in', 'out', 'direct'].includes(movement_type)) {
+        return res.status(400).json({ error: 'movement_type must be "in", "out", or "direct"' });
+    }
+
+    let currentStock, updatedRow;
+
+    if (variant_id) {
+        // Per-variant adjustment
+        const { data: variant, error: variantError } = await supabase
+            .from('product_variants')
+            .select('stock_quantity')
+            .eq('id', variant_id)
+            .eq('product_id', id)
+            .single();
+
+        if (variantError || !variant) {
+            return res.status(404).json({ error: 'Variant not found for this product' });
+        }
+
+        currentStock = variant.stock_quantity;
+        let newStock;
+        if (movement_type === 'in') {
+            newStock = currentStock + quantity;
+        } else if (movement_type === 'out') {
+            newStock = currentStock - quantity;
+        } else {
+            newStock = quantity;
+        }
+
+        if (newStock < 0) {
+            return res.status(400).json({
+                error: `Cannot reduce stock below 0. Current: ${currentStock}, requested reduction: ${quantity}`,
+            });
+        }
+
+        const { data, error } = await supabase
+            .from('product_variants')
+            .update({ stock_quantity: newStock })
+            .eq('id', variant_id)
+            .select()
+            .single();
+
+        if (error) throw error;
+        // Sync trigger automatically updates products.stock_quantity
+        updatedRow = data;
+    } else {
+        // Product-level adjustment (non-variant products)
+        const { data: product, error: productError } = await supabase
+            .from('products')
+            .select('stock_quantity')
+            .eq('id', id)
+            .single();
+
+        if (productError) throw productError;
+
+        currentStock = product.stock_quantity;
+        let newStock;
+        if (movement_type === 'in') {
+            newStock = currentStock + quantity;
+        } else if (movement_type === 'out') {
+            newStock = currentStock - quantity;
+        } else {
+            newStock = quantity;
+        }
+
+        if (newStock < 0) {
+            return res.status(400).json({
+                error: `Cannot reduce stock below 0. Current: ${currentStock}, requested reduction: ${quantity}`,
+            });
+        }
+
+        const { data, error } = await supabase
+            .from('products')
+            .update({ stock_quantity: newStock, updated_at: new Date().toISOString() })
+            .eq('id', id)
+            .select()
+            .single();
+
+        if (error) throw error;
+        updatedRow = data;
+    }
+
+    // Record stock movement (with variant_id for the audit trail)
     await supabase.from('stock_movements').insert([{
         product_id: id,
+        variant_id: variant_id || null,
         movement_type,
         quantity,
         reason,
@@ -846,13 +1208,13 @@ app.put('/api/admin/products/:id/stock', authenticateAdmin, asyncHandler(async (
     logger.info('Product stock updated successfully', {
         userId: req.user?.id,
         productId: id,
+        variantId: variant_id || null,
         movementType: movement_type,
         quantity,
-        newStock,
         reason
     });
 
-    res.json(data);
+    res.json(updatedRow);
 }));
 
 // Product Images Routes
@@ -1837,7 +2199,8 @@ app.post('/api/admin/init-categories', authenticateAdmin, async (req, res) => {
 app.get('/api/products', asyncHandler(async (req, res) => {
     const { data: products, error: productsError } = await supabase
         .from('products')
-        .select('*');
+        .select('*')
+        .eq('is_active', true);
 
     if (productsError) throw productsError;
 
@@ -1958,21 +2321,32 @@ app.get('/api/products/category/:category_name', async (req, res) => {
 // Admin Products Routes
 app.get('/api/admin/products', roleMiddleware.requirePermission(roleMiddleware.ADMIN_PERMISSIONS.VIEW_INVENTORY), async (req, res) => {
     try {
-        const { data: products, error: productsError } = await supabase
-            .from('products')
-            .select(`
-                *,
-                category:category_id(id, name)
-            `)
-            .eq('is_active', true)
-            .order('name');
-        
-        if (productsError) throw productsError;
+        const [productsResult, variantsResult] = await Promise.all([
+            supabase
+                .from('products')
+                .select(`*, category:category_id(id, name)`)
+                .eq('is_active', true)
+                .order('name'),
+            supabase
+                .from('product_variants')
+                .select('id, product_id, variant_name, size_value, size_unit, price, stock_quantity, is_default, display_order')
+                .eq('is_active', true)
+                .order('display_order', { ascending: true }),
+        ]);
 
-        // Add category_name for backward compatibility
-        const enhancedProducts = products.map(product => ({
+        if (productsResult.error) throw productsResult.error;
+
+        // Group variants by product for O(1) lookup
+        const variantsByProduct = {};
+        (variantsResult.data || []).forEach(v => {
+            if (!variantsByProduct[v.product_id]) variantsByProduct[v.product_id] = [];
+            variantsByProduct[v.product_id].push(v);
+        });
+
+        const enhancedProducts = productsResult.data.map(product => ({
             ...product,
-            category_name: product.category?.name || null
+            category_name: product.category?.name || null,
+            variants: variantsByProduct[product.id] || [],
         }));
 
         res.json({ products: enhancedProducts });
@@ -2043,11 +2417,12 @@ app.post('/api/admin/products/:id/variants', authenticateAdmin, asyncHandler(asy
                 size_value: parseFloat(variant.size_value),
                 size_unit: variant.size_unit,
                 price: parseFloat(variant.price),
+                stock_quantity: parseInt(variant.stock_quantity) || 0,
                 sku: variant.sku || null,
                 is_active: variant.is_active !== undefined ? variant.is_active : true,
                 is_default: variant.is_default || false,
                 display_order: variant.display_order !== undefined ? variant.display_order : index,
-                weight_grams: weightGrams  // Add calculated weight
+                weight_grams: weightGrams
             };
         });
 
@@ -2084,13 +2459,16 @@ app.put('/api/admin/products/:productId/variants/:variantId', authenticateAdmin,
     const variantUpdates = req.body;
 
     // Ensure we're only updating fields that should be updateable
-    const allowedFields = ['variant_name', 'size_value', 'size_unit', 'price', 'sku', 'is_active', 'is_default', 'display_order', 'weight_grams'];
+    const allowedFields = ['variant_name', 'size_value', 'size_unit', 'price', 'stock_quantity', 'sku', 'is_active', 'is_default', 'display_order', 'weight_grams'];
     const updates = {};
     allowedFields.forEach(field => {
         if (variantUpdates[field] !== undefined) {
             updates[field] = variantUpdates[field];
         }
     });
+    if (updates.stock_quantity !== undefined) {
+        updates.stock_quantity = parseInt(updates.stock_quantity) || 0;
+    }
 
     // Recalculate weight_grams if size_value, size_unit, or weight_grams is being updated
     if (updates.size_value !== undefined || updates.size_unit !== undefined || updates.weight_grams !== undefined) {
@@ -2247,7 +2625,7 @@ app.post('/api/admin/create-admin', asyncHandler(async (req, res) => {
         // Update existing user to be admin
         const { data, error } = await supabase
             .from('users')
-            .update({ is_admin: true, role: 'admin' })
+            .update({ role: 'admin' })
             .eq('id', user_id)
             .select()
             .single();
@@ -2278,8 +2656,7 @@ app.post('/api/admin/create-admin', asyncHandler(async (req, res) => {
                 name: name,
                 email: email,
                 password: 'managed_by_supabase_auth', // Dummy password since we use Supabase Auth
-                role: 'admin',
-                is_admin: true
+                role: 'admin'
             }])
             .select()
             .single();
@@ -2307,13 +2684,29 @@ app.post('/api/admin/create-admin', asyncHandler(async (req, res) => {
 // User Authentication Routes
 app.post('/api/auth/signup', asyncHandler(async (req, res) => {
     const { email, password, name } = req.body;
+
+    if (!email || !password || !name) {
+        return res.status(400).json({
+            success: false,
+            error: 'Name, email, and password are required',
+            code: 'missing_fields'
+        });
+    }
+
+    if (!isStrongPassword(password)) {
+        return res.status(400).json({
+            success: false,
+            error: PASSWORD_POLICY_MESSAGE,
+            code: 'weak_password'
+        });
+    }
     
     const { data, error } = await supabase.auth.signUp({
         email: email,
         password: password,
         options: {
             data: { name: name },
-            emailRedirectTo: undefined
+            emailRedirectTo: buildFrontendAuthUrl()
         },
     });
     
@@ -2323,7 +2716,9 @@ app.post('/api/auth/signup', asyncHandler(async (req, res) => {
             ip: req.ip,
             userAgent: req.get('User-Agent')
         });
-        throw error;
+
+        const mappedFailure = mapAuthFailure(error, 'Signup failed');
+        return res.status(mappedFailure.status).json(mappedFailure.body);
     }
     
     // Check if user needs email confirmation
@@ -2335,14 +2730,14 @@ app.post('/api/auth/signup', asyncHandler(async (req, res) => {
         return res.status(201).json({ 
             message: 'Please check your email to confirm your account',
             user: data.user,
+            email,
             confirmationRequired: true 
         });
     }
 
     // If user is created successfully, also create record in users table
     if (data.user) {
-        const isAdmin = email.includes('admin'); // Users with 'admin' in email become admin
-        
+        // New users are always created as customers - admins must be set explicitly via admin endpoint
         try {
             await supabase
                 .from('users')
@@ -2351,8 +2746,7 @@ app.post('/api/auth/signup', asyncHandler(async (req, res) => {
                     name: name,
                     email: email,
                     password: 'managed_by_supabase_auth', // Dummy password since we use Supabase Auth
-                    role: isAdmin ? 'admin' : 'customer',
-                    is_admin: isAdmin
+                    role: 'customer'
                 }]);
         } catch (insertError) {
             logger.warn('User record creation failed (user might already exist)', insertError, {
@@ -2364,7 +2758,7 @@ app.post('/api/auth/signup', asyncHandler(async (req, res) => {
         logger.info('User signup completed successfully', {
             userId: data.user.id,
             email,
-            role: isAdmin ? 'admin' : 'customer'
+            role: 'customer'
         });
     }
     
@@ -2373,12 +2767,20 @@ app.post('/api/auth/signup', asyncHandler(async (req, res) => {
 
 app.post('/api/auth/login', asyncHandler(async (req, res) => {
     const { email, password } = req.body;
-    
+
+    if (!email || !password) {
+        return res.status(400).json({
+            success: false,
+            error: 'Email and password are required',
+            code: 'missing_fields'
+        });
+    }
+
     const { data, error } = await supabase.auth.signInWithPassword({
         email: email,
         password: password,
     });
-    
+
     if (error) {
         logger.warn('User login failed', error, {
             email,
@@ -2386,17 +2788,232 @@ app.post('/api/auth/login', asyncHandler(async (req, res) => {
             userAgent: req.get('User-Agent'),
             timestamp: new Date().toISOString()
         });
-        throw error;
+        const mappedFailure = mapAuthFailure(error);
+        return res.status(mappedFailure.status).json({
+            ...mappedFailure.body,
+            timestamp: new Date().toISOString(),
+            path: req.originalUrl,
+            method: req.method,
+            requestId: req.requestId
+        });
     }
-    
+
     logger.info('User login successful', {
         userId: data.user?.id,
         email,
         ip: req.ip,
         sessionId: data.session?.access_token?.substring(0, 20) + '...'
     });
-    
+
     res.json(data);
+}));
+
+app.post('/api/auth/forgot-password', asyncHandler(async (req, res) => {
+    const { email } = req.body;
+
+    if (!email) {
+        return res.status(400).json({
+            success: false,
+            error: 'Email is required',
+            code: 'missing_email'
+        });
+    }
+
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: buildFrontendAuthUrl({ mode: 'reset-password' })
+    });
+
+    if (error) {
+        logger.warn('Forgot password request failed', error, {
+            email,
+            ip: req.ip
+        });
+
+        const mappedFailure = mapAuthFailure(error, 'Unable to send password reset email');
+        return res.status(mappedFailure.status).json(mappedFailure.body);
+    }
+
+    logger.info('Forgot password email requested', {
+        email,
+        ip: req.ip
+    });
+
+    res.json({
+        success: true,
+        email,
+        message: 'If an account exists for this email, a password reset link has been sent.'
+    });
+}));
+
+app.post('/api/auth/resend-confirmation', asyncHandler(async (req, res) => {
+    const { email } = req.body;
+
+    if (!email) {
+        return res.status(400).json({
+            success: false,
+            error: 'Email is required',
+            code: 'missing_email'
+        });
+    }
+
+    const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email,
+        options: {
+            emailRedirectTo: buildFrontendAuthUrl()
+        }
+    });
+
+    if (error) {
+        logger.warn('Resend confirmation failed', error, {
+            email,
+            ip: req.ip
+        });
+
+        const mappedFailure = mapAuthFailure(error, 'Unable to resend confirmation email');
+        return res.status(mappedFailure.status).json(mappedFailure.body);
+    }
+
+    logger.info('Confirmation email resent', {
+        email,
+        ip: req.ip
+    });
+
+    res.json({
+        success: true,
+        email,
+        message: 'Confirmation email sent. Please check your inbox.'
+    });
+}));
+
+app.post('/api/auth/session-from-link', asyncHandler(async (req, res) => {
+    const { code, token_hash: tokenHash, type } = req.body || {};
+    const authClient = createServerAuthClient();
+
+    if (!code && !tokenHash) {
+        return res.status(400).json({
+            success: false,
+            error: 'A code or token hash is required',
+            code: 'missing_link_token'
+        });
+    }
+
+    let result;
+
+    if (code) {
+        result = await authClient.auth.exchangeCodeForSession(code);
+    } else {
+        result = await authClient.auth.verifyOtp({
+            token_hash: tokenHash,
+            type: type || 'recovery'
+        });
+    }
+
+    const { data, error } = result;
+
+    if (error) {
+        logger.warn('Auth link exchange failed', error, {
+            codePresent: Boolean(code),
+            tokenHashPresent: Boolean(tokenHash),
+            type,
+            ip: req.ip
+        });
+
+        const mappedFailure = mapAuthFailure(error, 'Unable to verify authentication link');
+        return res.status(mappedFailure.status).json(mappedFailure.body);
+    }
+
+    logger.info('Auth link exchange successful', {
+        userId: data.user?.id,
+        type: type || (code ? 'pkce' : 'recovery'),
+        ip: req.ip
+    });
+
+    res.json(data);
+}));
+
+app.post('/api/auth/update-password', authenticateScopedAuthToken, asyncHandler(async (req, res) => {
+    const { password, refresh_token: refreshToken } = req.body;
+    const accessToken = req.headers.authorization?.replace('Bearer ', '') || req.body?.access_token || '';
+
+    if (!password) {
+        return res.status(400).json({
+            success: false,
+            error: 'Password is required',
+            code: 'missing_password'
+        });
+    }
+
+    if (!isStrongPassword(password)) {
+        return res.status(400).json({
+            success: false,
+            error: PASSWORD_POLICY_MESSAGE,
+            code: 'weak_password'
+        });
+    }
+
+    let updatedUser = null;
+    let error = null;
+
+    if (refreshToken) {
+        const sessionClient = createServerAuthClient();
+        const { data: sessionData, error: sessionError } = await sessionClient.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken
+        });
+
+        if (sessionError || !sessionData?.session) {
+            logger.warn('Password update session setup failed', sessionError, {
+                userId: req.user?.id,
+                ip: req.ip
+            });
+
+            const mappedFailure = mapAuthFailure(sessionError, 'Unable to verify your password reset session');
+            return res.status(mappedFailure.status).json(mappedFailure.body);
+        }
+
+        const { data, error: updateError } = await sessionClient.auth.updateUser({
+            password
+        });
+
+        updatedUser = data?.user || null;
+        error = updateError;
+    } else if (supabaseAdmin) {
+        const { data, error: updateError } = await supabaseAdmin.auth.admin.updateUserById(req.user.id, {
+            password
+        });
+
+        updatedUser = data?.user || null;
+        error = updateError;
+    } else {
+        return res.status(400).json({
+            success: false,
+            error: 'Refresh token is required to update password in this environment',
+            code: 'missing_refresh_token'
+        });
+    }
+
+    if (error) {
+        logger.warn(error);
+        logger.warn('Password update failed', error, {
+            userId: req.user?.id,
+            ip: req.ip
+        });
+
+        const mappedFailure = mapAuthFailure(error, 'Unable to update password');
+        return res.status(mappedFailure.status).json(mappedFailure.body);
+    }
+
+    logger.info('Password updated successfully', {
+        userId: req.user?.id,
+        ip: req.ip
+    });
+
+    res.json({
+        success: true,
+        user: updatedUser,
+        message: 'Password updated successfully'
+    });
 }));
 
 // Token validation route
@@ -2419,7 +3036,7 @@ app.get('/api/auth/profile', roleMiddleware.authenticateToken, asyncHandler(asyn
     // Get user role from database
     const { data: userData, error: userError } = await supabase
         .from('users')
-        .select('id, name, email, role, is_admin, created_at')
+        .select('id, name, email, role, created_at')
         .eq('id', req.user.id)
         .single();
 
@@ -2429,8 +3046,7 @@ app.get('/api/auth/profile', roleMiddleware.authenticateToken, asyncHandler(asyn
             id: req.user.id,
             name: req.user.user_metadata?.name || req.user.email.split('@')[0],
             email: req.user.email,
-            role: 'customer',
-            is_admin: false
+            role: 'customer'
         };
 
         const { data: newUser, error: createError } = await supabase
@@ -2440,8 +3056,7 @@ app.get('/api/auth/profile', roleMiddleware.authenticateToken, asyncHandler(asyn
                 name: defaultUser.name,
                 email: defaultUser.email,
                 password: 'managed_by_supabase_auth',
-                role: defaultUser.role,
-                is_admin: defaultUser.is_admin
+                role: defaultUser.role
             }])
             .select()
             .single();
@@ -2467,7 +3082,6 @@ app.get('/api/auth/profile', roleMiddleware.authenticateToken, asyncHandler(asyn
                 name: newUser.name,
                 email: newUser.email,
                 role: newUser.role,
-                is_admin: newUser.is_admin,
                 created_at: newUser.created_at
             }
         });
@@ -2518,32 +3132,168 @@ app.post('/api/auth/refresh', asyncHandler(async (req, res) => {
 // Order Routes (protected by authentication middleware)
 app.post('/api/orders', authenticateToken, asyncHandler(async (req, res) => {
     const {
-        total_amount,
-        status,
         items,
         payment_method,
         payment_status,
         customer_phone,
         customer_email,
-        shipping_address
+        shipping_address,
+        delivery_mode
     } = req.body;
     const { user } = req;
 
-    // COD orders are considered paid on delivery; online payments start as PENDING
+    if (!items || items.length === 0) {
+        return res.status(400).json({ error: 'Order must contain at least one item' });
+    }
+
+    if (!shipping_address || typeof shipping_address !== 'object') {
+        return res.status(400).json({ error: 'Shipping address is required' });
+    }
+
+    if (!/^\d{6}$/.test(String(shipping_address.pincode || '').trim())) {
+        return res.status(400).json({ error: 'A valid 6-digit delivery pincode is required' });
+    }
+
+    if (!String(shipping_address.address || '').trim()) {
+        return res.status(400).json({ error: 'Shipping address is required' });
+    }
+
+    // Validate that all product_id / variant_id values are proper UUIDs.
+    // Cart items for variant products use a composite string id on the frontend;
+    // Checkout.jsx always sets originalId so product_id should be a plain UUID.
+    // If originalId was somehow missing the composite string would arrive here
+    // and cause a cryptic DB error — catch it early with a clear message.
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    for (const item of items) {
+        if (!UUID_RE.test(item.product_id)) {
+            return res.status(400).json({
+                error: `Invalid product_id "${item.product_id}". Make sure variant cart items set originalId.`,
+            });
+        }
+        if (item.variant_id && !UUID_RE.test(item.variant_id)) {
+            return res.status(400).json({ error: `Invalid variant_id "${item.variant_id}"` });
+        }
+    }
+
+    // Fetch all referenced products and variants in parallel.
+    // We use the DB prices — never trust the client-sent price (Bug #6).
+    const productIds = [...new Set(items.map(i => i.product_id))];
+    const variantIds = items.map(i => i.variant_id).filter(Boolean);
+
+    const [productsResult, variantsResult] = await Promise.all([
+        supabase
+            .from('products')
+            .select('id, name, price, stock_quantity')
+            .in('id', productIds),
+        variantIds.length > 0
+            ? supabase
+                .from('product_variants')
+                .select('id, product_id, price, stock_quantity')
+                .in('id', variantIds)
+            : Promise.resolve({ data: [], error: null }),
+    ]);
+
+    if (productsResult.error) throw productsResult.error;
+    if (variantsResult.error) throw variantsResult.error;
+
+    const productMap = Object.fromEntries(productsResult.data.map(p => [p.id, p]));
+    const variantMap = Object.fromEntries((variantsResult.data || []).map(v => [v.id, v]));
+
+    // Per-item stock validation.
+    // Variant items check their own variant stock; non-variant items check the product total.
+    const stockErrors = [];
+    // Track checked non-variant product quantities to avoid duplicate errors
+    const nonVariantChecked = {};
+
+    for (const item of items) {
+        const product = productMap[item.product_id];
+        if (!product) {
+            stockErrors.push(`Product ${item.product_id} not found`);
+            continue;
+        }
+
+        if (item.variant_id) {
+            const variant = variantMap[item.variant_id];
+            if (!variant) {
+                stockErrors.push(`Variant ${item.variant_id} not found`);
+                continue;
+            }
+            if (variant.stock_quantity < item.quantity) {
+                stockErrors.push(
+                    `"${product.name}" (${item.variant_id}) has only ${variant.stock_quantity} units in stock (requested ${item.quantity})`
+                );
+            }
+        } else {
+            // Aggregate for products that appear multiple times without a variant
+            nonVariantChecked[item.product_id] = (nonVariantChecked[item.product_id] || 0) + item.quantity;
+        }
+    }
+
+    for (const [productId, qty] of Object.entries(nonVariantChecked)) {
+        const product = productMap[productId];
+        if (product && product.stock_quantity < qty) {
+            stockErrors.push(
+                `"${product.name}" only has ${product.stock_quantity} units in stock (requested ${qty})`
+            );
+        }
+    }
+
+    if (stockErrors.length > 0) {
+        return res.status(400).json({ error: stockErrors.join('; ') });
+    }
+
+    // Build order items using DB-verified prices (never the client price).
+    // Also compute the authoritative total_amount server-side.
+    const verifiedItems = items.map(item => {
+        const variant = item.variant_id ? variantMap[item.variant_id] : null;
+        const verifiedPrice = variant
+            ? parseFloat(variant.price)
+            : parseFloat(productMap[item.product_id].price);
+        return { ...item, verifiedPrice };
+    });
+    const subtotalAmount = verifiedItems.reduce((sum, i) => sum + i.verifiedPrice * i.quantity, 0);
+    let selectedDeliveryOption;
+    try {
+        selectedDeliveryOption = await deliveryService.resolveDeliverySelection({
+            pincode: shipping_address.pincode,
+            orderSubtotal: subtotalAmount,
+            requestedMode: delivery_mode
+        });
+    } catch (deliveryQuoteError) {
+        return res.status(400).json({ error: deliveryQuoteError.message });
+    }
+    const shippingFee = Number.parseFloat(selectedDeliveryOption.fee) || 0;
+    const serverTotal = subtotalAmount + shippingFee;
+
     const resolvedPaymentMethod = payment_method || 'COD';
-    const resolvedPaymentStatus = resolvedPaymentMethod === 'COD' ? 'COD_PENDING' : (payment_status || 'PENDING');
+    const resolvedPaymentStatus = payment_status || 'PENDING';
+    const resolvedOrderStatus = 'pending';
+
+    if (
+        resolvedPaymentMethod === 'COD' &&
+        selectedDeliveryOption.quote_snapshot?.serviceability?.serviceability_checked &&
+        selectedDeliveryOption.quote_snapshot?.serviceability?.cod_available === false
+    ) {
+        return res.status(400).json({
+            error: 'Cash on Delivery is not available for the selected pincode. Please choose an online payment method.'
+        });
+    }
 
     const { data: order, error: orderError } = await supabase
         .from('orders')
         .insert([{
             user_id: user.id,
-            total_amount,
-            status,
+            subtotal_amount: subtotalAmount,
+            shipping_fee: shippingFee,
+            total_amount: serverTotal,
+            status: resolvedOrderStatus,
             payment_method: resolvedPaymentMethod,
             payment_status: resolvedPaymentStatus,
             customer_phone,
             customer_email,
-            shipping_address
+            shipping_address,
+            delivery_mode: selectedDeliveryOption.mode,
+            delivery_quote: selectedDeliveryOption.quote_snapshot
         }])
         .select()
         .single();
@@ -2551,18 +3301,20 @@ app.post('/api/orders', authenticateToken, asyncHandler(async (req, res) => {
     if (orderError) {
         logger.error('Failed to create order', orderError, {
             userId: user.id,
-            totalAmount: total_amount,
+            totalAmount: serverTotal,
+            subtotalAmount,
+            shippingFee,
             itemCount: items?.length || 0
         });
         throw orderError;
     }
 
-    const orderItems = items.map(item => ({
+    const orderItems = verifiedItems.map(item => ({
         order_id: order.id,
         product_id: item.product_id,
-        variant_id: item.variant_id || null,  // Track which variant was ordered
+        variant_id: item.variant_id || null,
         quantity: item.quantity,
-        price: item.price,
+        price: item.verifiedPrice,
     }));
 
     const { data: newOrderItems, error: orderItemsError } = await supabase
@@ -2579,12 +3331,63 @@ app.post('/api/orders', authenticateToken, asyncHandler(async (req, res) => {
         throw orderItemsError;
     }
 
+    // Atomically decrement stock per item (variant-aware).
+    // The new decrement_stock RPC uses WHERE stock_quantity >= p_quantity so it
+    // returns false instead of silently clipping — this catches the rare race where
+    // another order consumed the last unit between our check above and now.
+    const decrementResults = await Promise.all(
+        verifiedItems.map(item =>
+            supabase.rpc('decrement_stock', {
+                p_product_id: item.product_id,
+                p_quantity: item.quantity,
+                p_variant_id: item.variant_id || null,
+            }).then(r => ({ ...r, item }))
+        )
+    );
+
+    const decrementFailures = decrementResults.filter(r => r.error || r.data === false);
+    if (decrementFailures.length > 0) {
+        // A race condition: stock was valid at check-time but gone by decrement-time.
+        // Cancel the just-created order so it doesn't hold phantom reservations.
+        logger.error('Stock decrement race condition — cancelling order', {
+            orderId: order.id,
+            failures: decrementFailures.map(f => ({
+                productId: f.item.product_id,
+                variantId: f.item.variant_id,
+                qty: f.item.quantity,
+                error: f.error?.message,
+            })),
+        });
+        await supabase
+            .from('orders')
+            .update({ status: 'cancelled', updated_at: new Date().toISOString() })
+            .eq('id', order.id);
+        return res.status(409).json({
+            error: 'One or more items went out of stock. Please refresh and try again.',
+        });
+    }
+
     logger.info('Order created successfully', {
         orderId: order.id,
         userId: user.id,
-        totalAmount: total_amount,
-        itemCount: newOrderItems.length
+        totalAmount: serverTotal,
+        subtotalAmount,
+        shippingFee,
+        itemCount: newOrderItems.length,
+        orderStatus: resolvedOrderStatus,
+        paymentMethod: resolvedPaymentMethod,
+        deliveryMode: selectedDeliveryOption.mode
     });
+
+    if (resolvedPaymentMethod === 'COD') {
+        try {
+            await deliveryService.processOrderForFulfillment(order.id);
+        } catch (deliveryError) {
+            logger.error('Automatic COD fulfillment setup failed', deliveryError, {
+                orderId: order.id
+            });
+        }
+    }
 
     res.status(201).json({ order, newOrderItems });
 }));
@@ -2606,7 +3409,8 @@ app.get('/api/orders/:user_id', authenticateToken, asyncHandler(async (req, res)
             *,
             order_items (
                 *,
-                products (*)
+                products (*),
+                product_variants (variant_name, size_value, size_unit)
             )
         `)
         .eq('user_id', user_id)
@@ -4196,8 +5000,9 @@ app.get('/api/admin/inventory/movements', roleMiddleware.requirePermission(roleM
             .select(`
                 *,
                 product:product_id(name, sku, unit),
-                party:party_id(name),
-                purchase_order:purchase_order_id(po_number),
+                variant:variant_id(variant_name, size_value, size_unit),
+                party:parties!fk_stock_movements_party_id(name),
+                purchase_order:purchase_orders!fk_stock_movements_purchase_order(po_number),
                 purchase_order_items!fk_stock_movements_purchase_order_item_id(item_name, quantity as po_quantity)
             `)
             .eq('product_id', product_id)

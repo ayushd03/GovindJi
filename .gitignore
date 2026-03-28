@@ -32,4 +32,7 @@ build
 
 # Supabase related files (if any local configs are generated)
 supabase/*.csv
-supabase/*.json 
+supabase/*.json
+
+# Local deploy secrets / EC2 keys (never commit)
+.deploy/

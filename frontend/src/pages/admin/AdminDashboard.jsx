@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { PermissionGuard } from '../../components/PermissionGuard';
 import { ADMIN_PERMISSIONS } from '../../enums/roles';
+import { API_BASE_URL } from '../../config/apiBaseUrl';
 import {
   CubeIcon,
   ShoppingCartIcon,
@@ -20,17 +21,12 @@ const AdminDashboard = () => {
   const [dashboardData, setDashboardData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
   useEffect(() => {
     window.scrollTo(0, 0);
   }, []);
 
-  useEffect(() => {
-    fetchDashboardData();
-  }, []);
-
-  const fetchDashboardData = async () => {
+  const fetchDashboardData = useCallback(async () => {
     try {
       const token = localStorage.getItem('authToken');
       const response = await fetch(`${API_BASE_URL}/api/admin/dashboard`, {
@@ -51,7 +47,11 @@ const AdminDashboard = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, [fetchDashboardData]);
 
   if (loading) return (
     <div className="flex items-center justify-center min-h-96">
@@ -109,6 +109,7 @@ const AdminDashboard = () => {
       case 'pending': return ClockIcon;
       case 'processing': return CubeIcon;
       case 'shipped': return TruckIcon;
+      case 'completed':
       case 'delivered': return CheckCircleIcon;
       case 'cancelled': return XCircleIcon;
       default: return ClockIcon;
@@ -120,6 +121,7 @@ const AdminDashboard = () => {
       case 'pending': return 'bg-yellow-400/10 text-yellow-500';
       case 'processing': return 'bg-blue-400/10 text-blue-500';
       case 'shipped': return 'bg-indigo-400/10 text-indigo-500';
+      case 'completed':
       case 'delivered': return 'bg-green-400/10 text-green-500';
       case 'cancelled': return 'bg-red-400/10 text-red-500';
       default: return 'bg-gray-400/10 text-gray-500';
@@ -138,23 +140,23 @@ const AdminDashboard = () => {
 
   return (
     <PermissionGuard permission={ADMIN_PERMISSIONS.VIEW_DASHBOARD}>
-      <div className="space-y-6">
-      <div className="bg-card rounded-xl shadow-sm border p-6">
+      <div className="admin-page">
+      <div className="admin-page-header">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
-            <p className="mt-1 text-muted-foreground">
+            <h1 className="admin-page-title">Dashboard</h1>
+            <p className="admin-page-description">
               Welcome back, {user?.user_metadata?.name || user?.email}
             </p>
           </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         {statsCards.map((stat, index) => {
           const IconComponent = stat.icon;
           return (
-            <div key={index} className="bg-card rounded-xl shadow-sm border p-6 hover:shadow-md transition-shadow duration-200">
+            <div key={index} className="admin-stat-card">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">{stat.title}</p>

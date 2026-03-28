@@ -6,7 +6,8 @@
  */
 
 const DelhiveryGateway = require('./DelhiveryGateway');
-const { createClient } = require('@supabase/supabase-js');
+const deliverySettingsService = require('./DeliverySettingsService');
+const { createBackendSupabaseClient } = require('../../config/supabaseClient');
 
 class DeliveryService {
   constructor() {
@@ -14,10 +15,228 @@ class DeliveryService {
     this.initialized = false;
 
     // Initialize Supabase client
-    this.supabase = createClient(
-      process.env.SUPABASE_URL,
-      process.env.SUPABASE_ANON_KEY
+    this.supabase = createBackendSupabaseClient({ preferServiceRole: true });
+  }
+
+  isGatewayReady() {
+    return Boolean(this.initialized && this.gateway);
+  }
+
+  normalizeShippingMode(value, fallback = 'Surface') {
+    const raw = String(value || '').trim().toLowerCase();
+
+    if (raw === 'express') {
+      return 'Express';
+    }
+
+    if (['surface', 'normal', 'standard'].includes(raw)) {
+      return 'Surface';
+    }
+
+    return fallback;
+  }
+
+  parseMoney(value, fallback = 0) {
+    const parsed = Number.parseFloat(value);
+    return Number.isFinite(parsed) ? Number(parsed.toFixed(2)) : fallback;
+  }
+
+  createDateFromParts(dateString, timeString = '00:00:00') {
+    const [year, month, day] = String(dateString || '').split('-').map(Number);
+    const [hours, minutes, seconds] = String(timeString || '00:00:00').split(':').map(Number);
+
+    return new Date(
+      Number.isFinite(year) ? year : 1970,
+      Number.isFinite(month) ? month - 1 : 0,
+      Number.isFinite(day) ? day : 1,
+      Number.isFinite(hours) ? hours : 0,
+      Number.isFinite(minutes) ? minutes : 0,
+      Number.isFinite(seconds) ? seconds : 0,
+      0
     );
+  }
+
+  addCalendarDays(date, days) {
+    const next = new Date(date);
+    next.setDate(next.getDate() + (Number.parseInt(days, 10) || 0));
+    return next;
+  }
+
+  buildDeliveryOption({
+    mode,
+    label,
+    description,
+    subtotal,
+    dispatchSlot,
+    freeShippingThreshold,
+    freeShippingEligible,
+    baseFee,
+    minDays,
+    maxDays,
+    isDefault,
+  }) {
+    const normalizedBaseFee = this.parseMoney(baseFee, 0);
+    const normalizedSubtotal = this.parseMoney(subtotal, 0);
+    const normalizedThreshold = this.parseMoney(freeShippingThreshold, 0);
+    const freeShippingApplied = Boolean(
+      freeShippingEligible &&
+      normalizedThreshold > 0 &&
+      normalizedSubtotal >= normalizedThreshold
+    );
+    const fee = freeShippingApplied ? 0 : normalizedBaseFee;
+    const dispatchDate = this.createDateFromParts(dispatchSlot.pickup_date, dispatchSlot.pickup_time);
+    const estimatedStart = this.addCalendarDays(dispatchDate, minDays);
+    const estimatedEnd = this.addCalendarDays(dispatchDate, maxDays);
+
+    return {
+      id: mode.toLowerCase(),
+      mode,
+      label,
+      description,
+      is_default: isDefault,
+      fee,
+      base_fee: normalizedBaseFee,
+      free_shipping_applied: freeShippingApplied,
+      free_shipping_threshold: normalizedThreshold,
+      transit_min_days: minDays,
+      transit_max_days: maxDays,
+      estimated_dispatch_date: dispatchSlot.pickup_date,
+      estimated_dispatch_time: dispatchSlot.pickup_time,
+      estimated_delivery_start: deliverySettingsService.formatDate(estimatedStart),
+      estimated_delivery_end: deliverySettingsService.formatDate(estimatedEnd),
+    };
+  }
+
+  async getServiceabilitySnapshot(pincode, settings = null) {
+    const resolvedSettings = settings || await deliverySettingsService.getSettings();
+    const fallback = {
+      pincode,
+      serviceable: true,
+      serviceability_checked: false,
+      reason: !resolvedSettings.is_enabled
+        ? 'Courier automation is currently disabled. Using saved store delivery defaults.'
+        : 'Courier API is unavailable right now. Using saved store delivery defaults.',
+    };
+
+    if (!resolvedSettings.is_enabled || !this.isGatewayReady()) {
+      return fallback;
+    }
+
+    try {
+      const result = await this.gateway.checkServiceability(pincode);
+      return {
+        ...result,
+        pincode,
+        serviceability_checked: true,
+      };
+    } catch (error) {
+      console.error('[DeliveryService] Delivery quote serviceability check failed:', error.message);
+      return {
+        ...fallback,
+        serviceability_error: error.message,
+      };
+    }
+  }
+
+  async getDeliveryOptions({ pincode, orderSubtotal = 0 } = {}) {
+    const normalizedPincode = String(pincode || '').trim();
+    if (!/^\d{6}$/.test(normalizedPincode)) {
+      throw new Error('Valid 6-digit pincode is required to calculate delivery options');
+    }
+
+    const settings = await deliverySettingsService.getSettings();
+    const serviceability = await this.getServiceabilitySnapshot(normalizedPincode, settings);
+    const defaultMode = this.normalizeShippingMode(settings.shipping_mode);
+    const nextPickupSlot = deliverySettingsService.calculateNextPickupSlot(settings);
+
+    if (serviceability.serviceability_checked && !serviceability.serviceable) {
+      return {
+        success: true,
+        pincode: normalizedPincode,
+        default_mode: defaultMode,
+        pickup_slot: nextPickupSlot,
+        options: [],
+        ...serviceability,
+      };
+    }
+
+    const subtotal = this.parseMoney(orderSubtotal, 0);
+    const options = [
+      this.buildDeliveryOption({
+        mode: 'Surface',
+        label: 'Normal delivery',
+        description: 'Balanced delivery speed with the lowest shipping cost.',
+        subtotal,
+        dispatchSlot: nextPickupSlot,
+        freeShippingThreshold: settings.free_shipping_threshold,
+        freeShippingEligible: true,
+        baseFee: settings.surface_delivery_fee,
+        minDays: settings.surface_min_delivery_days,
+        maxDays: settings.surface_max_delivery_days,
+        isDefault: defaultMode === 'Surface',
+      }),
+      this.buildDeliveryOption({
+        mode: 'Express',
+        label: 'Express delivery',
+        description: 'Priority dispatch for faster doorstep delivery.',
+        subtotal,
+        dispatchSlot: nextPickupSlot,
+        freeShippingThreshold: settings.free_shipping_threshold,
+        freeShippingEligible: false,
+        baseFee: settings.express_delivery_fee,
+        minDays: settings.express_min_delivery_days,
+        maxDays: settings.express_max_delivery_days,
+        isDefault: defaultMode === 'Express',
+      }),
+    ];
+
+    return {
+      success: true,
+      pincode: normalizedPincode,
+      default_mode: defaultMode,
+      pickup_slot: nextPickupSlot,
+      options,
+      ...serviceability,
+    };
+  }
+
+  async resolveDeliverySelection({ pincode, orderSubtotal = 0, requestedMode = null } = {}) {
+    const quoteResponse = await this.getDeliveryOptions({ pincode, orderSubtotal });
+
+    if (quoteResponse.serviceability_checked && !quoteResponse.serviceable) {
+      throw new Error(
+        quoteResponse.message ||
+        quoteResponse.reason ||
+        `Delivery is not available to pincode ${pincode}`
+      );
+    }
+
+    const desiredMode = this.normalizeShippingMode(requestedMode, quoteResponse.default_mode);
+    const selectedOption = quoteResponse.options.find((option) => option.mode === desiredMode)
+      || quoteResponse.options.find((option) => option.mode === quoteResponse.default_mode)
+      || quoteResponse.options[0];
+
+    if (!selectedOption) {
+      throw new Error('No delivery options are available for this order');
+    }
+
+    return {
+      ...selectedOption,
+      quote_snapshot: {
+        ...selectedOption,
+        pincode: quoteResponse.pincode,
+        pickup_slot: quoteResponse.pickup_slot,
+        serviceability: {
+          serviceable: quoteResponse.serviceable,
+          serviceability_checked: quoteResponse.serviceability_checked,
+          city: quoteResponse.city || null,
+          state: quoteResponse.state || null,
+          cod_available: quoteResponse.cod_available ?? null,
+          prepaid_available: quoteResponse.prepaid_available ?? null,
+          reason: quoteResponse.reason || quoteResponse.message || null,
+        },
+      },
+    };
   }
 
   /**
@@ -185,16 +404,19 @@ class DeliveryService {
       const codAmount = paymentMode === 'COD' ? order.total_amount : 0;
 
       // Prepare shipment details
+      const settings = await deliverySettingsService.getSettings();
+      const selectedShippingMode = this.normalizeShippingMode(order.delivery_mode, settings.shipping_mode);
+
       const shipmentDetails = {
         weight_grams: totalWeight,
         payment_mode: paymentMode,
         cod_amount: codAmount,
         products_desc: productsDesc.join(', '),
         quantity: order.order_items?.length || 1,
-        shipping_mode: 'Surface', // Can be made configurable
-        dimensions_width: 15,
-        dimensions_height: 15,
-        dimensions_length: 20
+        shipping_mode: selectedShippingMode,
+        dimensions_width: settings.default_package_width,
+        dimensions_height: settings.default_package_height,
+        dimensions_length: settings.default_package_length
       };
 
       // Prepare order data for Delhivery
@@ -347,6 +569,167 @@ class DeliveryService {
       console.error('[DeliveryService] Pickup scheduling failed:', error.message);
       throw error;
     }
+  }
+
+  async schedulePickupForShipments(shipments, settings = null) {
+    this.ensureInitialized();
+
+    if (!shipments || shipments.length === 0) {
+      return { success: true, reused_existing_request: false, scheduled_count: 0 };
+    }
+
+    const resolvedSettings = settings || await deliverySettingsService.getSettings();
+    const slot = deliverySettingsService.calculateNextPickupSlot(resolvedSettings);
+    const shipmentIds = shipments.map((shipment) => shipment.id);
+    const existingStatuses = ['SCHEDULED', 'REQUESTED', 'CREATED'];
+
+    const { data: existingRequest, error: pickupRequestError } = await this.supabase
+      .from('pickup_requests')
+      .select('*')
+      .eq('pickup_location', slot.pickup_location)
+      .eq('pickup_date', slot.pickup_date)
+      .eq('pickup_time', slot.pickup_time)
+      .in('status', existingStatuses)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (pickupRequestError) {
+      throw pickupRequestError;
+    }
+
+    let pickupResult = null;
+    let reusedExistingRequest = false;
+
+    if (existingRequest) {
+      reusedExistingRequest = true;
+      pickupResult = {
+        success: true,
+        pickup_id: existingRequest.delhivery_pickup_id,
+        response: existingRequest.delhivery_response
+      };
+    } else {
+      pickupResult = await this.schedulePickup({
+        pickup_date: slot.pickup_date,
+        pickup_time: slot.pickup_time,
+        pickup_location: slot.pickup_location,
+        expected_package_count: shipments.length
+      });
+    }
+
+    const { error: shipmentUpdateError } = await this.supabase
+      .from('shipments')
+      .update({
+        pickup_scheduled_date: slot.pickup_date,
+        pickup_scheduled_time: slot.pickup_time,
+        status: 'PICKUP_SCHEDULED',
+        updated_at: new Date().toISOString()
+      })
+      .in('id', shipmentIds);
+
+    if (shipmentUpdateError) {
+      throw shipmentUpdateError;
+    }
+
+    return {
+      ...pickupResult,
+      reused_existing_request: reusedExistingRequest,
+      pickup_date: slot.pickup_date,
+      pickup_time: slot.pickup_time,
+      pickup_location: slot.pickup_location,
+      scheduled_count: shipments.length
+    };
+  }
+
+  async schedulePickupForOrder(orderId, settings = null) {
+    const { data: shipments, error } = await this.supabase
+      .from('shipments')
+      .select('*')
+      .eq('order_id', orderId)
+      .is('pickup_scheduled_date', null)
+      .in('status', ['MANIFESTED', 'PENDING']);
+
+    if (error) {
+      throw error;
+    }
+
+    return this.schedulePickupForShipments(shipments || [], settings);
+  }
+
+  async processOrderForFulfillment(orderId, options = {}) {
+    this.ensureInitialized();
+
+    const { data: order, error } = await this.supabase
+      .from('orders')
+      .select('id, status, payment_method, payment_status, has_shipment')
+      .eq('id', orderId)
+      .single();
+
+    if (error) throw error;
+    if (!order) throw new Error('Order not found');
+
+    if (['cancelled', 'delivered', 'completed'].includes(order.status)) {
+      return {
+        success: false,
+        skipped: true,
+        reason: `Order is already ${order.status}`
+      };
+    }
+
+    const settings = await deliverySettingsService.getSettings();
+    if (!settings.is_enabled) {
+      return {
+        success: false,
+        skipped: true,
+        reason: 'Delhivery integration is disabled in settings'
+      };
+    }
+
+    const result = {
+      success: true,
+      order_id: orderId,
+      status_updated: false,
+      shipment_created: false,
+      pickup_scheduled: false
+    };
+
+    let readyForFulfillment = order.status === 'processing';
+
+    if (!readyForFulfillment && settings.auto_move_orders_to_processing) {
+      const { error: statusUpdateError } = await this.supabase
+        .from('orders')
+        .update({
+          status: 'processing',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', orderId);
+
+      if (statusUpdateError) throw statusUpdateError;
+      result.status_updated = true;
+      readyForFulfillment = true;
+    }
+
+    if (!readyForFulfillment) {
+      return {
+        ...result,
+        waiting_for_manual_processing: true,
+        reason: 'Order is still pending. Move it to processing to start shipment and pickup automation.'
+      };
+    }
+
+    if (settings.auto_create_shipment && !order.has_shipment) {
+      const shipmentResult = await this.autoCreateShipment(orderId);
+      result.shipment_created = true;
+      result.shipment = shipmentResult;
+    }
+
+    if (settings.auto_schedule_pickup) {
+      const pickupResult = await this.schedulePickupForOrder(orderId, settings);
+      result.pickup_scheduled = Boolean(pickupResult?.scheduled_count);
+      result.pickup = pickupResult;
+    }
+
+    return result;
   }
 
   /**

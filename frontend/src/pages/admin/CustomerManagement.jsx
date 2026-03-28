@@ -1,35 +1,33 @@
 import React from 'react';
+import { UsersIcon } from '@heroicons/react/24/outline';
 import { PermissionGuard } from '../../components/PermissionGuard';
 import { ADMIN_PERMISSIONS } from '../../enums/roles';
-import { UsersIcon } from '@heroicons/react/24/outline';
 
 const CustomerManagement = () => {
   return (
     <PermissionGuard permission={ADMIN_PERMISSIONS.VIEW_CUSTOMERS}>
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center space-x-3">
-            <UsersIcon className="w-8 h-8 text-green-600" />
+      <div className="admin-page">
+        <div className="admin-page-header">
+          <div className="flex items-start gap-4">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10">
+              <UsersIcon className="h-6 w-6 text-primary" />
+            </div>
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">Customer Management</h1>
-              <p className="mt-1 text-gray-500">Manage customer accounts and information</p>
+              <h1 className="admin-page-title">Customer Management</h1>
+              <p className="admin-page-description">Customer profiles, account activity, and support actions will live here.</p>
             </div>
           </div>
         </div>
 
-        {/* Content */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <div className="text-center py-12">
-            <UsersIcon className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Customer Management</h3>
-            <p className="text-gray-600 mb-6">
-              This feature allows you to view customer profiles, manage accounts, and handle customer support.
+        <div className="admin-section">
+          <div className="admin-empty-state border-solid bg-card px-8 py-16">
+            <UsersIcon className="mb-4 h-16 w-16 text-muted-foreground/50" />
+            <h3 className="text-lg font-semibold text-foreground">Customer workspace coming next</h3>
+            <p className="mt-3 max-w-xl text-sm leading-6 text-muted-foreground">
+              This page is reserved for customer profiles, account activity, and support workflows. The shell is now aligned with the rest of the admin panel so the feature can be added without redesigning the page again.
             </p>
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4 max-w-md mx-auto">
-              <p className="text-sm text-red-800">
-                This page is accessible by Admin role only.
-              </p>
+            <div className="mt-6 rounded-2xl border border-primary/15 bg-primary/5 px-5 py-4 text-sm text-primary">
+              Accessible to the Admin role only.
             </div>
           </div>
         </div>

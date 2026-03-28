@@ -7,13 +7,52 @@
 const express = require('express');
 const router = express.Router();
 const deliveryService = require('../services/delivery/DeliveryService');
-const { createClient } = require('@supabase/supabase-js');
+const deliverySettingsService = require('../services/delivery/DeliverySettingsService');
+const roleMiddleware = require('../middleware/roleMiddleware');
+const { createBackendSupabaseClient } = require('../config/supabaseClient');
 
 // Initialize Supabase client
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_ANON_KEY
-);
+const supabase = createBackendSupabaseClient({ preferServiceRole: true });
+
+router.use(roleMiddleware.authenticateAdmin);
+
+router.get('/settings', async (req, res) => {
+  try {
+    const settings = await deliverySettingsService.getSettings();
+    const nextPickupSlot = deliverySettingsService.calculateNextPickupSlot(settings);
+
+    res.json({
+      success: true,
+      settings,
+      next_pickup_slot: nextPickupSlot
+    });
+  } catch (error) {
+    console.error('[AdminDeliveryRoutes] Get settings failed:', error.message);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+router.put('/settings', async (req, res) => {
+  try {
+    const settings = await deliverySettingsService.saveSettings(req.body, req.user?.id);
+    const nextPickupSlot = deliverySettingsService.calculateNextPickupSlot(settings);
+
+    res.json({
+      success: true,
+      settings,
+      next_pickup_slot: nextPickupSlot
+    });
+  } catch (error) {
+    console.error('[AdminDeliveryRoutes] Save settings failed:', error.message);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
 
 /**
  * POST /api/admin/delivery/create-shipment/:orderId
@@ -81,7 +120,9 @@ router.post('/schedule-pickup', async (req, res) => {
  */
 router.get('/shipments', async (req, res) => {
   try {
-    const { status, page = 1, limit = 50 } = req.query;
+    const { status, order_id, page = 1, limit = 50 } = req.query;
+    const parsedPage = Number.parseInt(page, 10) || 1;
+    const parsedLimit = Number.parseInt(limit, 10) || 50;
 
     let query = supabase
       .from('shipments')
@@ -96,10 +137,14 @@ router.get('/shipments', async (req, res) => {
         )
       `)
       .order('created_at', { ascending: false })
-      .range((page - 1) * limit, page * limit - 1);
+      .range((parsedPage - 1) * parsedLimit, parsedPage * parsedLimit - 1);
 
     if (status) {
       query = query.eq('status', status);
+    }
+
+    if (order_id) {
+      query = query.eq('order_id', order_id);
     }
 
     const { data: shipments, error } = await query;
@@ -109,8 +154,8 @@ router.get('/shipments', async (req, res) => {
     res.json({
       success: true,
       shipments,
-      page: parseInt(page),
-      limit: parseInt(limit)
+      page: parsedPage,
+      limit: parsedLimit
     });
 
   } catch (error) {
@@ -207,6 +252,7 @@ router.get('/pickup-requests', async (req, res) => {
     });
 
   } catch (error) {
+    console.error(error);
     console.error('[AdminDeliveryRoutes] Get pickup requests failed:', error.message);
     res.status(500).json({
       success: false,

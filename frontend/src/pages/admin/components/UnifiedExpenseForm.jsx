@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   CubeIcon,
   BuildingOfficeIcon,
@@ -6,12 +6,12 @@ import {
   XMarkIcon
 } from '@heroicons/react/24/outline';
 import PaymentMethodSelector from './PaymentMethodSelector';
-import MultiVendorItemManager from './MultiVendorItemManager';
 import UnifiedVendorOrderForm from './UnifiedVendorOrderForm';
 import UnifiedVendorPaymentForm from './UnifiedVendorPaymentForm';
-import { Card, CardContent, CardHeader, CardTitle } from '../../../components/ui/card';
+import { Card, CardContent } from '../../../components/ui/card';
 import { Button } from '../../../components/ui/button';
 import { useToast } from '../../../hooks/useToast';
+import { API_BASE_URL } from '../../../config/apiBaseUrl';
 
 // Simplified expense categories - this replaces the complex top-level categories
 const EXPENSE_CATEGORIES = [
@@ -32,60 +32,11 @@ const UnifiedExpenseForm = ({
   validationErrors = {}
 }) => {
   const { toast } = useToast();
-  const [selectedVendor, setSelectedVendor] = useState(null);
-  const [vendorSearch, setVendorSearch] = useState('');
-  const [filteredVendors, setFilteredVendors] = useState([]);
-  const [showVendorDropdown, setShowVendorDropdown] = useState(false);
   const [showVendorOrderModal, setShowVendorOrderModal] = useState(false);
-
-  const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
   // Define expense category checks
   const isVendorOrder = transactionData.expense_category === 'Vendor Order';
   const isVendorPayment = transactionData.expense_category === 'Vendor Payment';
-
-  // Filter vendors based on search
-  useEffect(() => {
-    if (!dependencies.parties) return;
-    
-    const vendors = dependencies.parties.filter(party => party.party_type === 'vendor');
-    if (vendorSearch) {
-      setFilteredVendors(
-        vendors.filter(vendor =>
-          vendor.name.toLowerCase().includes(vendorSearch.toLowerCase()) ||
-          (vendor.contact_person && vendor.contact_person.toLowerCase().includes(vendorSearch.toLowerCase()))
-        )
-      );
-    } else {
-      setFilteredVendors(vendors.slice(0, 10)); // Show first 10 vendors
-    }
-  }, [vendorSearch, dependencies.parties]);
-
-  // Set selected vendor from transaction data if available
-  useEffect(() => {
-    if (isVendorPayment && transactionData.parties && transactionData.parties.length > 0 && dependencies.parties) {
-      const partyId = transactionData.parties[0].party_id;
-      const vendor = dependencies.parties.find(p => p.id === partyId && p.party_type === 'vendor');
-      if (vendor && !selectedVendor) {
-        setSelectedVendor(vendor);
-        setVendorSearch(vendor.name);
-      }
-    }
-  }, [isVendorPayment, transactionData.parties, dependencies.parties, selectedVendor]);
-
-  // Close vendor dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (!event.target.closest('.vendor-dropdown-container')) {
-        setShowVendorDropdown(false);
-      }
-    };
-
-    if (showVendorDropdown) {
-      document.addEventListener('click', handleClickOutside);
-      return () => document.removeEventListener('click', handleClickOutside);
-    }
-  }, [showVendorDropdown]);
 
   const handleFieldChange = (field, value) => {
     updateTransactionData({ [field]: value });
@@ -95,42 +46,18 @@ const UnifiedExpenseForm = ({
     updateTransactionData({ payment_method: paymentMethod });
   };
 
-  const handleItemsChange = (items) => {
-    updateTransactionData({ items });
-  };
-
-  const handleVendorSelect = (vendor) => {
-    setSelectedVendor(vendor);
-    setVendorSearch(vendor.name);
-    setShowVendorDropdown(false);
-    
-    // Update the parties in transaction data
-    updateTransactionData({ 
-      parties: [{
-        party_id: vendor.id,
-        party_name: vendor.name,
-        party_type: 'vendor',
-        amount: transactionData.total_amount || 0
-      }]
-    });
-  };
-
   const handleCategoryChange = (category) => {
     handleFieldChange('expense_category', category);
 
     // Reset relevant fields when changing categories
     if (category === 'Vendor Order') {
       handleFieldChange('total_amount', 0);
-      setSelectedVendor(null);
-      setVendorSearch('');
       updateTransactionData({ parties: [] });
     } else if (category === 'Vendor Payment') {
       handleFieldChange('total_amount', 0);
       updateTransactionData({ items: [] });
     } else {
       // For other categories, reset vendor-related data
-      setSelectedVendor(null);
-      setVendorSearch('');
       updateTransactionData({ parties: [], items: [] });
     }
   };
@@ -285,13 +212,13 @@ const UnifiedExpenseForm = ({
             Amount *
             </label>
             <div className="relative">
-              <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground text-sm">₹</span>
+              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[13px] text-muted-foreground">₹</span>
               <input
                 type="number"
                 step="0.01"
                 min="0"
                 required
-                className={`w-full pl-8 pr-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-sm ${
+                className={`input-field w-full pl-8 pr-3 ${
                   validationErrors.total_amount ? 'border-red-500' : 'border-border'
                 }`}
                 value={transactionData.total_amount || ''}

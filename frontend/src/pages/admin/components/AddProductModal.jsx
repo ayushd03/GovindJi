@@ -1,6 +1,5 @@
-import React, { useState, useEffect, Fragment } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
-  XMarkIcon,
   CubeIcon,
   CalculatorIcon,
   MagnifyingGlassIcon,
@@ -9,8 +8,19 @@ import {
   PlusIcon
 } from '@heroicons/react/24/outline';
 import { useToast } from '../../../hooks/useToast';
-import { Dialog, Transition, Tab } from '@headlessui/react';
+import { Tab } from '@headlessui/react';
 import UnitSelectionDialog from '../../../components/UnitSelectionDialog';
+import {
+  AdminDialog,
+  AdminDialogBody,
+  AdminDialogContent,
+  AdminDialogDescription,
+  AdminDialogFooter,
+  AdminDialogHeader,
+  AdminDialogIconButton,
+  AdminDialogTitle,
+} from '../../../components/AdminDialog';
+import { API_BASE_URL } from '../../../config/apiBaseUrl';
 
 const AddProductModal = ({
   isOpen,
@@ -19,7 +29,7 @@ const AddProductModal = ({
   defaultName = '',
   editingProduct = null, // For editing existing products
   mode = 'add', // 'add' or 'edit'
-  apiBaseUrl = process.env.REACT_APP_API_URL || 'http://localhost:3001'
+  apiBaseUrl = API_BASE_URL
 }) => {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
@@ -206,13 +216,7 @@ const AddProductModal = ({
   };
 
   // Load categories when modal opens
-  useEffect(() => {
-    if (isOpen) {
-      fetchCategories();
-    }
-  }, [isOpen]);
-
-  const fetchCategories = async () => {
+  const fetchCategories = useCallback(async () => {
     try {
       const authToken = localStorage.getItem('authToken');
       const response = await fetch(`${apiBaseUrl}/api/admin/categories`, {
@@ -226,13 +230,22 @@ const AddProductModal = ({
     } catch (error) {
       console.error('Error fetching categories:', error);
     }
-  };
+  }, [apiBaseUrl]);
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchCategories();
+    }
+  }, [fetchCategories, isOpen]);
 
   // Tab configuration
   const tabs = [
     { name: 'Pricing', icon: CalculatorIcon },
     { name: 'Stock', icon: CubeIcon }
   ];
+  const sectionCardClass = 'admin-dialog-section';
+  const fieldLabelClass = 'admin-dialog-label';
+  const fieldClass = 'input-field';
 
   function classNames(...classes) {
     return classes.filter(Boolean).join(' ');
@@ -298,101 +311,68 @@ const AddProductModal = ({
   };
 
   return (
-    <Transition show={isOpen} as={Fragment}>
-      <Dialog as="div" className="relative z-50" onClose={handleClose}>
-        <Transition.Child
-          as={Fragment}
-          enter="ease-out duration-300"
-          enterFrom="opacity-0"
-          enterTo="opacity-100"
-          leave="ease-in duration-200"
-          leaveFrom="opacity-100"
-          leaveTo="opacity-0"
-        >
-          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm transition-opacity" />
-        </Transition.Child>
-
-        <div className="fixed inset-0 z-10 overflow-y-auto">
-          <div className="flex min-h-full items-center justify-center p-4">
-            <Transition.Child
-              as={Fragment}
-              enter="ease-out duration-300"
-              enterFrom="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
-              enterTo="opacity-100 translate-y-0 sm:scale-100"
-              leave="ease-in duration-200"
-              leaveFrom="opacity-100 translate-y-0 sm:scale-100"
-              leaveTo="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
-            >
-              <Dialog.Panel className="relative w-full max-w-5xl bg-white rounded-xl shadow-2xl transform transition-all">
-                {/* Modern Header with Gradient */}
-                <div className="relative bg-gradient-to-r from-blue-600 to-blue-700 px-8 py-6 rounded-t-xl">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-4">
-                      <div className="flex items-center justify-center w-12 h-12 bg-white/10 backdrop-blur-sm rounded-xl">
-                        <CubeIcon className="w-7 h-7 text-white" />
-                      </div>
-                      <div>
-                        <Dialog.Title as="h3" className="text-2xl font-bold text-white">
-                          {mode === 'edit' ? 'Edit' : 'Add New'} {formData.is_service ? 'Service' : 'Product'}
-                        </Dialog.Title>
-                        <p className="text-blue-100 text-sm mt-0.5">
-                          Fill in the details below to {mode === 'edit' ? 'update' : 'create'} your {formData.is_service ? 'service' : 'product'}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Product/Service Toggle */}
-                    <div className="flex items-center space-x-3">
-                      <div className="flex bg-white/10 backdrop-blur-sm rounded-lg p-1">
-                        <button
-                          type="button"
-                          onClick={() => setFormData(prev => ({ ...prev, is_service: false }))}
-                          className={`px-4 py-2 rounded-md text-sm font-semibold transition-all ${
-                            !formData.is_service
-                              ? 'bg-white text-blue-700 shadow-md'
-                              : 'text-white hover:bg-white/10'
-                          }`}
-                        >
-                          Product
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setFormData(prev => ({ ...prev, is_service: true }))}
-                          className={`px-4 py-2 rounded-md text-sm font-semibold transition-all ${
-                            formData.is_service
-                              ? 'bg-white text-blue-700 shadow-md'
-                              : 'text-white hover:bg-white/10'
-                          }`}
-                        >
-                          Service
-                        </button>
-                      </div>
-
-                      <button
-                        onClick={handleClose}
-                        className="p-2 text-white/80 hover:text-white hover:bg-white/10 rounded-lg transition-all"
-                      >
-                        <XMarkIcon className="w-6 h-6" />
-                      </button>
-                    </div>
-                  </div>
+    <AdminDialog open={isOpen} onOpenChange={(open) => { if (!open) handleClose(); }}>
+      <AdminDialogContent size="lg">
+        <AdminDialogHeader sticky className="bg-card/95 backdrop-blur-sm">
+          <div className="flex w-full flex-col gap-3">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-start gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10">
+                  <CubeIcon className="h-4 w-4 text-primary" />
                 </div>
+                <div>
+                  <AdminDialogTitle>
+                    {mode === 'edit' ? 'Edit' : 'Add New'} {formData.is_service ? 'Service' : 'Product'}
+                  </AdminDialogTitle>
+                  <AdminDialogDescription>
+                    Keep the record tight: core product identity first, then pricing and stock details.
+                  </AdminDialogDescription>
+                </div>
+              </div>
+              <AdminDialogIconButton onClick={handleClose} />
+            </div>
 
-                {/* Content Area */}
-                <div className="overflow-y-auto bg-gray-50" style={{ maxHeight: 'calc(90vh - 180px)' }}>
-                  <form onSubmit={handleSubmit} className="p-8 space-y-8">
-                    {/* Basic Information Section */}
-                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                      <div className="flex items-center space-x-2 mb-5">
-                        <div className="w-1 h-6 bg-blue-600 rounded-full"></div>
-                        <h4 className="text-lg font-bold text-gray-900">Basic Information</h4>
-                      </div>
+            <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex rounded-xl border border-border bg-muted/40 p-1">
+                <button
+                  type="button"
+                  onClick={() => setFormData(prev => ({ ...prev, is_service: false }))}
+                  className={`rounded-lg px-3 py-1.5 text-[13px] font-semibold transition-all ${
+                    !formData.is_service
+                      ? 'bg-card text-foreground shadow-sm'
+                      : 'text-muted-foreground hover:bg-card/70'
+                  }`}
+                >
+                  Product
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFormData(prev => ({ ...prev, is_service: true }))}
+                  className={`rounded-lg px-3 py-1.5 text-[13px] font-semibold transition-all ${
+                    formData.is_service
+                      ? 'bg-card text-foreground shadow-sm'
+                      : 'text-muted-foreground hover:bg-card/70'
+                  }`}
+                >
+                  Service
+                </button>
+              </div>
+              <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
+                {mode === 'edit' ? 'Editing existing item' : 'New catalog item'}
+              </p>
+            </div>
+          </div>
+        </AdminDialogHeader>
 
-                      <div className="space-y-5">
+        <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
+          <AdminDialogBody className="admin-dialog-stack bg-muted/20">
+            <div className={sectionCardClass}>
+
+              <div className="space-y-3.5">
                         {/* Name & Category Row */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                        <div className="admin-dialog-grid-2">
                           <div>
-                            <label className="block text-sm font-semibold text-gray-700 mb-2">
+                            <label className={fieldLabelClass}>
                               {formData.is_service ? 'Service' : 'Item'} Name <span className="text-red-500">*</span>
                             </label>
                             <input
@@ -401,18 +381,18 @@ const AddProductModal = ({
                               value={formData.name}
                               onChange={handleInputChange}
                               required
-                              className="w-full px-4 py-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                              className={fieldClass}
                               placeholder={`Enter ${formData.is_service ? 'service' : 'item'} name`}
                             />
                           </div>
 
                           <div>
-                            <label className="block text-sm font-semibold text-gray-700 mb-2">Category</label>
+                            <label className={fieldLabelClass}>Category</label>
                             <select
                               name="category_id"
                               value={formData.category_id}
                               onChange={handleInputChange}
-                              className="w-full px-4 py-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-white"
+                              className={fieldClass}
                             >
                               <option value="">Select Category</option>
                               {categories.map(category => (
@@ -423,37 +403,37 @@ const AddProductModal = ({
                         </div>
 
                         {/* HSN & SKU Row */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                        <div className="admin-dialog-grid-2">
                           <div>
-                            <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center">
+                            <label className={`${fieldLabelClass} flex items-center`}>
                               HSN Code
-                              <MagnifyingGlassIcon className="w-4 h-4 ml-1.5 text-gray-400" />
+                              <MagnifyingGlassIcon className="ml-1.5 h-4 w-4 text-muted-foreground/70" />
                             </label>
                             <input
                               type="text"
                               name="item_hsn"
                               value={formData.item_hsn}
                               onChange={handleInputChange}
-                              className="w-full px-4 py-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                              className={fieldClass}
                               placeholder="Enter HSN code"
                             />
                           </div>
 
                           <div>
-                            <label className="block text-sm font-semibold text-gray-700 mb-2">SKU Code</label>
+                            <label className={fieldLabelClass}>SKU Code</label>
                             <div className="flex gap-2">
                               <input
                                 type="text"
                                 name="sku"
                                 value={formData.sku}
                                 onChange={handleInputChange}
-                                className="flex-1 px-4 py-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                                className={`flex-1 ${fieldClass}`}
                                 placeholder="Auto-generated or custom"
                               />
                               <button
                                 type="button"
                                 onClick={generateSKU}
-                                className="px-5 py-3 text-sm font-medium bg-gradient-to-r from-gray-100 to-gray-200 text-gray-700 border border-gray-300 rounded-lg hover:from-gray-200 hover:to-gray-300 transition-all shadow-sm"
+                                className="btn-outline whitespace-nowrap rounded-lg px-3 py-1.5 text-[13px] font-medium"
                               >
                                 Generate
                               </button>
@@ -463,15 +443,15 @@ const AddProductModal = ({
 
                         {/* Unit Configuration */}
                         <div>
-                          <label className="block text-sm font-semibold text-gray-700 mb-2">Unit Configuration</label>
-                          <div className="flex items-center gap-3">
-                            <div className="flex-1 px-4 py-3 text-sm bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-lg text-gray-700 font-medium">
+                          <label className={fieldLabelClass}>Unit Configuration</label>
+                          <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+                            <div className="flex-1 rounded-xl border border-border/70 bg-muted/30 px-3 py-2 text-[13px] font-medium text-foreground">
                               {getUnitDisplayText()}
                             </div>
                             <button
                               type="button"
                               onClick={() => setShowUnitSelectionDialog(true)}
-                              className="px-5 py-3 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all shadow-sm flex items-center gap-2"
+                              className="btn-primary inline-flex items-center justify-center gap-2 rounded-lg px-3 py-1.5 text-[13px] font-medium"
                             >
                               <Cog6ToothIcon className="w-4 h-4" />
                               Configure
@@ -481,13 +461,13 @@ const AddProductModal = ({
 
                         {/* Description */}
                         <div>
-                          <label className="block text-sm font-semibold text-gray-700 mb-2">Description</label>
+                          <label className={fieldLabelClass}>Description</label>
                           <textarea
                             name="description"
                             value={formData.description}
                             onChange={handleInputChange}
                             rows={3}
-                            className="w-full px-4 py-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all resize-none"
+                            className={`${fieldClass} resize-none`}
                             placeholder={`Describe your ${formData.is_service ? 'service' : 'product'}...`}
                           />
                         </div>
@@ -495,18 +475,18 @@ const AddProductModal = ({
                     </div>
 
                     {/* Tabbed Sections - Pricing & Stock */}
-                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                      <Tab.Group selectedIndex={selectedTabIndex} onChange={setSelectedTabIndex}>
-                        <Tab.List className="flex border-b border-gray-200 bg-gray-50">
+            <div className={classNames(sectionCardClass, 'overflow-hidden p-0')}>
+              <Tab.Group selectedIndex={selectedTabIndex} onChange={setSelectedTabIndex}>
+                <Tab.List className="flex border-b border-border/70 bg-muted/20">
                           {tabs.map((tab) => (
                             <Tab
                               key={tab.name}
                               className={({ selected }) =>
                                 classNames(
-                                  'flex-1 py-4 px-6 text-sm font-semibold transition-all focus:outline-none',
+                                  'flex-1 px-3 py-2.5 text-[13px] font-semibold transition-all focus:outline-none',
                                   selected
-                                    ? 'text-blue-600 border-b-2 border-blue-600 bg-white'
-                                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                                    ? 'border-b-2 border-primary bg-card text-foreground'
+                                    : 'text-muted-foreground hover:bg-muted/30 hover:text-foreground'
                                 )
                               }
                             >
@@ -518,13 +498,13 @@ const AddProductModal = ({
                           ))}
                         </Tab.List>
 
-                        <Tab.Panels className="p-6">
+                <Tab.Panels className="p-3.5 sm:p-4">
                           {/* Pricing Tab */}
-                          <Tab.Panel className="space-y-6">
+                  <Tab.Panel className="space-y-4">
                             {/* Main Pricing Row */}
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                            <div className="admin-dialog-grid-3">
                               <div>
-                                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                <label className={fieldLabelClass}>
                                   Sale Price <span className="text-red-500">*</span>
                                 </label>
                                 <input
@@ -535,23 +515,23 @@ const AddProductModal = ({
                                   step="0.01"
                                   min="0"
                                   required
-                                  className="w-full px-4 py-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                                  className={fieldClass}
                                   placeholder="0.00"
                                 />
-                                <div className="flex items-center mt-2">
+                                <div className="mt-2 flex items-center">
                                   <input
                                     type="checkbox"
                                     name="sale_price_without_tax"
                                     checked={formData.sale_price_without_tax}
                                     onChange={handleInputChange}
-                                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                    className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
                                   />
-                                  <label className="ml-2 text-sm text-gray-600 font-medium">Price without tax</label>
+                                  <label className="ml-2 text-[13px] font-medium text-muted-foreground">Price without tax</label>
                                 </div>
                               </div>
 
                               <div>
-                                <label className="block text-sm font-semibold text-gray-700 mb-2">Discount Amount</label>
+                                <label className={fieldLabelClass}>Discount Amount</label>
                                 <input
                                   type="number"
                                   name="discount_on_sale_price"
@@ -559,18 +539,18 @@ const AddProductModal = ({
                                   onChange={handleInputChange}
                                   step="0.01"
                                   min="0"
-                                  className="w-full px-4 py-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                                  className={fieldClass}
                                   placeholder="0.00"
                                 />
                               </div>
 
                               <div>
-                                <label className="block text-sm font-semibold text-gray-700 mb-2">Discount Type</label>
+                                <label className={fieldLabelClass}>Discount Type</label>
                                 <select
                                   name="discount_type"
                                   value={formData.discount_type}
                                   onChange={handleInputChange}
-                                  className="w-full px-4 py-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-white"
+                                  className={fieldClass}
                                 >
                                   <option value="percentage">Percentage (%)</option>
                                   <option value="amount">Fixed Amount (₹)</option>
@@ -579,13 +559,13 @@ const AddProductModal = ({
                             </div>
 
                             {/* Wholesale Prices Section */}
-                            <div className="pt-4 border-t border-gray-200">
-                              <div className="flex items-center justify-between mb-4">
-                                <label className="text-sm font-semibold text-gray-700">Wholesale Pricing Tiers</label>
+                            <div className="border-t border-border/70 pt-4">
+                              <div className="mb-3 flex items-center justify-between">
+                                <label className="text-sm font-semibold text-foreground">Wholesale Pricing Tiers</label>
                                 <button
                                   type="button"
                                   onClick={addWholesalePrice}
-                                  className="px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all flex items-center gap-2 shadow-sm"
+                                  className="btn-primary inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-[13px] font-medium"
                                 >
                                   <PlusIcon className="w-4 h-4" />
                                   Add Tier
@@ -595,30 +575,30 @@ const AddProductModal = ({
                               {formData.wholesale_prices.length > 0 ? (
                                 <div className="space-y-3">
                                   {formData.wholesale_prices.map((wholesale, index) => (
-                                    <div key={index} className="flex gap-3 items-center p-4 bg-gray-50 rounded-lg border border-gray-200">
-                                      <div className="flex-1">
+                                    <div key={index} className="grid gap-2.5 rounded-xl border border-border/70 bg-muted/20 p-3 sm:grid-cols-[1fr_1fr_auto] sm:items-center">
+                                      <div>
                                         <input
                                           type="number"
                                           placeholder="Minimum quantity"
                                           value={wholesale.quantity}
                                           onChange={(e) => updateWholesalePrice(index, 'quantity', e.target.value)}
-                                          className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                          className={fieldClass}
                                         />
                                       </div>
-                                      <div className="flex-1">
+                                      <div>
                                         <input
                                           type="number"
                                           step="0.01"
                                           placeholder="Price per unit"
                                           value={wholesale.price}
                                           onChange={(e) => updateWholesalePrice(index, 'price', e.target.value)}
-                                          className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                          className={fieldClass}
                                         />
                                       </div>
                                       <button
                                         type="button"
                                         onClick={() => removeWholesalePrice(index)}
-                                        className="p-2.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                        className="justify-self-start rounded-lg p-2 text-destructive transition-colors hover:bg-destructive/10 sm:justify-self-center"
                                       >
                                         <TrashIcon className="w-5 h-5" />
                                       </button>
@@ -626,7 +606,7 @@ const AddProductModal = ({
                                   ))}
                                 </div>
                               ) : (
-                                <div className="text-center py-8 text-gray-500 text-sm bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+                                <div className="rounded-xl border-2 border-dashed border-border/70 bg-muted/20 py-8 text-center text-sm text-muted-foreground">
                                   No wholesale pricing tiers added yet
                                 </div>
                               )}
@@ -634,54 +614,62 @@ const AddProductModal = ({
                           </Tab.Panel>
 
                           {/* Stock Tab */}
-                          <Tab.Panel className="space-y-6">
+                  <Tab.Panel className="space-y-4">
+                            {/* Per-variant stock notice */}
+                            {editingProduct?.variants?.length > 0 && (
+                              <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
+                                This product uses per-variant stock. The total shown here is automatically computed as the sum of all variant stocks. To change individual variant stock, use the <strong>Variants</strong> tab.
+                              </div>
+                            )}
                             {/* Current Stock Info */}
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                            <div className="admin-dialog-grid-3">
                               <div>
-                                <label className="block text-sm font-semibold text-gray-700 mb-2">Current Stock Quantity</label>
+                                <label className={fieldLabelClass}>Current Stock Quantity</label>
                                 <input
                                   type="number"
                                   name="stock_quantity"
                                   value={formData.stock_quantity}
                                   onChange={handleInputChange}
                                   min="0"
-                                  className="w-full px-4 py-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                                  className={fieldClass}
                                   placeholder="0"
+                                  disabled={!!(editingProduct?.variants?.length > 0)}
+                                  title={editingProduct?.variants?.length > 0 ? 'Managed automatically via variant stock' : undefined}
                                 />
                               </div>
 
                               <div>
-                                <label className="block text-sm font-semibold text-gray-700 mb-2">Minimum Stock Level</label>
+                                <label className={fieldLabelClass}>Minimum Stock Level</label>
                                 <input
                                   type="number"
                                   name="min_stock_level"
                                   value={formData.min_stock_level}
                                   onChange={handleInputChange}
                                   min="0"
-                                  className="w-full px-4 py-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                                  className={fieldClass}
                                   placeholder="0"
                                 />
                               </div>
 
                               <div>
-                                <label className="block text-sm font-semibold text-gray-700 mb-2">Stock Location</label>
+                                <label className={fieldLabelClass}>Stock Location</label>
                                 <input
                                   type="text"
                                   name="stock_location"
                                   value={formData.stock_location}
                                   onChange={handleInputChange}
-                                  className="w-full px-4 py-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                                  className={fieldClass}
                                   placeholder="e.g., Warehouse A, Store 1"
                                 />
                               </div>
                             </div>
 
                             {/* Opening Stock Section */}
-                            <div className="pt-4 border-t border-gray-200">
-                              <h5 className="text-sm font-semibold text-gray-700 mb-4">Opening Stock Details</h5>
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                            <div className="border-t border-border/70 pt-4">
+                              <h5 className="mb-3 text-sm font-semibold text-foreground">Opening Stock Details</h5>
+                              <div className="admin-dialog-grid-2">
                                 <div>
-                                  <label className="block text-sm font-semibold text-gray-700 mb-2">Opening Quantity at Price</label>
+                                  <label className={fieldLabelClass}>Opening Quantity at Price</label>
                                   <input
                                     type="number"
                                     name="opening_quantity_at_price"
@@ -689,62 +677,56 @@ const AddProductModal = ({
                                     onChange={handleInputChange}
                                     step="0.01"
                                     min="0"
-                                    className="w-full px-4 py-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                                    className={fieldClass}
                                     placeholder="0.00"
                                   />
                                 </div>
 
                                 <div>
-                                  <label className="block text-sm font-semibold text-gray-700 mb-2">As of Date</label>
+                                  <label className={fieldLabelClass}>As of Date</label>
                                   <input
                                     type="date"
                                     name="opening_quantity_as_of_date"
                                     value={formData.opening_quantity_as_of_date}
                                     onChange={handleInputChange}
-                                    className="w-full px-4 py-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                                    className={fieldClass}
                                   />
                                 </div>
                               </div>
                             </div>
                           </Tab.Panel>
-                        </Tab.Panels>
-                      </Tab.Group>
-                    </div>
-                  </form>
-                </div>
+                </Tab.Panels>
+              </Tab.Group>
+            </div>
+          </AdminDialogBody>
 
-                {/* Modern Footer with Actions */}
-                <div className="px-8 py-5 bg-white border-t border-gray-200 rounded-b-xl">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm text-gray-500">
-                      <span className="text-red-500">*</span> Required fields
-                    </p>
-                    <div className="flex gap-3">
-                      <button
-                        type="button"
-                        onClick={handleClose}
-                        className="px-6 py-2.5 text-sm font-semibold text-gray-700 bg-white border-2 border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-400 transition-all"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="submit"
-                        onClick={handleSubmit}
-                        disabled={isLoading}
-                        className="px-8 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-blue-600 to-blue-700 rounded-lg hover:from-blue-700 hover:to-blue-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md hover:shadow-lg"
-                      >
-                        {isLoading
-                          ? (mode === 'edit' ? 'Updating...' : 'Adding...')
-                          : (mode === 'edit' ? `Update ${formData.is_service ? 'Service' : 'Product'}` : `Add ${formData.is_service ? 'Service' : 'Product'}`)
-                        }
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </Dialog.Panel>
-            </Transition.Child>
-          </div>
-        </div>
+          <AdminDialogFooter sticky className="bg-card/95 backdrop-blur-sm">
+            <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-[13px] text-muted-foreground">
+                <span className="text-red-500">*</span> Required fields
+              </p>
+              <div className="flex w-full flex-col-reverse gap-3 sm:w-auto sm:flex-row">
+                <button
+                  type="button"
+                  onClick={handleClose}
+                  className="btn-outline rounded-lg px-3 py-1.5 text-[13px] font-semibold"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  className="btn-primary rounded-lg px-4 py-1.5 text-[13px] font-semibold disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {isLoading
+                    ? (mode === 'edit' ? 'Updating...' : 'Adding...')
+                    : (mode === 'edit' ? `Update ${formData.is_service ? 'Service' : 'Product'}` : `Add ${formData.is_service ? 'Service' : 'Product'}`)
+                  }
+                </button>
+              </div>
+            </div>
+          </AdminDialogFooter>
+        </form>
 
         {/* Unit Selection Dialog */}
         <UnitSelectionDialog
@@ -755,8 +737,8 @@ const AddProductModal = ({
           secondaryUnit={formData.secondary_unit}
           unitConversionValue={formData.unit_conversion_value}
         />
-      </Dialog>
-    </Transition>
+      </AdminDialogContent>
+    </AdminDialog>
   );
 };
 

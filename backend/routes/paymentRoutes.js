@@ -2,46 +2,9 @@ const express = require('express');
 const router = express.Router();
 const { v4: uuidv4 } = require('uuid');
 const paymentService = require('../services/payment/PaymentService');
-
-// Note: authenticateToken middleware should be imported from your auth middleware
-// const { authenticateToken } = require('../middleware/auth');
-
-// Temporary middleware for development - replace with actual auth
-const authenticateToken = async (req, res, next) => {
-  try {
-    const token = req.headers.authorization?.replace('Bearer ', '');
-    if (!token) {
-      return res.status(401).json({ success: false, error: 'No token provided' });
-    }
-
-    // Initialize supabase client if not already done
-    if (!req.supabase) {
-      const { createClient } = require('@supabase/supabase-js');
-      req.supabase = createClient(
-        process.env.SUPABASE_URL,
-        process.env.SUPABASE_ANON_KEY,
-        {
-          global: {
-            headers: { Authorization: `Bearer ${token}` }
-          }
-        }
-      );
-    }
-
-    // Get user from token
-    const { data: { user }, error } = await req.supabase.auth.getUser();
-
-    if (error || !user) {
-      return res.status(401).json({ success: false, error: 'Invalid token' });
-    }
-
-    req.user = user;
-    next();
-  } catch (error) {
-    console.error('Auth error:', error);
-    res.status(401).json({ success: false, error: 'Authentication failed' });
-  }
-};
+const deliveryService = require('../services/delivery/DeliveryService');
+const { authenticateToken } = require('../middleware/authMiddleware');
+const { createBackendSupabaseClient } = require('../config/supabaseClient');
 
 /**
  * POST /api/payments/initiate
@@ -54,10 +17,10 @@ router.post('/initiate', authenticateToken, async (req, res) => {
     console.log('Payment initiation request:', { orderId, amount, paymentMethod, userId: req.user.id });
 
     // Validate request
-    if (!orderId || !amount || amount <= 0) {
+    if (!orderId) {
       return res.status(400).json({
         success: false,
-        error: 'Missing required fields: orderId, amount'
+        error: 'Missing required field: orderId'
       });
     }
 
@@ -77,6 +40,23 @@ router.post('/initiate', authenticateToken, async (req, res) => {
       return res.status(404).json({ success: false, error: 'Order not found' });
     }
 
+    const orderAmount = Number.parseFloat(order.total_amount);
+    if (!Number.isFinite(orderAmount) || orderAmount <= 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Order total is invalid for payment'
+      });
+    }
+
+    if (amount && Number.parseFloat(amount) !== orderAmount) {
+      console.warn('Ignoring client-sent payment amount in favor of order total', {
+        orderId,
+        clientAmount: amount,
+        orderAmount,
+        userId: req.user.id
+      });
+    }
+
     // Create payment transaction record
     const { data: transaction, error: txError } = await req.supabase
       .from('payment_transactions')
@@ -84,7 +64,7 @@ router.post('/initiate', authenticateToken, async (req, res) => {
         merchant_transaction_id: merchantTransactionId,
         order_id: orderId,
         user_id: req.user.id,
-        amount: amount,
+        amount: orderAmount,
         currency: 'INR',
         payment_method: paymentMethod,
         status: 'INITIATED',
@@ -103,7 +83,7 @@ router.post('/initiate', authenticateToken, async (req, res) => {
 
     // Initiate payment with gateway
     const paymentResponse = await paymentService.initiatePayment(paymentMethod, {
-      amount: Math.round(amount * 100), // Convert to paise
+      amount: Math.round(orderAmount * 100), // Convert to paise
       merchantTransactionId: merchantTransactionId,
       orderId: orderId,
       redirectUrl: `${process.env.FRONTEND_URL}/payment/verify?txnId=${merchantTransactionId}`,
@@ -173,11 +153,10 @@ router.post('/callback', async (req, res) => {
     console.log('Received payment callback');
 
     // Initialize Supabase for callback handling
-    const { createClient } = require('@supabase/supabase-js');
-    const supabase = createClient(
-      process.env.SUPABASE_URL,
-      process.env.SUPABASE_SERVICE_ROLE_KEY // Use service role for callback
-    );
+    const supabase = createBackendSupabaseClient({
+      preferServiceRole: true,
+      allowAnonFallback: false
+    });
 
     // Verify callback signature
     const verification = await paymentService.verifyCallback('PHONEPE', payload, headers);
@@ -206,9 +185,9 @@ router.post('/callback', async (req, res) => {
       return res.status(404).json({ success: false, error: 'Transaction not found' });
     }
 
-    // Prevent double processing
-    if (transaction.status === 'COMPLETED') {
-      console.log('Transaction already processed');
+    // Prevent double processing (idempotency guard for both success and failure)
+    if (transaction.status === 'COMPLETED' || transaction.status === 'FAILED') {
+      console.log('Transaction already processed:', transaction.status);
       return res.json({ success: true, message: 'Already processed' });
     }
 
@@ -246,17 +225,44 @@ router.post('/callback', async (req, res) => {
         })
         .eq('id', transaction.order_id);
 
+      try {
+        await deliveryService.processOrderForFulfillment(transaction.order_id);
+      } catch (deliveryError) {
+        console.error('Automatic fulfillment after payment callback failed:', deliveryError);
+      }
+
       console.log('Order payment completed:', transaction.order_id);
     } else {
+      // Cancel the order and restore stock — stock was already decremented at
+      // order creation time, so a failed payment must undo that reservation.
       await supabase
         .from('orders')
         .update({
           payment_status: 'FAILED',
+          status: 'cancelled',
           updated_at: new Date().toISOString()
         })
         .eq('id', transaction.order_id);
 
-      console.log('Order payment failed:', transaction.order_id);
+      // Fetch order items to restore per-variant (or per-product) stock
+      const { data: orderItems } = await supabase
+        .from('order_items')
+        .select('product_id, variant_id, quantity')
+        .eq('order_id', transaction.order_id);
+
+      if (orderItems && orderItems.length > 0) {
+        await Promise.all(
+          orderItems.map(item =>
+            supabase.rpc('restore_stock', {
+              p_product_id: item.product_id,
+              p_quantity: item.quantity,
+              p_variant_id: item.variant_id || null,
+            })
+          )
+        );
+      }
+
+      console.log('Order payment failed, order cancelled, stock restored:', transaction.order_id);
     }
 
     res.json({ success: true, message: 'Callback processed' });
@@ -322,6 +328,12 @@ router.get('/status/:merchantTransactionId', authenticateToken, async (req, res)
                 updated_at: new Date().toISOString()
               })
               .eq('id', transaction.order_id);
+
+            try {
+              await deliveryService.processOrderForFulfillment(transaction.order_id);
+            } catch (deliveryError) {
+              console.error('Automatic fulfillment after payment status sync failed:', deliveryError);
+            }
 
             transaction.status = 'COMPLETED';
             console.log('Payment status updated to COMPLETED');

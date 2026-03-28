@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { productsAPI } from '../services/api';
 import { getImageUrl, handleImageError } from '../utils/imageUtils';
 import './ProductImageGallery.css';
@@ -7,92 +8,86 @@ const ProductImageGallery = ({ productId, fallbackImageUrl = null }) => {
   const [images, setImages] = useState([]);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [isHovered, setIsHovered] = useState(false);
-  const intervalRef = useRef(null);
 
   useEffect(() => {
-    if (productId) {
-      fetchImages();
-    }
-  }, [productId]);
+    let isActive = true;
 
-  useEffect(() => {
-    // Start automatic slideshow if there are multiple images
-    if (images.length > 1 && !isHovered) {
-      startSlideshow();
-    } else {
-      stopSlideshow();
-    }
-
-    return () => stopSlideshow();
-  }, [images.length, isHovered]);
-
-  const fetchImages = async () => {
-    setLoading(true);
-    try {
-      const response = await productsAPI.getImages(productId);
-      const data = response.data;
-      
-      if (data && data.length > 0) {
-        // Sort by sort_order and prioritize primary image, and process URLs
-        const sortedImages = data.sort((a, b) => {
-          if (a.is_primary && !b.is_primary) return -1;
-          if (!a.is_primary && b.is_primary) return 1;
-          return a.sort_order - b.sort_order;
-        }).map(img => ({
-          ...img,
-          image_url: getImageUrl(img.image_url, 'product')
-        }));
-        setImages(sortedImages);
-      } else if (fallbackImageUrl) {
-        // Use fallback image if no images found
-        setImages([{ 
-          id: 'fallback', 
-          image_url: getImageUrl(fallbackImageUrl, 'product'), 
-          alt_text: 'Product image',
-          is_primary: true 
-        }]);
-      } else {
+    const loadImages = async () => {
+      if (!productId) {
         setImages([]);
+        setLoading(false);
+        return;
       }
-    } catch (error) {
-      console.error('Error fetching images:', error);
-      if (fallbackImageUrl) {
-        setImages([{ 
-          id: 'fallback', 
-          image_url: getImageUrl(fallbackImageUrl, 'product'), 
-          alt_text: 'Product image',
-          is_primary: true 
-        }]);
+
+      setLoading(true);
+      try {
+        const response = await productsAPI.getImages(productId);
+        const data = response.data;
+
+        if (!isActive) {
+          return;
+        }
+
+        if (data && data.length > 0) {
+          const sortedImages = data
+            .sort((a, b) => {
+              if (a.is_primary && !b.is_primary) return -1;
+              if (!a.is_primary && b.is_primary) return 1;
+              return a.sort_order - b.sort_order;
+            })
+            .map((img) => ({
+              ...img,
+              image_url: getImageUrl(img.image_url, 'product'),
+            }));
+          setImages(sortedImages);
+        } else if (fallbackImageUrl) {
+          setImages([
+            {
+              id: 'fallback',
+              image_url: getImageUrl(fallbackImageUrl, 'product'),
+              alt_text: 'Product image',
+              is_primary: true,
+            },
+          ]);
+        } else {
+          setImages([]);
+        }
+      } catch (error) {
+        console.error('Error fetching images:', error);
+
+        if (!isActive) {
+          return;
+        }
+
+        if (fallbackImageUrl) {
+          setImages([
+            {
+              id: 'fallback',
+              image_url: getImageUrl(fallbackImageUrl, 'product'),
+              alt_text: 'Product image',
+              is_primary: true,
+            },
+          ]);
+        } else {
+          setImages([]);
+        }
+      } finally {
+        if (isActive) {
+          setLoading(false);
+        }
       }
-    } finally {
-      setLoading(false);
-    }
-  };
+    };
 
-  const startSlideshow = () => {
-    stopSlideshow(); // Clear any existing interval
-    intervalRef.current = setInterval(() => {
-      setCurrentImageIndex((prevIndex) => 
-        prevIndex === images.length - 1 ? 0 : prevIndex + 1
-      );
-    }, 3000); // 3 seconds transition
-  };
+    loadImages();
 
-  const stopSlideshow = () => {
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
-    }
-  };
+    return () => {
+      isActive = false;
+    };
+  }, [fallbackImageUrl, productId]);
 
-  const handleMouseEnter = () => {
-    setIsHovered(true);
-  };
-
-  const handleMouseLeave = () => {
-    setIsHovered(false);
-  };
+  useEffect(() => {
+    setCurrentImageIndex((current) => (images.length > 0 && current < images.length ? current : 0));
+  }, [images.length]);
 
   const handleThumbnailClick = (index) => {
     setCurrentImageIndex(index);
@@ -108,9 +103,9 @@ const ProductImageGallery = ({ productId, fallbackImageUrl = null }) => {
 
   if (loading) {
     return (
-      <div className="product-image-gallery loading">
-        <div className="gallery-skeleton">
-          <div className="main-image-skeleton"></div>
+      <div className="product-gallery product-gallery--loading">
+        <div className="product-gallery__skeleton">
+          <div className="product-gallery__skeleton-media"></div>
         </div>
       </div>
     );
@@ -118,111 +113,80 @@ const ProductImageGallery = ({ productId, fallbackImageUrl = null }) => {
 
   if (images.length === 0) {
     return (
-      <div className="product-image-gallery no-images">
-        <div className="no-image-placeholder bg-gray-100 flex items-center justify-center h-64 rounded-lg">
-          <div className="text-gray-400 text-center">
-            <div className="text-4xl mb-2">📦</div>
-            <p className="text-sm">No image available</p>
-          </div>
+      <div className="product-gallery product-gallery--empty">
+        <div className="product-gallery__placeholder">
+          <div className="product-gallery__placeholder-icon">📦</div>
+          <p className="product-gallery__placeholder-copy">No image available</p>
         </div>
       </div>
     );
   }
 
   const currentImage = images[currentImageIndex];
+  const hasMultipleImages = images.length > 1;
 
   return (
-    <div className="product-image-gallery">
-      <div 
-        className="main-image-container"
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
-      >
-        <div className="main-image-wrapper">
+    <div className="product-gallery">
+      <div className="product-gallery__frame">
+        <div className="product-gallery__media">
           <img
             src={currentImage.image_url}
             alt={currentImage.alt_text || 'Product image'}
-            className="main-image"
+            className="product-gallery__image"
             onError={(e) => handleImageError(e, 'product')}
           />
-          
-          {/* Overlay indicators */}
-          <div className="image-overlay">
-            {images.length > 1 && (
-              <>
-                <button 
-                  className="nav-button prev-button"
-                  onClick={handlePrevious}
-                  aria-label="Previous image"
-                >
-                  ‹
-                </button>
-                <button 
-                  className="nav-button next-button"
-                  onClick={handleNext}
-                  aria-label="Next image"
-                >
-                  ›
-                </button>
-                
-                <div className="image-counter">
-                  {currentImageIndex + 1} / {images.length}
-                </div>
-              </>
-            )}
-            
-            {isHovered && images.length > 1 && (
-              <div className="pause-indicator">
-                ⏸️ Paused
-              </div>
-            )}
-          </div>
 
-          {/* Image transition indicator */}
-          {images.length > 1 && !isHovered && (
-            <div className="progress-bar">
-              <div 
-                className="progress-fill"
-                style={{
-                  animationDuration: '3s',
-                  animationPlayState: isHovered ? 'paused' : 'running'
-                }}
-              ></div>
-            </div>
+          {hasMultipleImages && (
+            <>
+              <button
+                type="button"
+                className="product-gallery__nav product-gallery__nav--prev"
+                onClick={handlePrevious}
+                aria-label="Previous image"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                className="product-gallery__nav product-gallery__nav--next"
+                onClick={handleNext}
+                aria-label="Next image"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+
+              <div className="product-gallery__counter">
+                {currentImageIndex + 1} / {images.length}
+              </div>
+            </>
           )}
         </div>
 
-        {/* Thumbnail navigation for multiple images */}
-        {images.length > 1 && (
-          <div className="thumbnails-container">
-            <div className="thumbnails-scroll">
-              {images.map((image, index) => (
-                <button
-                  key={image.id}
-                  className={`thumbnail ${index === currentImageIndex ? 'active' : ''}`}
-                  onClick={() => handleThumbnailClick(index)}
-                  onMouseEnter={() => setCurrentImageIndex(index)}
-                >
-                  <img
-                    src={image.image_url}
-                    alt={image.alt_text || `Product image ${index + 1}`}
-                    onError={(e) => handleImageError(e, 'product')}
-                  />
-                  {image.is_primary && (
-                    <div className="primary-badge">★</div>
-                  )}
-                </button>
-              ))}
-            </div>
+        {hasMultipleImages && (
+          <div className="product-gallery__thumbs">
+            {images.map((image, index) => (
+              <button
+                key={image.id}
+                type="button"
+                className={`product-gallery__thumb ${index === currentImageIndex ? 'product-gallery__thumb--active' : ''}`}
+                onClick={() => handleThumbnailClick(index)}
+              >
+                <img
+                  src={image.image_url}
+                  alt={image.alt_text || `Product image ${index + 1}`}
+                  onError={(e) => handleImageError(e, 'product')}
+                />
+                {image.is_primary && (
+                  <span className="product-gallery__thumb-badge">Primary</span>
+                )}
+              </button>
+            ))}
           </div>
         )}
       </div>
 
-      {/* Image metadata */}
       {currentImage.alt_text && (
-        <div className="image-info">
-          <p className="image-description">{currentImage.alt_text}</p>
-        </div>
+        <p className="product-gallery__caption">{currentImage.alt_text}</p>
       )}
     </div>
   );

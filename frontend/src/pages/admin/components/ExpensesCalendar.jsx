@@ -4,6 +4,7 @@ import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import { formatMobileCurrency, formatMobileDayCurrency, formatCalendarCurrency } from '../../../utils/currencyUtils';
+import { API_BASE_URL } from '../../../config/apiBaseUrl';
 import './ExpensesCalendar.css';
 
 // Placeholder calendar shell: renders a simple grid until FullCalendar is added
@@ -30,7 +31,6 @@ const parseYMD = (ymd) => {
 };
 
 const ExpensesCalendar = ({ scope, dateRange, onRangeChange, filters, onSelectExpense, onTitleChange }) => {
-  const apiBaseUrl = process.env.REACT_APP_API_URL || 'http://localhost:3001';
   const [events, setEvents] = useState([]);
   const [dayItems, setDayItems] = useState(new Map()); // date -> { products: [...], pos: [...], otherExpenses: [...], payments: [...] }
   const [loading, setLoading] = useState(false);
@@ -146,7 +146,7 @@ const ExpensesCalendar = ({ scope, dateRange, onRangeChange, filters, onSelectEx
           ...(effectiveRange.start_date && { start_date: effectiveRange.start_date }),
           ...(effectiveRange.end_date && { end_date: effectiveRange.end_date })
         });
-        const txnRes = await fetch(`${apiBaseUrl}/api/admin/expenses/history?${txnParams.toString()}`, {
+        const txnRes = await fetch(`${API_BASE_URL}/api/admin/expenses/history?${txnParams.toString()}`, {
           headers: { 'Authorization': `Bearer ${authToken}` }
         });
         const txnPayload = await txnRes.json();
@@ -161,7 +161,7 @@ const ExpensesCalendar = ({ scope, dateRange, onRangeChange, filters, onSelectEx
         });
         let poItems = [];
         try {
-          const poRes = await fetch(`${apiBaseUrl}/api/admin/purchase-orders?${poParams.toString()}`, {
+          const poRes = await fetch(`${API_BASE_URL}/api/admin/purchase-orders?${poParams.toString()}`, {
             headers: { 'Authorization': `Bearer ${authToken}` }
           });
           if (poRes.ok) {
@@ -327,7 +327,7 @@ const ExpensesCalendar = ({ scope, dateRange, onRangeChange, filters, onSelectEx
       }
     };
     fetchForRange();
-  }, [apiBaseUrl, effectiveRange.start_date, effectiveRange.end_date, filters?.searchTerm, filters?.selectedCategory, filters?.selectedPaymentMethod]);
+  }, [effectiveRange.start_date, effectiveRange.end_date, filters?.searchTerm, filters?.selectedCategory, filters?.selectedPaymentMethod]);
 
   // Build simple day grid
   const days = useMemo(() => {

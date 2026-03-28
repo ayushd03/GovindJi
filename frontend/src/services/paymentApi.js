@@ -1,6 +1,5 @@
 import axios from 'axios';
-
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+import { API_BASE_URL as API_URL } from '../config/apiBaseUrl';
 
 // Create axios instance with default config
 const axiosInstance = axios.create({
@@ -19,19 +18,17 @@ const paymentAPI = {
   /**
    * Initiate payment for an order
    * @param {string} orderId - Order ID
-   * @param {number} amount - Amount in rupees
    * @param {Object} customerInfo - Customer information (phone, email)
    * @param {string} paymentMethod - Payment method (default: PHONEPE)
    * @returns {Promise<Object>} Payment initiation response
    */
-  initiatePayment: async (orderId, amount, customerInfo, paymentMethod = 'PHONEPE') => {
+  initiatePayment: async (orderId, customerInfo = {}, paymentMethod = 'PHONEPE') => {
     try {
       const token = localStorage.getItem('authToken');
       const response = await axiosInstance.post(
         '/api/payments/initiate',
         {
           orderId,
-          amount,
           customerInfo,
           paymentMethod
         },

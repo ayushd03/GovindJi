@@ -136,7 +136,7 @@ const authenticateAdmin = asyncHandler(async (req, res, next) => {
   // Check if user has admin role
   const { data: userData, error: userError } = await supabase
     .from('users')
-    .select('is_admin, role')
+    .select('role')
     .eq('id', user.id)
     .single();
 

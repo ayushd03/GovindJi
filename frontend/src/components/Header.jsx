@@ -1,28 +1,46 @@
-import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Search, ShoppingCart, User, Menu, X, ChevronDown } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { AnimatePresence, motion } from 'framer-motion';
+import { ChevronDown, Menu, Search, ShoppingCart, User, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import AuthModal from './AuthModal';
+
+const navLinks = [
+  { label: 'Home', href: '/' },
+  { label: 'Products', href: '/products' },
+];
 
 const Header = () => {
   const { user, logout, isAuthenticated } = useAuth();
   const { getCartItemsCount, toggleCartPopup } = useCart();
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchTerm, setSearchTerm] = useState('');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
+  const cartItemsCount = getCartItemsCount();
+  const displayName = useMemo(
+    () => user?.user_metadata?.name || user?.email?.split('@')[0] || 'Account',
+    [user]
+  );
+
   useEffect(() => {
     const handleScroll = () => {
-      setIsScrolled(window.scrollY > 10);
+      setIsScrolled(window.scrollY > 8);
     };
+
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+  useEffect(() => {
+    setIsMenuOpen(false);
+    setIsUserMenuOpen(false);
+  }, [location.pathname]);
 
   const handleLogout = () => {
     logout();
@@ -30,282 +48,257 @@ const Header = () => {
     setIsUserMenuOpen(false);
   };
 
-  const handleSearch = (e) => {
-    e.preventDefault();
-    if (searchTerm.trim()) {
-      navigate(`/products?search=${encodeURIComponent(searchTerm)}`);
+  const handleSearch = (event) => {
+    event.preventDefault();
+    const normalizedSearch = searchTerm.trim();
+    if (!normalizedSearch) {
+      return;
     }
+
+    navigate(`/products?search=${encodeURIComponent(normalizedSearch)}`);
+    setIsMenuOpen(false);
   };
 
-  const cartItemsCount = getCartItemsCount();
+  const isActiveLink = (href) => (
+    href === '/'
+      ? location.pathname === '/'
+      : location.pathname === href || location.pathname.startsWith(`${href}/`)
+  );
 
   return (
-    <motion.header 
-      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-        isScrolled 
-          ? 'bg-background/95 backdrop-blur-md shadow-lg' 
-          : 'bg-background/85 backdrop-blur-xl shadow-sm'
-      }`}
-      initial={{ y: -100 }}
-      animate={{ y: 0 }}
-      transition={{ duration: 0.5 }}
-    >
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-20">
-          <motion.div
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-          >
-            <Link to="/" className="flex items-center">
-              <img 
-                src="/Govindji_Logo.webp" 
-                alt="GovindJi Dry Fruits" 
-                className="h-16 w-auto transition-transform duration-300"
+    <>
+      <header
+        className={`fixed inset-x-0 top-0 z-50 border-b border-border/70 transition-all duration-200 ${
+          isScrolled
+            ? 'bg-[rgba(255,253,248,0.96)] shadow-[0_18px_40px_rgba(15,23,42,0.06)] backdrop-blur-xl'
+            : 'bg-[rgba(255,253,248,0.88)] backdrop-blur-lg'
+        }`}
+      >
+        <div className="page-container">
+          <div className="flex h-[74px] items-center justify-between gap-4">
+            <Link to="/" className="flex shrink-0 items-center">
+              <img
+                src="/Govindji_Logo.webp"
+                alt="GovindJi Dry Fruits"
+                className="h-12 w-auto sm:h-14"
               />
             </Link>
-          </motion.div>
 
-          <div className="hidden md:flex flex-1 max-w-xl mx-8">
-            <form onSubmit={handleSearch} className="relative w-full">
-              <input
-                type="text"
-                placeholder="Search for premium dry fruits..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="input-field w-full pl-12 pr-4 py-3 rounded-full bg-muted/50 border-transparent"
-              />
-              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5" />
-            </form>
-          </div>
+            <div className="hidden flex-1 justify-center lg:flex">
+              <form onSubmit={handleSearch} className="relative w-full max-w-[380px] xl:max-w-[440px]">
+                <input
+                  type="text"
+                  placeholder="Search products"
+                  value={searchTerm}
+                  onChange={(event) => setSearchTerm(event.target.value)}
+                  className="input-field w-[250px] rounded-full border-border/80 bg-white pl-10 pr-4"
+                />
+                <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              </form>
+            </div>
 
-          <nav className="hidden lg:flex items-center space-x-8">
-            <Link 
-              to="/products" 
-              className="text-foreground hover:text-primary transition-colors duration-300 font-medium"
-            >
-              Products
-            </Link>
-            
-            {isAuthenticated ? (
-              <div className="relative">
-                <button
-                  onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-                  className="flex items-center space-x-2 text-foreground hover:text-primary transition-colors duration-300"
-                >
-                  <User className="w-5 h-5" />
-                  <span className="font-medium">
-                    {user?.user_metadata?.name || user?.email?.split('@')[0]}
-                  </span>
-                  <ChevronDown className="w-4 h-4" />
-                </button>
-                
-                <AnimatePresence>
-                  {isUserMenuOpen && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: 10 }}
-                      className="absolute right-0 mt-2 w-48 bg-card/95 backdrop-blur-md rounded-lg shadow-lg border py-2"
-                    >
-                      <Link
-                        to="/orders"
-                        className="block px-4 py-2 text-sm text-foreground hover:bg-muted transition-colors duration-200"
-                        onClick={() => setIsUserMenuOpen(false)}
+            <div className="hidden items-center gap-2.5 lg:flex">
+              <nav className="flex items-center gap-1">
+                {navLinks.map((link) => (
+                  <Link
+                    key={link.href}
+                    to={link.href}
+                    className={`inline-flex items-center rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
+                      isActiveLink(link.href)
+                        ? 'bg-[#23442a] text-white'
+                        : 'text-slate-600 hover:bg-[#23442a]/6 hover:text-[#16221a]'
+                    }`}
+                  >
+                    {link.label}
+                  </Link>
+                ))}
+              </nav>
+
+              {isAuthenticated ? (
+                <div className="relative">
+                  <button
+                    onClick={() => setIsUserMenuOpen((current) => !current)}
+                    className="inline-flex h-11 items-center gap-2 rounded-full border border-border/80 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:border-[#23442a]/15 hover:text-[#16221a]"
+                    type="button"
+                  >
+                    <User className="h-4 w-4 text-[#23442a]" />
+                    <span className="max-w-[140px] truncate">{displayName}</span>
+                    <ChevronDown className="h-4 w-4 text-slate-400" />
+                  </button>
+
+                  <AnimatePresence>
+                    {isUserMenuOpen && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 8 }}
+                        className="absolute right-0 mt-2 w-52 overflow-hidden rounded-2xl border border-border/80 bg-white shadow-[0_18px_40px_rgba(15,23,42,0.08)]"
                       >
+                        <div className="border-b border-border/70 px-4 py-3">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                            Signed in
+                          </p>
+                          <p className="mt-1 truncate text-sm font-semibold text-foreground">{displayName}</p>
+                        </div>
+                        <div className="p-2">
+                          <Link
+                            to="/orders"
+                            className="block rounded-xl px-3 py-2 text-sm font-medium text-slate-700 hover:bg-muted/60 hover:text-foreground"
+                          >
+                            My Orders
+                          </Link>
+                          {(user?.role === 'admin' || user?.role === 'manager') && (
+                            <Link
+                              to="/admin"
+                              className="block rounded-xl px-3 py-2 text-sm font-medium text-slate-700 hover:bg-muted/60 hover:text-foreground"
+                            >
+                              Admin Panel
+                            </Link>
+                          )}
+                          <button
+                            onClick={handleLogout}
+                            className="mt-1 block w-full rounded-xl px-3 py-2 text-left text-sm font-medium text-rose-600 hover:bg-rose-50"
+                            type="button"
+                          >
+                            Logout
+                          </button>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setIsAuthModalOpen(true)}
+                  className="inline-flex h-11 items-center rounded-full border border-border/80 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:border-[#23442a]/15 hover:text-[#16221a]"
+                  type="button"
+                >
+                  <User className="mr-2 h-4 w-4 text-[#23442a]" />
+                  Sign In
+                </button>
+              )}
+
+              <button
+                onClick={toggleCartPopup}
+                className="premium-cart-btn relative inline-flex h-11 items-center gap-2 rounded-full bg-[#23442a] px-4 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#1d3722]"
+                type="button"
+              >
+                <ShoppingCart className="h-4 w-4" data-cart-icon />
+                <span>Cart</span>
+                {cartItemsCount > 0 && (
+                  <span className="inline-flex min-w-[1.4rem] items-center justify-center rounded-full bg-white px-1.5 py-0.5 text-[11px] font-bold text-[#23442a]">
+                    {cartItemsCount}
+                  </span>
+                )}
+              </button>
+            </div>
+
+            <div className="flex items-center gap-2 lg:hidden">
+              <button
+                onClick={toggleCartPopup}
+                className="premium-cart-btn relative inline-flex h-10 w-10 items-center justify-center rounded-full border border-border/80 bg-white text-slate-700 shadow-sm"
+                type="button"
+                aria-label="Open cart"
+              >
+                <ShoppingCart className="h-4 w-4" data-cart-icon />
+                {cartItemsCount > 0 && (
+                  <span className="absolute -right-1 -top-1 inline-flex min-w-[1.1rem] items-center justify-center rounded-full bg-[#23442a] px-1 py-0.5 text-[10px] font-bold text-white">
+                    {cartItemsCount}
+                  </span>
+                )}
+              </button>
+              <button
+                onClick={() => setIsMenuOpen((current) => !current)}
+                className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-border/80 bg-white text-slate-700 shadow-sm"
+                type="button"
+                aria-label={isMenuOpen ? 'Close menu' : 'Open menu'}
+              >
+                {isMenuOpen ? <X className="h-[18px] w-[18px]" /> : <Menu className="h-[18px] w-[18px]" />}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <AnimatePresence>
+          {isMenuOpen && (
+            <motion.div
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              className="border-t border-border/70 bg-[rgba(255,253,248,0.98)] lg:hidden"
+            >
+              <div className="page-container space-y-4 py-4">
+                <form onSubmit={handleSearch} className="relative">
+                  <input
+                    type="text"
+                    placeholder="Search products"
+                    value={searchTerm}
+                    onChange={(event) => setSearchTerm(event.target.value)}
+                    className="input-field w-full rounded-full border-border/80 bg-white pl-10 pr-4"
+                  />
+                  <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                </form>
+
+                <div className="grid gap-2">
+                  {navLinks.map((link) => (
+                    <Link
+                      key={link.href}
+                      to={link.href}
+                      className={`rounded-2xl px-4 py-3 text-sm font-semibold ${
+                        isActiveLink(link.href)
+                          ? 'bg-[#23442a] text-white'
+                          : 'bg-white text-slate-700'
+                      }`}
+                    >
+                      {link.label}
+                    </Link>
+                  ))}
+                </div>
+
+                {isAuthenticated ? (
+                  <div className="rounded-[1.4rem] border border-border/80 bg-white p-4">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                      Account
+                    </p>
+                    <p className="mt-1 text-sm font-semibold text-foreground">{displayName}</p>
+                    <div className="mt-3 grid gap-2">
+                      <Link to="/orders" className="rounded-xl bg-muted/45 px-3 py-2.5 text-sm font-medium text-slate-700">
                         My Orders
                       </Link>
-                      {(user?.email?.includes('admin') || user?.user_metadata?.role === 'admin') && (
-                        <Link
-                          to="/admin"
-                          className="block px-4 py-2 text-sm text-foreground hover:bg-muted transition-colors duration-200"
-                          onClick={() => setIsUserMenuOpen(false)}
-                        >
+                      {(user?.role === 'admin' || user?.role === 'manager') && (
+                        <Link to="/admin" className="rounded-xl bg-muted/45 px-3 py-2.5 text-sm font-medium text-slate-700">
                           Admin Panel
                         </Link>
                       )}
-                      <hr className="my-2" />
                       <button
                         onClick={handleLogout}
-                        className="block w-full text-left px-4 py-2 text-sm text-destructive hover:bg-destructive/10 transition-colors duration-200"
+                        className="rounded-xl bg-rose-50 px-3 py-2.5 text-left text-sm font-medium text-rose-600"
+                        type="button"
                       >
                         Logout
                       </button>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            ) : (
-              <motion.button
-                whileHover={{ 
-                  scale: 1.05,
-                  boxShadow: "0 20px 40px rgba(44, 85, 48, 0.35)"
-                }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => setIsAuthModalOpen(true)}
-                className="premium-signin-btn flex items-center space-x-2 px-4 py-2 rounded-full font-medium text-white shadow-lg transition-all duration-300 relative overflow-hidden group"
-                style={{
-                  background: 'linear-gradient(135deg, #2c5530 0%, #4a7856 100%)',
-                  boxShadow: '0 10px 25px rgba(44, 85, 48, 0.25)'
-                }}
-              >
-                <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                <User className="w-5 h-5 relative z-10" />
-                <span className="relative z-10">Sign In</span>
-              </motion.button>
-            )}
-
-            <div className="relative p-2">
-              <motion.button
-                whileHover={{
-                  scale: 1.05,
-                  boxShadow: "0 20px 40px rgba(44, 85, 48, 0.35)"
-                }}
-                whileTap={{ scale: 0.95 }}
-                onClick={toggleCartPopup}
-                className="premium-cart-btn flex items-center space-x-2 px-4 py-2 rounded-full font-medium text-white shadow-lg transition-all duration-300 relative overflow-visible group"
-                style={{
-                  background: 'linear-gradient(135deg, #2c5530 0%, #4a7856 100%)',
-                  boxShadow: '0 10px 25px rgba(44, 85, 48, 0.25)'
-                }}
-              >
-                <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                <ShoppingCart className="w-5 h-5 relative z-10" data-cart-icon />
-                <span className="font-medium relative z-10">Cart</span>
-                {cartItemsCount > 0 && (
-                  <motion.span
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    className="absolute -top-2 -right-2 z-20 bg-gradient-to-br from-red-500 to-red-600 text-white text-xs rounded-full w-7 h-7 flex items-center justify-center font-bold shadow-lg border-2 border-white"
-                    style={{
-                      boxShadow: '0 4px 12px rgba(239, 68, 68, 0.4)'
-                    }}
-                  >
-                    {cartItemsCount}
-                  </motion.span>
-                )}
-              </motion.button>
-            </div>
-          </nav>
-
-          <button
-            onClick={() => setIsMenuOpen(!isMenuOpen)}
-            className="lg:hidden p-2 text-foreground hover:text-primary transition-colors duration-300"
-          >
-            {isMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-          </button>
-        </div>
-
-        <div className="md:hidden pb-4">
-          <form onSubmit={handleSearch} className="relative">
-            <input
-              type="text"
-              placeholder="Search for premium dry fruits..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="input-field w-full pl-12 pr-4 py-3 rounded-full bg-muted/50 border-transparent"
-            />
-            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5" />
-          </form>
-        </div>
-      </div>
-
-      <AnimatePresence>
-        {isMenuOpen && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            className="lg:hidden bg-card/95 backdrop-blur-md border-t"
-          >
-            <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4 space-y-4">
-              <Link 
-                to="/products" 
-                className="block text-foreground hover:text-primary transition-colors duration-300 font-medium py-2"
-                onClick={() => setIsMenuOpen(false)}
-              >
-                Products
-              </Link>
-              
-              {isAuthenticated ? (
-                <>
-                  <div className="border-t pt-4">
-                    <p className="text-sm text-muted-foreground mb-2">
-                      Hi, {user?.user_metadata?.name || user?.email?.split('@')[0]}
-                    </p>
-                    <Link
-                      to="/orders"
-                      className="block text-foreground hover:text-primary transition-colors duration-300 py-2"
-                      onClick={() => setIsMenuOpen(false)}
-                    >
-                      My Orders
-                    </Link>
-                    {(user?.email?.includes('admin') || user?.user_metadata?.role === 'admin') && (
-                      <Link
-                        to="/admin"
-                        className="block text-foreground hover:text-primary transition-colors duration-300 py-2"
-                        onClick={() => setIsMenuOpen(false)}
-                      >
-                        Admin Panel
-                      </Link>
-                    )}
-                    <button
-                      onClick={handleLogout}
-                      className="block text-destructive hover:opacity-80 transition-colors duration-300 py-2"
-                    >
-                      Logout
-                    </button>
+                    </div>
                   </div>
-                </>
-              ) : (
-                <div className="border-t pt-4">
-                  <motion.button
-                    whileHover={{ 
-                      scale: 1.02,
-                      boxShadow: "0 20px 40px rgba(44, 85, 48, 0.35)"
-                    }}
-                    whileTap={{ scale: 0.98 }}
+                ) : (
+                  <button
                     onClick={() => {
                       setIsMenuOpen(false);
                       setIsAuthModalOpen(true);
                     }}
-                    className="premium-signin-btn flex items-center justify-center space-x-2 w-full px-4 py-3 rounded-full font-medium text-white shadow-lg transition-all duration-300 relative overflow-hidden group"
-                    style={{
-                      background: 'linear-gradient(135deg, #2c5530 0%, #4a7856 100%)',
-                      boxShadow: '0 10px 25px rgba(44, 85, 48, 0.25)'
-                    }}
+                    className="store-button-primary w-full"
+                    type="button"
                   >
-                    <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                    <User className="w-5 h-5 relative z-10" />
-                    <span className="font-medium relative z-10">Sign In</span>
-                  </motion.button>
-                </div>
-              )}
-              
-              <button 
-                onClick={() => {
-                  setIsMenuOpen(false);
-                  toggleCartPopup();
-                }}
-                className="premium-cart-btn flex items-center justify-center space-x-2 w-full px-4 py-3 rounded-full font-medium text-white shadow-lg transition-all duration-300 relative overflow-hidden group"
-                style={{
-                  background: 'linear-gradient(135deg, #2c5530 0%, #4a7856 100%)',
-                  boxShadow: '0 10px 25px rgba(44, 85, 48, 0.25)'
-                }}
-              >
-                <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                <ShoppingCart className="w-5 h-5 relative z-10" data-cart-icon />
-                <span className="font-medium relative z-10">Cart ({cartItemsCount})</span>
-              </button>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+                    Sign In
+                  </button>
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </header>
 
-      <AuthModal 
-        isOpen={isAuthModalOpen} 
-        onClose={() => setIsAuthModalOpen(false)} 
-      />
-    </motion.header>
+      <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} />
+    </>
   );
 };
 

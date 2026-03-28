@@ -7,12 +7,10 @@
 
 const cron = require('node-cron');
 const deliveryService = require('./DeliveryService');
-const { createClient } = require('@supabase/supabase-js');
+const deliverySettingsService = require('./DeliverySettingsService');
+const { createBackendSupabaseClient } = require('../../config/supabaseClient');
 
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+const supabase = createBackendSupabaseClient({ preferServiceRole: true });
 
 class PickupScheduler {
   constructor() {
@@ -60,11 +58,22 @@ class PickupScheduler {
     try {
       // Get all shipments created today that need pickup
       const today = new Date().toISOString().split('T')[0];
+      const settings = await deliverySettingsService.getSettings();
+
+      if (!settings.is_enabled) {
+        console.log('[PickupScheduler] Delivery integration is disabled. Skipping daily pickup scheduling.');
+        return;
+      }
+
+      if (!settings.auto_schedule_pickup) {
+        console.log('[PickupScheduler] Auto pickup scheduling is disabled. Skipping daily pickup scheduling.');
+        return;
+      }
 
       const { data: pendingShipments, error: fetchError } = await supabase
         .from('shipments')
-        .select('id, awb_number, created_at')
-        .eq('status', 'PENDING')
+        .select('*')
+        .in('status', ['PENDING', 'MANIFESTED'])
         .gte('created_at', `${today}T00:00:00`)
         .is('pickup_scheduled_date', null);
 
@@ -80,35 +89,12 @@ class PickupScheduler {
 
       console.log(`[PickupScheduler] Found ${pendingShipments.length} shipments needing pickup`);
 
-      // Schedule pickup for next day at 10 AM
-      const tomorrow = new Date();
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      const pickupDate = tomorrow.toISOString().split('T')[0];
-
-      const pickupResult = await deliveryService.schedulePickup({
-        pickup_date: pickupDate,
-        pickup_time: '10:00:00',
-        pickup_location: process.env.DELHIVERY_WAREHOUSE_NAME || 'Main Warehouse',
-        expected_package_count: pendingShipments.length
-      });
+      const pickupResult = await deliveryService.schedulePickupForShipments(pendingShipments, settings);
 
       if (pickupResult.success) {
-        // Update shipments with pickup details
-        const { error: updateError } = await supabase
-          .from('shipments')
-          .update({
-            pickup_scheduled_date: pickupDate,
-            pickup_scheduled_time: '10:00:00',
-            status: 'PICKUP_SCHEDULED',
-            updated_at: new Date().toISOString()
-          })
-          .in('id', pendingShipments.map(s => s.id));
-
-        if (updateError) {
-          console.error('[PickupScheduler] Error updating shipments:', updateError);
-        } else {
-          console.log(`[PickupScheduler] ✅ Successfully scheduled pickup for ${pendingShipments.length} shipments on ${pickupDate} at 10:00 AM`);
-        }
+        console.log(
+          `[PickupScheduler] ✅ Successfully scheduled pickup for ${pickupResult.scheduled_count} shipments on ${pickupResult.pickup_date} at ${pickupResult.pickup_time}`
+        );
       }
 
     } catch (error) {

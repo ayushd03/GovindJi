@@ -1,242 +1,105 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { 
-  Mail, 
-  Phone, 
-  MapPin, 
-  Facebook, 
-  Twitter, 
-  Instagram, 
-  Youtube,
-  Heart,
-  ArrowUp
-} from 'lucide-react';
+import { ArrowUp, Mail, MapPin, Phone } from 'lucide-react';
+import { buildAuthPath } from '../utils/authRouting';
+
+const shopLinks = [
+  { name: 'Home', href: '/' },
+  { name: 'All Products', href: '/products' },
+  { name: 'My Orders', href: '/orders' },
+];
+
+const accountLinks = [
+  { name: 'Sign In', href: buildAuthPath({ mode: 'sign-in' }) },
+  { name: 'Create Account', href: buildAuthPath({ mode: 'sign-up' }) },
+];
 
 const Footer = () => {
   const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const fadeInUp = {
-    initial: { opacity: 0, y: 30 },
-    whileInView: { opacity: 1, y: 0 },
-    transition: { duration: 0.6, ease: "easeOut" },
-    viewport: { once: true }
-  };
-
-  const stagger = {
-    whileInView: {
-      transition: {
-        staggerChildren: 0.1
-      }
-    }
-  };
-
   return (
-    <footer style={{ backgroundColor: '#2c5530' }} className="text-gray-100 mt-16">
-      {/* Main Footer Content */}
-      <motion.div
-        className="container mx-auto px-4 sm:px-6 lg:px-8 py-16"
-        variants={stagger}
-        initial="initial"
-        whileInView="whileInView"
-        viewport={{ once: true }}
-      >
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-12 items-start">
-          {/* Company Info */}
-          <motion.div variants={fadeInUp} className="space-y-6">
-            <div>
-              <h3 className="text-xl font-bold text-white mb-3">
-                GovindJi
-              </h3>
-              <p className="text-gray-400 leading-relaxed text-sm">
-                Premium quality dry fruits and nuts, handpicked for freshness.
-              </p>
-            </div>
-            
-            {/* Social Media */}
-            <div>
-              <h4 className="text-lg font-semibold mb-4 text-white">Follow Us</h4>
-              <div className="flex space-x-4">
-                {[
-                  { icon: Facebook, href: '#', label: 'Facebook' },
-                  { icon: Instagram, href: '#', label: 'Instagram' },
-                  { icon: Twitter, href: '#', label: 'Twitter' },
-                  { icon: Youtube, href: '#', label: 'YouTube' }
-                ].map((social) => {
-                  const IconComponent = social.icon;
-                  return (
-                    <motion.a
-                      key={social.label}
-                      href={social.href}
-                      whileHover={{ scale: 1.1, y: -2 }}
-                      whileTap={{ scale: 0.9 }}
-                      className="w-10 h-10 bg-gray-700 rounded-full flex items-center justify-center hover:bg-orange-500 transition-all duration-300 text-gray-200 hover:text-white"
-                      aria-label={social.label}
-                    >
-                      <IconComponent className="w-5 h-5" />
-                    </motion.a>
-                  );
-                })}
-              </div>
-            </div>
-          </motion.div>
+    <footer className="mt-14 border-t border-border/70 bg-[#17311f] text-white">
+      <div className="page-container py-12">
+        <div className="grid gap-8 lg:grid-cols-[1.25fr_0.75fr_0.75fr_1fr]">
+          <div className="space-y-4">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-white/55">
+              GovindJi Dry Fruits
+            </p>
+            <h3 className="max-w-sm font-heading text-2xl font-semibold leading-tight text-white">
+              A cleaner way to order premium dry fruits online.
+            </h3>
+            <p className="max-w-md text-sm leading-7 text-white/68">
+              Thoughtful product pages, clearer delivery information, and a more dependable
+              checkout flow built for repeat ordering.
+            </p>
+          </div>
 
-          {/* Quick Links */}
-          <motion.div variants={fadeInUp}>
-            <h4 className="text-lg font-semibold mb-6 text-white">Shop</h4>
-            <ul className="space-y-3">
-              {[
-                { name: 'All Products', href: '/products' },
-                { name: 'Featured', href: '/products?featured=true' },
-                { name: 'Best Sellers', href: '/products?bestseller=true' }
-              ].map((link) => (
+          <div>
+            <h4 className="text-[11px] font-semibold uppercase tracking-[0.2em] text-white/55">Shop</h4>
+            <ul className="mt-4 space-y-3 text-sm text-white/75">
+              {shopLinks.map((link) => (
                 <li key={link.name}>
-                  <Link
-                    to={link.href}
-                    className="text-gray-400 hover:text-orange-400 transition-colors duration-300 inline-flex items-center group"
-                  >
-                    <span className="group-hover:translate-x-1 transition-transform duration-300">
-                      {link.name}
-                    </span>
+                  <Link to={link.href} className="hover:text-white">
+                    {link.name}
                   </Link>
                 </li>
               ))}
             </ul>
-          </motion.div>
+          </div>
 
-          {/* Customer Service */}
-          <motion.div variants={fadeInUp}>
-            <h4 className="text-lg font-semibold mb-6 text-white">Support</h4>
-            <ul className="space-y-3">
-              {[
-                { name: 'Track Your Order', href: '/track-order' },
-                { name: 'Shipping Info', href: '/shipping' },
-                { name: 'Returns', href: '/returns' },
-                { name: 'FAQ', href: '/faq' }
-              ].map((link) => (
+          <div>
+            <h4 className="text-[11px] font-semibold uppercase tracking-[0.2em] text-white/55">Account</h4>
+            <ul className="mt-4 space-y-3 text-sm text-white/75">
+              {accountLinks.map((link) => (
                 <li key={link.name}>
-                  <Link
-                    to={link.href}
-                    className="text-gray-400 hover:text-orange-400 transition-colors duration-300 inline-flex items-center group"
-                  >
-                    <span className="group-hover:translate-x-1 transition-transform duration-300">
-                      {link.name}
-                    </span>
+                  <Link to={link.href} className="hover:text-white">
+                    {link.name}
                   </Link>
                 </li>
               ))}
             </ul>
-          </motion.div>
+          </div>
 
-          {/* Contact Info */}
-          <motion.div variants={fadeInUp}>
-            <h4 className="text-lg font-semibold mb-6 text-white">Get In Touch</h4>
-            <div className="space-y-4">
-              <div className="flex items-start space-x-3">
-                <MapPin className="w-5 h-5 text-orange-400 mt-1 flex-shrink-0" />
-                <div>
-                  <p className="text-gray-400 text-sm leading-relaxed">
-                    Bartan Bazar, Indore<br />
-                    MP 452002
-                  </p>
-                </div>
+          <div>
+            <h4 className="text-[11px] font-semibold uppercase tracking-[0.2em] text-white/55">Contact</h4>
+            <div className="mt-4 space-y-3.5 text-sm text-white/75">
+              <div className="flex items-start gap-3">
+                <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-white/45" />
+                <p className="leading-6">
+                  Bartan Bazar, Indore
+                  <br />
+                  MP 452002
+                </p>
               </div>
-              
-              <div className="flex items-center space-x-3">
-                <Phone className="w-5 h-5 text-orange-400 flex-shrink-0" />
-                <a
-                  href="tel:+919340637575"
-                  className="text-gray-400 hover:text-orange-400 transition-colors duration-300 text-sm"
-                >
-                  +91 93406 37575
-                </a>
-              </div>
-
-              <div className="flex items-center space-x-3">
-                <Mail className="w-5 h-5 text-orange-400 flex-shrink-0" />
-                <a
-                  href="mailto:info@govindjidryfruit.com"
-                  className="text-gray-400 hover:text-orange-400 transition-colors duration-300 text-sm"
-                >
-                  info@govindji.com
-                </a>
-              </div>
-              
-              <div className="flex items-start space-x-3">
-                <div className="w-5 h-5 text-orange-400 mt-1 flex-shrink-0">🕐</div>
-                <div>
-                  <p className="text-gray-400 text-sm leading-relaxed">
-                    9 am - 6 pm Mon-Fri
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Newsletter Signup */}
-            <div className="mt-6">
-              <h5 className="text-sm font-semibold mb-3 text-white">Newsletter</h5>
-              <div className="flex">
-                <input
-                  type="email"
-                  placeholder="Your email address"
-                  className="flex-1 px-3 py-2 bg-gray-800 border border-gray-700 rounded-l-lg text-white placeholder-gray-500 focus:outline-none focus:border-orange-400 transition-colors duration-300"
-                />
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  className="px-4 py-2 bg-orange-500 text-white rounded-r-lg hover:bg-orange-600 transition-colors duration-300 font-medium"
-                >
-                  Subscribe
-                </motion.button>
-              </div>
-            </div>
-          </motion.div>
-        </div>
-      </motion.div>
-
-      {/* Footer Bottom */}
-      <motion.div
-        style={{ backgroundColor: '#1a3a1d' }}
-        className="border-t border-opacity-20 border-white py-8"
-        initial={{ opacity: 0 }}
-        whileInView={{ opacity: 1 }}
-        transition={{ duration: 0.6, delay: 0.3 }}
-        viewport={{ once: true }}
-      >
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
-            <div className="flex items-center space-x-2 text-gray-400">
-              <span>&copy; 2025 GovindJi Dry Fruits. All rights reserved.</span>
-            </div>
-
-            <div className="flex items-center space-x-6">
-              <Link
-                to="/privacy"
-                className="text-gray-400 hover:text-orange-400 transition-colors duration-300 text-sm"
-              >
-                Privacy Policy
-              </Link>
-              <Link
-                to="/terms"
-                className="text-gray-400 hover:text-orange-400 transition-colors duration-300 text-sm"
-              >
-                Terms & Conditions
-              </Link>
-              <motion.button
-                onClick={scrollToTop}
-                whileHover={{ scale: 1.1, y: -2 }}
-                whileTap={{ scale: 0.9 }}
-                className="w-10 h-10 bg-orange-500 rounded-full flex items-center justify-center hover:bg-orange-600 transition-all duration-300 shadow-lg text-white"
-                aria-label="Scroll to top"
-              >
-                <ArrowUp className="w-5 h-5" />
-              </motion.button>
+              <a href="tel:+919340637575" className="flex items-center gap-3 hover:text-white">
+                <Phone className="h-4 w-4 shrink-0 text-white/45" />
+                <span>+91 93406 37575</span>
+              </a>
+              <a href="mailto:info@govindji.com" className="flex items-center gap-3 hover:text-white">
+                <Mail className="h-4 w-4 shrink-0 text-white/45" />
+                <span>info@govindji.com</span>
+              </a>
+              <p className="pl-7 text-white/55">Mon-Fri, 9:00 am to 6:00 pm</p>
             </div>
           </div>
         </div>
-      </motion.div>
+      </div>
+
+      <div className="border-t border-white/10 bg-[#132819]">
+        <div className="page-container flex flex-col gap-3 py-4 text-sm text-white/55 sm:flex-row sm:items-center sm:justify-between">
+          <p>&copy; 2025 GovindJi Dry Fruits. All rights reserved.</p>
+          <button
+            onClick={scrollToTop}
+            className="inline-flex items-center gap-2 self-start rounded-full border border-white/12 px-4 py-2 text-white/70 hover:bg-white/5 hover:text-white sm:self-auto"
+            type="button"
+          >
+            <ArrowUp className="h-4 w-4" />
+            Back to top
+          </button>
+        </div>
+      </div>
     </footer>
   );
 };

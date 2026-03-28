@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { PermissionGuard } from '../../components/PermissionGuard';
 import { ADMIN_PERMISSIONS } from '../../enums/roles';
 import {
@@ -11,7 +11,6 @@ import {
   EnvelopeIcon,
   CalendarIcon,
   CurrencyRupeeIcon,
-  XMarkIcon,
   UserIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
@@ -21,6 +20,16 @@ import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { useToast } from '../../hooks/useToast';
 import { Toaster } from '../../components/ui/toaster';
+import {
+  AdminDialog,
+  AdminDialogBody,
+  AdminDialogContent,
+  AdminDialogFooter,
+  AdminDialogHeader,
+  AdminDialogIconButton,
+  AdminDialogTitle,
+} from '../../components/AdminDialog';
+import { API_BASE_URL } from '../../config/apiBaseUrl';
 
 const EMPLOYEE_ROLES = [
   'Store Manager',
@@ -65,16 +74,15 @@ const EmployeeManagement = () => {
     notes: ''
   });
 
-  const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+  const showSuccess = useCallback((message) => {
+    toast({ title: "Success", description: message, variant: "success", duration: 3000 });
+  }, [toast]);
 
-  const showSuccess = (message) => toast({ title: "Success", description: message, variant: "success", duration: 3000 });
-  const showError = (message) => toast({ title: "Error", description: message, variant: "destructive", duration: 5000 });
+  const showError = useCallback((message) => {
+    toast({ title: "Error", description: message, variant: "destructive", duration: 5000 });
+  }, [toast]);
 
-  useEffect(() => {
-    fetchEmployees(1);
-  }, []);
-
-  const fetchEmployees = async (page = 1, limit = itemsPerPage) => {
+  const fetchEmployees = useCallback(async (page = 1, limit = itemsPerPage) => {
     try {
       const token = localStorage.getItem('authToken');
       const queryParams = new URLSearchParams({
@@ -102,7 +110,11 @@ const EmployeeManagement = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [itemsPerPage, searchTerm, selectedRole, showError]);
+
+  useEffect(() => {
+    fetchEmployees(1);
+  }, [fetchEmployees]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -110,7 +122,7 @@ const EmployeeManagement = () => {
       else setCurrentPage(1);
     }, 500);
     return () => clearTimeout(timer);
-  }, [searchTerm, selectedRole]);
+  }, [currentPage, fetchEmployees, searchTerm, selectedRole]);
 
   const totalPages = Math.ceil(totalEmployees / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
@@ -213,35 +225,52 @@ const EmployeeManagement = () => {
 
   return (
     <PermissionGuard permission={ADMIN_PERMISSIONS.VIEW_EMPLOYEES}>
-      <div className="space-y-6">
-        <Card>
-          <CardHeader className="pb-4">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <div className="flex items-center gap-4">
-                <CardTitle className="text-lg">Employee Management</CardTitle>
-                <Button variant="outline" size="sm" onClick={() => setShowFilters(!showFilters)} className="md:hidden">
-                  <AdjustmentsHorizontalIcon className="w-4 h-4 mr-2" /> Filters
-                </Button>
-              </div>
+      <div className="admin-page">
+        <div className="admin-page-header">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="space-y-1">
+              <h1 className="admin-page-title">Employee Management</h1>
+              <p className="admin-page-description">Manage employee records, roles, and contact details.</p>
+            </div>
+            <div className="flex items-center gap-3">
+              <Button variant="outline" size="sm" onClick={() => setShowFilters(!showFilters)} className="md:hidden">
+                <AdjustmentsHorizontalIcon className="w-4 h-4 mr-2" /> Filters
+              </Button>
               <PermissionGuard permission={ADMIN_PERMISSIONS.MANAGE_EMPLOYEES}>
                 <Button onClick={() => handleOpenModal()} className="btn-primary">
                   <PlusIcon className="w-4 h-4 mr-2" /> Add Employee
                 </Button>
               </PermissionGuard>
             </div>
+          </div>
+        </div>
+
+        <Card className="admin-section">
+          <CardHeader className="pb-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div>
+                <CardTitle className="text-lg">Employee Directory</CardTitle>
+                <p className="text-sm text-muted-foreground">Search, filter, and update your team records.</p>
+              </div>
+              <div className="flex items-center gap-4">
+                <Button variant="outline" size="sm" onClick={() => setShowFilters(!showFilters)} className="md:hidden">
+                  <AdjustmentsHorizontalIcon className="w-4 h-4 mr-2" /> Filters
+                </Button>
+              </div>
+            </div>
           </CardHeader>
           <CardContent className="pt-0">
             <div className="mb-4 md:hidden">
               <div className="relative">
-                <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                <input type="text" placeholder="Search employees..." className="input-field w-full pl-10" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                <MagnifyingGlassIcon className="input-icon-left" />
+                <input type="text" placeholder="Search employees..." className="input-field input-with-left-icon w-full" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
               </div>
             </div>
             <div className={`${showFilters ? 'block' : 'hidden'} md:block`}>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                 <div className="relative hidden md:block">
-                  <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                  <input type="text" placeholder="Search employees..." className="input-field w-full pl-10" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                  <MagnifyingGlassIcon className="input-icon-left" />
+                  <input type="text" placeholder="Search employees..." className="input-field input-with-left-icon w-full" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
                 </div>
                 <select className="input-field" value={selectedRole} onChange={(e) => setSelectedRole(e.target.value)}>
                   <option value="">All Roles</option>
@@ -255,7 +284,7 @@ const EmployeeManagement = () => {
 
         {error && <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4"><p className="text-destructive-foreground">{error}</p></div>}
 
-        <Card>
+        <Card className="admin-section overflow-hidden">
           <CardHeader className="pb-4">
             <div className="flex items-center justify-between">
               <CardTitle>Employees ({totalEmployees})</CardTitle>
@@ -321,21 +350,22 @@ const EmployeeManagement = () => {
         </Card>
 
         {isModalOpen && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-card rounded-xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-              <div className="p-6 border-b">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-xl font-semibold text-foreground">{editingEmployee ? 'Edit Employee' : 'Add New Employee'}</h2>
-                  <button onClick={handleCloseModal} className="p-2 text-muted-foreground hover:text-foreground rounded-lg"><XMarkIcon className="w-5 h-5" /></button>
+          <AdminDialog open={isModalOpen} onOpenChange={(open) => { if (!open) handleCloseModal(); }}>
+            <AdminDialogContent size="lg">
+              <AdminDialogHeader sticky>
+                <div className="flex w-full items-start justify-between gap-3">
+                  <AdminDialogTitle>{editingEmployee ? 'Edit Employee' : 'Add New Employee'}</AdminDialogTitle>
+                  <AdminDialogIconButton onClick={handleCloseModal} />
                 </div>
-              </div>
-              <form onSubmit={handleSubmit} className="p-6 space-y-6">
-                <div>
+              </AdminDialogHeader>
+              <form onSubmit={handleSubmit}>
+              <AdminDialogBody className="admin-dialog-stack">
+                <div className="admin-dialog-section">
                   <h3 className="text-lg font-medium text-foreground mb-4">Basic Information</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div><label className="block text-sm font-medium text-muted-foreground mb-1">Full Name *</label><input type="text" required className="input-field" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} /></div>
+                  <div className="admin-dialog-grid-2">
+                    <div><label className="admin-dialog-label">Full Name *</label><input type="text" required className="input-field" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} /></div>
                     <div>
-                      <label className="block text-sm font-medium text-muted-foreground mb-1">Role *</label>
+                      <label className="admin-dialog-label">Role *</label>
                       <select required className="input-field" value={formData.role} onChange={(e) => setFormData({ ...formData, role: e.target.value })}>
                         <option value="">Select Role</option>
                         {EMPLOYEE_ROLES.map(role => <option key={role} value={role}>{role}</option>)}
@@ -343,44 +373,45 @@ const EmployeeManagement = () => {
                     </div>
                   </div>
                 </div>
-                <div>
+                <div className="admin-dialog-section">
                   <h3 className="text-lg font-medium text-foreground mb-4">Contact Information</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div><label className="block text-sm font-medium text-muted-foreground mb-1">Phone Number</label><input type="tel" className="input-field" value={formData.contact_number} onChange={(e) => setFormData({ ...formData, contact_number: e.target.value })} /></div>
-                    <div><label className="block text-sm font-medium text-muted-foreground mb-1">Email</label><input type="email" className="input-field" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} /></div>
+                  <div className="admin-dialog-grid-2">
+                    <div><label className="admin-dialog-label">Phone Number</label><input type="tel" className="input-field" value={formData.contact_number} onChange={(e) => setFormData({ ...formData, contact_number: e.target.value })} /></div>
+                    <div><label className="admin-dialog-label">Email</label><input type="email" className="input-field" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} /></div>
                   </div>
-                  <div className="mt-4"><label className="block text-sm font-medium text-muted-foreground mb-1">Address</label><textarea rows={3} className="input-field" value={formData.address} onChange={(e) => setFormData({ ...formData, address: e.target.value })} /></div>
+                  <div className="mt-4"><label className="admin-dialog-label">Address</label><textarea rows={3} className="input-field" value={formData.address} onChange={(e) => setFormData({ ...formData, address: e.target.value })} /></div>
                 </div>
-                <div>
+                <div className="admin-dialog-section">
                   <h3 className="text-lg font-medium text-foreground mb-4">Employment Details</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div><label className="block text-sm font-medium text-muted-foreground mb-1">Start Date *</label><input type="date" required className="input-field" value={formData.start_date} onChange={(e) => setFormData({ ...formData, start_date: e.target.value })} /></div>
-                    <div><label className="block text-sm font-medium text-muted-foreground mb-1">Monthly Salary (₹)</label><input type="number" step="0.01" className="input-field" value={formData.salary} onChange={(e) => setFormData({ ...formData, salary: e.target.value })} /></div>
+                  <div className="admin-dialog-grid-2">
+                    <div><label className="admin-dialog-label">Start Date *</label><input type="date" required className="input-field" value={formData.start_date} onChange={(e) => setFormData({ ...formData, start_date: e.target.value })} /></div>
+                    <div><label className="admin-dialog-label">Monthly Salary (₹)</label><input type="number" step="0.01" className="input-field" value={formData.salary} onChange={(e) => setFormData({ ...formData, salary: e.target.value })} /></div>
                   </div>
                 </div>
-                <div>
+                <div className="admin-dialog-section">
                   <h3 className="text-lg font-medium text-foreground mb-4">Emergency Contact</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div><label className="block text-sm font-medium text-muted-foreground mb-1">Emergency Contact Name</label><input type="text" className="input-field" value={formData.emergency_contact} onChange={(e) => setFormData({ ...formData, emergency_contact: e.target.value })} /></div>
-                    <div><label className="block text-sm font-medium text-muted-foreground mb-1">Emergency Phone Number</label><input type="tel" className="input-field" value={formData.emergency_phone} onChange={(e) => setFormData({ ...formData, emergency_phone: e.target.value })} /></div>
+                  <div className="admin-dialog-grid-2">
+                    <div><label className="admin-dialog-label">Emergency Contact Name</label><input type="text" className="input-field" value={formData.emergency_contact} onChange={(e) => setFormData({ ...formData, emergency_contact: e.target.value })} /></div>
+                    <div><label className="admin-dialog-label">Emergency Phone Number</label><input type="tel" className="input-field" value={formData.emergency_phone} onChange={(e) => setFormData({ ...formData, emergency_phone: e.target.value })} /></div>
                   </div>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-muted-foreground mb-1">Notes</label>
+                <div className="admin-dialog-section">
+                  <label className="admin-dialog-label">Notes</label>
                   <textarea rows={3} className="input-field" value={formData.notes} onChange={(e) => setFormData({ ...formData, notes: e.target.value })} placeholder="Any additional notes about the employee..." />
                 </div>
-                <div className="flex justify-end space-x-3 pt-4 border-t">
+              </AdminDialogBody>
+                <AdminDialogFooter sticky>
                   <Button type="button" variant="outline" onClick={handleCloseModal}>Cancel</Button>
                   <Button type="submit" className="btn-primary">{editingEmployee ? 'Update Employee' : 'Add Employee'}</Button>
-                </div>
+                </AdminDialogFooter>
               </form>
-            </div>
-          </div>
+            </AdminDialogContent>
+          </AdminDialog>
         )}
 
         {deleteConfirm && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-card rounded-xl shadow-xl max-w-md w-full p-6">
+          <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-[2px] flex items-center justify-center p-3 sm:p-6">
+            <div className="w-full max-w-md rounded-3xl border bg-card p-6 shadow-2xl">
               <div className="flex items-center justify-center w-12 h-12 bg-destructive/10 rounded-full mx-auto mb-4"><TrashIcon className="w-6 h-6 text-destructive" /></div>
               <h3 className="text-lg font-medium text-foreground text-center mb-2">Delete Employee</h3>
               <p className="text-muted-foreground text-center mb-6">Are you sure you want to delete "{deleteConfirm.name}"? This action cannot be undone.</p>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { PermissionGuard } from '../../components/PermissionGuard';
 import { ADMIN_PERMISSIONS } from '../../enums/roles';
 import {
@@ -10,8 +10,6 @@ import {
   ExclamationTriangleIcon,
   ArrowUpIcon,
   ArrowDownIcon,
-  PlusIcon,
-  MinusIcon,
   EyeIcon,
   XMarkIcon,
 } from '@heroicons/react/24/outline';
@@ -19,9 +17,12 @@ import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { useToast } from '../../hooks/useToast';
 import { Toaster } from '../../components/ui/toaster';
+import { usePermissions } from '../../context/PermissionContext';
+import { API_BASE_URL } from '../../config/apiBaseUrl';
 
 const InventoryManagement = () => {
   const { toast } = useToast();
+  const { hasPermission } = usePermissions();
   const [products, setProducts] = useState([]);
   const [stockMovements, setStockMovements] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -36,43 +37,41 @@ const InventoryManagement = () => {
   const [showAdjustment, setShowAdjustment] = useState(null);
   const [showPOBreakdown, setShowPOBreakdown] = useState(null);
   const [showReceiveItem, setShowReceiveItem] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
   const [adjustmentData, setAdjustmentData] = useState({
     quantity: 0,
     type: 'in',
     reason: '',
-    notes: ''
+    notes: '',
+    variant_id: '',
   });
+  const PRODUCTS_PER_PAGE = 10;
+  const canManageInventory = hasPermission(ADMIN_PERMISSIONS.MANAGE_INVENTORY);
   const [receiveData, setReceiveData] = useState({
     receive_quantity: 0,
     notes: ''
   });
   const [purchaseOrders, setPurchaseOrders] = useState([]);
 
-  const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
-
-  const showSuccess = (message) => {
+  const showSuccess = useCallback((message) => {
     toast({
       title: "Success",
       description: message,
       variant: "success",
       duration: 3000,
     });
-  };
+  }, [toast]);
 
-  const showError = (message) => {
+  const showError = useCallback((message) => {
     toast({
       title: "Error",
       description: message,
       variant: "destructive",
       duration: 5000,
     });
-  };
+  }, [toast]);
 
-  useEffect(() => {
-    fetchProducts();
-  }, []);
-
-  const fetchProducts = async () => {
+  const fetchProducts = useCallback(async () => {
     try {
       const token = localStorage.getItem('authToken');
       const response = await fetch(`${API_BASE_URL}/api/admin/products`, {
@@ -92,7 +91,11 @@ const InventoryManagement = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [showError]);
+
+  useEffect(() => {
+    fetchProducts();
+  }, [fetchProducts]);
 
   const fetchStockMovements = async (productId) => {
     try {
@@ -163,28 +166,49 @@ const InventoryManagement = () => {
   const handleStockAdjustment = async () => {
     try {
       const token = localStorage.getItem('authToken');
+      const body = {
+        quantity: adjustmentData.quantity,
+        movement_type: adjustmentData.type,
+        reason: adjustmentData.reason || `Manual ${adjustmentData.type === 'in' ? 'increase' : 'decrease'}`,
+      };
+      if (adjustmentData.variant_id) {
+        body.variant_id = adjustmentData.variant_id;
+      }
+
       const response = await fetch(`${API_BASE_URL}/api/admin/products/${showAdjustment.id}/stock`, {
-        method: 'POST',
+        method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          quantity_change: adjustmentData.type === 'in' ? adjustmentData.quantity : -adjustmentData.quantity,
-          reason: adjustmentData.reason || `Manual ${adjustmentData.type === 'in' ? 'increase' : 'decrease'}`,
-          notes: adjustmentData.notes
-        })
+        body: JSON.stringify(body)
       });
 
-      if (!response.ok) throw new Error('Failed to adjust stock');
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.error || 'Failed to adjust stock');
+      }
 
       await fetchProducts();
       setShowAdjustment(null);
-      setAdjustmentData({ quantity: 0, type: 'in', reason: '', notes: '' });
+      setAdjustmentData({ quantity: 0, type: 'in', reason: '', notes: '', variant_id: '' });
       showSuccess('Stock adjusted successfully');
     } catch (err) {
-      showError('Failed to adjust stock');
+      showError(err.message || 'Failed to adjust stock');
     }
+  };
+
+  const openAdjustmentModal = (product) => {
+    setShowAdjustment(product);
+    // Pre-select the default variant (if any) so the admin doesn't have to pick one every time
+    const defaultVariant = product.variants?.find(v => v.is_default) || product.variants?.[0];
+    setAdjustmentData({
+      quantity: 0,
+      type: 'in',
+      reason: '',
+      notes: '',
+      variant_id: defaultVariant?.id || '',
+    });
   };
 
   const formatCurrency = (amount) => {
@@ -212,14 +236,43 @@ const InventoryManagement = () => {
     const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          (product.sku && product.sku.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesCategory = !selectedCategory || product.category_name === selectedCategory;
-    const matchesLowStock = !showLowStock || product.stock_quantity <= product.min_stock_level;
-    
+    // Low stock: some stock exists but is at or below the minimum. Out-of-stock is excluded.
+    const matchesLowStock = !showLowStock || (
+      product.stock_quantity > 0 && product.stock_quantity <= (product.min_stock_level || 0)
+    );
     return matchesSearch && matchesCategory && matchesLowStock;
   });
 
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, selectedCategory, showLowStock]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredProducts.length / PRODUCTS_PER_PAGE));
+  const pageStartIndex = (currentPage - 1) * PRODUCTS_PER_PAGE;
+  const paginatedProducts = filteredProducts.slice(pageStartIndex, pageStartIndex + PRODUCTS_PER_PAGE);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
   const categories = [...new Set(products.map(product => product.category_name).filter(Boolean))];
-  const totalValue = products.reduce((sum, product) => sum + ((product.stock_quantity || 0) * (product.price || 0)), 0);
-  const lowStockCount = products.filter(product => product.stock_quantity <= product.min_stock_level).length;
+
+  // For variant products use sum(variant.stock × variant.price) for accuracy.
+  const totalValue = products.reduce((sum, product) => {
+    if (product.variants && product.variants.length > 0) {
+      return sum + product.variants.reduce(
+        (vSum, v) => vSum + (v.stock_quantity || 0) * (parseFloat(v.price) || 0), 0
+      );
+    }
+    return sum + (product.stock_quantity || 0) * (product.price || 0);
+  }, 0);
+
+  // Low stock: stock is positive but at or below min level (out-of-stock is separate)
+  const lowStockCount = products.filter(
+    p => p.stock_quantity > 0 && p.stock_quantity <= (p.min_stock_level || 0)
+  ).length;
   const outOfStockCount = products.filter(product => product.stock_quantity <= 0).length;
 
   if (loading) {
@@ -233,10 +286,23 @@ const InventoryManagement = () => {
 
   return (
     <PermissionGuard permission={ADMIN_PERMISSIONS.VIEW_INVENTORY}>
-      <div className="space-y-6">
+      <div className="admin-page">
+        <div className="admin-page-header">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="space-y-1">
+              <h1 className="admin-page-title">Inventory Management</h1>
+              <p className="admin-page-description">Track stock levels, adjustments, receipts, and purchase-order intake.</p>
+            </div>
+            <Button variant="outline" size="sm" onClick={() => setShowFilters(!showFilters)} className="md:hidden">
+              <AdjustmentsHorizontalIcon className="w-4 h-4 mr-2" />
+              Filters
+            </Button>
+          </div>
+        </div>
+
         {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <Card className="admin-stat-card">
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
@@ -248,7 +314,7 @@ const InventoryManagement = () => {
             </CardContent>
           </Card>
           
-          <Card>
+          <Card className="admin-stat-card">
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
@@ -260,7 +326,7 @@ const InventoryManagement = () => {
             </CardContent>
           </Card>
           
-          <Card>
+          <Card className="admin-stat-card">
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
@@ -272,7 +338,7 @@ const InventoryManagement = () => {
             </CardContent>
           </Card>
           
-          <Card>
+          <Card className="admin-stat-card">
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
@@ -285,15 +351,12 @@ const InventoryManagement = () => {
           </Card>
         </div>
 
-        <Card>
+        <Card className="admin-section">
           <CardHeader className="pb-4">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <div className="flex items-center gap-4">
-                <CardTitle className="text-lg">Inventory Management</CardTitle>
-                <Button variant="outline" size="sm" onClick={() => setShowFilters(!showFilters)} className="md:hidden">
-                  <AdjustmentsHorizontalIcon className="w-4 h-4 mr-2" />
-                  Filters
-                </Button>
+              <div>
+                <CardTitle className="text-lg">Inventory Overview</CardTitle>
+                <p className="text-sm text-muted-foreground">Use filters to find stock issues quickly and review recent movement details.</p>
               </div>
             </div>
           </CardHeader>
@@ -301,8 +364,8 @@ const InventoryManagement = () => {
             <div className={`${showFilters ? 'block' : 'hidden'} md:block`}>
               <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-4">
                 <div className="relative">
-                  <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                  <input type="text" placeholder="Search products..." className="input-field w-full pl-10" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                  <MagnifyingGlassIcon className="input-icon-left" />
+                  <input type="text" placeholder="Search products..." className="input-field input-with-left-icon w-full" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
                 </div>
                 <select className="input-field" value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)}>
                   <option value="">All Categories</option>
@@ -329,7 +392,7 @@ const InventoryManagement = () => {
 
         {error && (<div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4"><p className="text-destructive-foreground">{error}</p></div>)}
 
-        <Card>
+        <Card className="admin-section overflow-hidden">
           <CardContent className="p-0">
             {filteredProducts.length === 0 ? (
               <div className="p-12 text-center">
@@ -339,7 +402,7 @@ const InventoryManagement = () => {
               </div>
             ) : (
               <div className="divide-y">
-                {filteredProducts.map((product) => {
+                {paginatedProducts.map((product) => {
                   const stockStatus = getStockStatus(product);
                   
                   return (
@@ -349,19 +412,56 @@ const InventoryManagement = () => {
                           <div className="flex items-start justify-between sm:items-center sm:space-x-4">
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 mb-1">
-                                <h3 className="text-base sm:text-lg font-medium text-foreground truncate">{product.name}</h3>
+                                {canManageInventory ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => openAdjustmentModal(product)}
+                                    className="text-left text-base sm:text-lg font-medium text-foreground truncate hover:text-primary transition-colors"
+                                    title="Adjust stock"
+                                  >
+                                    {product.name}
+                                  </button>
+                                ) : (
+                                  <h3 className="text-base sm:text-lg font-medium text-foreground truncate">{product.name}</h3>
+                                )}
                                 <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${stockStatus.color}`}>
                                   {stockStatus.label}
                                 </span>
+                                {product.variants && product.variants.length > 0 && (() => {
+                                  const outCount = product.variants.filter(v => v.is_active && (v.stock_quantity ?? 0) === 0).length;
+                                  return outCount > 0 ? (
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-800">
+                                      {outCount} variant{outCount > 1 ? 's' : ''} out
+                                    </span>
+                                  ) : null;
+                                })()}
                               </div>
                               <div className="mt-1 space-y-1 sm:space-y-0 sm:flex sm:items-center sm:space-x-4 text-sm text-muted-foreground">
                                 <div><span className="font-medium">Stock:</span> {product.stock_quantity || 0} {product.unit}</div>
                                 <div><span className="font-medium">Min Level:</span> {product.min_stock_level || 0}</div>
-                                <div><span className="font-medium">Price:</span> {formatCurrency(product.price)}</div>
+                                {(!product.variants || product.variants.length === 0) && (
+                                  <div><span className="font-medium">Price:</span> {formatCurrency(product.price)}</div>
+                                )}
                                 {product.sku && <div><span className="font-medium">SKU:</span> {product.sku}</div>}
                               </div>
+                              {product.variants && product.variants.length > 0 && (
+                                <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+                                  {product.variants.map(v => (
+                                    <span key={v.id}>
+                                      <span className="font-medium">{v.variant_name}:</span>{' '}
+                                      {v.stock_quantity ?? 0} units @ {formatCurrency(v.price)}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
                               <div className="mt-2 text-sm text-muted-foreground">
-                                <span className="font-medium">Value:</span> {formatCurrency((product.stock_quantity || 0) * (product.price || 0))}
+                                <span className="font-medium">Value:</span>{' '}
+                                {product.variants && product.variants.length > 0
+                                  ? formatCurrency(product.variants.reduce(
+                                      (s, v) => s + (v.stock_quantity || 0) * (parseFloat(v.price) || 0), 0
+                                    ))
+                                  : formatCurrency((product.stock_quantity || 0) * (product.price || 0))
+                                }
                                 {product.category_name && (
                                   <span className="ml-4"><span className="font-medium">Category:</span> {product.category_name}</span>
                                 )}
@@ -375,7 +475,7 @@ const InventoryManagement = () => {
                                 <Button variant="ghost" size="icon" onClick={() => { setShowPOBreakdown(product); fetchPurchaseOrders(product.id); }} className="h-9 w-9 text-muted-foreground hover:text-blue-600" title="View Purchase Orders">
                                   <ClipboardDocumentListIcon className="w-4 h-4" />
                                 </Button>
-                                <Button variant="ghost" size="icon" onClick={() => setShowAdjustment(product)} className="h-9 w-9 text-muted-foreground hover:text-primary" title="Adjust Stock">
+                                <Button variant="ghost" size="icon" onClick={() => openAdjustmentModal(product)} className="h-9 w-9 text-muted-foreground hover:text-primary" title="Adjust Stock">
                                   <AdjustmentsHorizontalIcon className="w-4 h-4" />
                                 </Button>
                               </div>
@@ -390,7 +490,7 @@ const InventoryManagement = () => {
                             <Button variant="outline" size="sm" onClick={() => { setShowPOBreakdown(product); fetchPurchaseOrders(product.id); }} className="flex-1">
                               <ClipboardDocumentListIcon className="w-4 h-4 mr-2" />POs
                             </Button>
-                            <Button variant="outline" size="sm" onClick={() => setShowAdjustment(product)} className="flex-1">
+                            <Button variant="outline" size="sm" onClick={() => openAdjustmentModal(product)} className="flex-1">
                               <AdjustmentsHorizontalIcon className="w-4 h-4 mr-2" />Adjust
                             </Button>
                           </div>
@@ -403,37 +503,91 @@ const InventoryManagement = () => {
             )}
           </CardContent>
         </Card>
+        {filteredProducts.length > 0 && (
+          <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-muted-foreground">
+              Showing {pageStartIndex + 1}-{Math.min(pageStartIndex + PRODUCTS_PER_PAGE, filteredProducts.length)} of {filteredProducts.length} products
+            </p>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                disabled={currentPage === 1}
+              >
+                Previous
+              </Button>
+              <span className="text-sm text-muted-foreground">
+                Page {currentPage} of {totalPages}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                disabled={currentPage === totalPages}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
+        )}
 
         {/* Stock Adjustment Modal */}
         {showAdjustment && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-2 sm:p-4 z-50">
-            <div className="bg-card rounded-xl shadow-xl w-full max-w-2xl">
-              <div className="p-4 sm:p-6 border-b">
+          <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-[2px] flex items-center justify-center p-3 sm:p-6">
+            <div className="w-full max-w-2xl rounded-3xl border bg-card shadow-2xl">
+              <div className="admin-dialog-header admin-dialog-header-sticky">
                 <div className="flex items-center justify-between">
-                  <h2 className="text-lg sm:text-xl font-semibold text-foreground">
+                  <h2 className="admin-dialog-title">
                     Adjust Stock - {showAdjustment.name}
                   </h2>
-                  <button onClick={() => setShowAdjustment(null)} className="p-2 text-muted-foreground hover:text-foreground rounded-lg">
+                  <button onClick={() => setShowAdjustment(null)} className="admin-dialog-close">
                     <XMarkIcon className="w-5 h-5" />
                   </button>
                 </div>
               </div>
               
-              <div className="p-4 sm:p-6 space-y-6">
-                <div className="bg-muted/50 p-4 rounded-lg">
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div><span className="font-medium">Current Stock:</span> {showAdjustment.stock_quantity || 0} {showAdjustment.unit}</div>
+              <div className="admin-dialog-body space-y-6">
+                <div className="admin-dialog-section-muted">
+                  <div className="admin-dialog-grid-2 text-sm">
+                    <div><span className="font-medium">Total Stock:</span> {showAdjustment.stock_quantity || 0} {showAdjustment.unit}</div>
                     <div><span className="font-medium">Min Level:</span> {showAdjustment.min_stock_level || 0}</div>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {showAdjustment.variants && showAdjustment.variants.length > 0 && (
                   <div>
-                    <label className="block text-sm font-medium text-muted-foreground mb-1">Adjustment Type *</label>
-                    <select 
-                      required 
-                      className="input-field" 
-                      value={adjustmentData.type} 
+                    <label className="admin-dialog-label">Variant *</label>
+                    <select
+                      required
+                      className="input-field"
+                      value={adjustmentData.variant_id}
+                      onChange={(e) => setAdjustmentData({...adjustmentData, variant_id: e.target.value})}
+                    >
+                      {showAdjustment.variants.map(v => (
+                        <option key={v.id} value={v.id}>
+                          {v.variant_name} — {v.stock_quantity ?? 0} in stock
+                        </option>
+                      ))}
+                    </select>
+                    {adjustmentData.variant_id && (() => {
+                      const selectedVariant = showAdjustment.variants.find(v => v.id === adjustmentData.variant_id);
+                      return selectedVariant ? (
+                        <p className="mt-1.5 text-sm text-muted-foreground">
+                          Current stock for <span className="font-medium">{selectedVariant.variant_name}</span>: <span className="font-semibold text-foreground">{selectedVariant.stock_quantity ?? 0}</span>
+                        </p>
+                      ) : null;
+                    })()}
+                  </div>
+                )}
+
+                <div className="admin-dialog-grid-2">
+                  <div>
+                    <label className="admin-dialog-label">Adjustment Type *</label>
+                    <select
+                      required
+                      className="input-field"
+                      value={adjustmentData.type}
                       onChange={(e) => setAdjustmentData({...adjustmentData, type: e.target.value})}
                     >
                       <option value="in">Increase Stock</option>
@@ -441,20 +595,21 @@ const InventoryManagement = () => {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-muted-foreground mb-1">Quantity *</label>
-                    <input 
-                      type="number" 
-                      step="0.001" 
-                      required 
-                      className="input-field" 
-                      value={adjustmentData.quantity} 
-                      onChange={(e) => setAdjustmentData({...adjustmentData, quantity: parseFloat(e.target.value) || 0})} 
+                    <label className="admin-dialog-label">Quantity *</label>
+                    <input
+                      type="number"
+                      step="1"
+                      min="1"
+                      required
+                      className="input-field"
+                      value={adjustmentData.quantity}
+                      onChange={(e) => setAdjustmentData({...adjustmentData, quantity: parseInt(e.target.value) || 0})}
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-muted-foreground mb-1">Reason</label>
+                  <label className="admin-dialog-label">Reason</label>
                   <select 
                     className="input-field" 
                     value={adjustmentData.reason} 
@@ -470,7 +625,7 @@ const InventoryManagement = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-muted-foreground mb-1">Notes</label>
+                  <label className="admin-dialog-label">Notes</label>
                   <textarea 
                     rows={3} 
                     className="input-field" 
@@ -479,7 +634,7 @@ const InventoryManagement = () => {
                   />
                 </div>
 
-                <div className="flex flex-col sm:flex-row sm:justify-end gap-3 pt-4 border-t">
+                <div className="admin-dialog-footer admin-dialog-footer-sticky">
                   <Button type="button" variant="outline" onClick={() => setShowAdjustment(null)}>Cancel</Button>
                   <Button 
                     type="button" 
@@ -497,26 +652,34 @@ const InventoryManagement = () => {
 
         {/* Stock Movements Modal */}
         {showMovements && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-2 sm:p-4 z-50">
-            <div className="bg-card rounded-xl shadow-xl w-full max-w-4xl max-h-[95vh] overflow-y-auto">
-              <div className="p-4 sm:p-6 border-b">
+          <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-[2px] flex items-center justify-center p-3 sm:p-6">
+            <div className="w-full max-w-4xl max-h-[95vh] overflow-y-auto rounded-3xl border bg-card shadow-2xl">
+              <div className="admin-dialog-header admin-dialog-header-sticky">
                 <div className="flex items-center justify-between">
-                  <h2 className="text-lg sm:text-xl font-semibold text-foreground">
+                  <h2 className="admin-dialog-title">
                     Stock Movement History - {showMovements.name}
                   </h2>
-                  <button onClick={() => setShowMovements(null)} className="p-2 text-muted-foreground hover:text-foreground rounded-lg">
+                  <button onClick={() => setShowMovements(null)} className="admin-dialog-close">
                     <XMarkIcon className="w-5 h-5" />
                   </button>
                 </div>
               </div>
               
-              <div className="p-4 sm:p-6 space-y-6">
-                <div className="bg-muted/50 p-4 rounded-lg">
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                    <div><span className="font-medium">Current Stock:</span> {showMovements.stock_quantity || 0} {showMovements.unit}</div>
+              <div className="admin-dialog-body space-y-6">
+                <div className="admin-dialog-section-muted">
+                  <div className="grid grid-cols-2 gap-4 text-sm md:grid-cols-4">
+                    <div><span className="font-medium">Current Stock:</span> {showMovements.stock_quantity || 0} {showMovements.variants?.length > 0 ? 'units' : showMovements.unit}</div>
                     <div><span className="font-medium">Min Level:</span> {showMovements.min_stock_level || 0}</div>
-                    <div><span className="font-medium">Price:</span> {formatCurrency(showMovements.price)}</div>
-                    <div><span className="font-medium">Total Value:</span> {formatCurrency((showMovements.stock_quantity || 0) * (showMovements.price || 0))}</div>
+                    {(!showMovements.variants || showMovements.variants.length === 0) && (
+                      <div><span className="font-medium">Price:</span> {formatCurrency(showMovements.price)}</div>
+                    )}
+                    <div>
+                      <span className="font-medium">Total Value:</span>{' '}
+                      {showMovements.variants && showMovements.variants.length > 0
+                        ? formatCurrency(showMovements.variants.reduce((s, v) => s + (v.stock_quantity || 0) * (parseFloat(v.price) || 0), 0))
+                        : formatCurrency((showMovements.stock_quantity || 0) * (showMovements.price || 0))
+                      }
+                    </div>
                   </div>
                 </div>
 
@@ -538,6 +701,9 @@ const InventoryManagement = () => {
                           <div>
                             <p className="font-medium">
                               {movement.movement_type === 'in' ? '+' : '-'}{movement.quantity} {showMovements.unit}
+                              {movement.variant?.variant_name && (
+                                <span className="ml-1.5 text-sm font-normal text-muted-foreground">({movement.variant.variant_name})</span>
+                              )}
                             </p>
                             <p className="text-sm text-muted-foreground">{movement.reason}</p>
                             {movement.party_name && (
@@ -564,22 +730,22 @@ const InventoryManagement = () => {
 
         {/* Purchase Orders Breakdown Modal */}
         {showPOBreakdown && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-2 sm:p-4 z-50">
-            <div className="bg-card rounded-xl shadow-xl w-full max-w-6xl max-h-[95vh] overflow-y-auto">
-              <div className="p-4 sm:p-6 border-b">
+          <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-[2px] flex items-center justify-center p-3 sm:p-6">
+            <div className="w-full max-w-6xl max-h-[95vh] overflow-y-auto rounded-3xl border bg-card shadow-2xl">
+              <div className="admin-dialog-header admin-dialog-header-sticky">
                 <div className="flex items-center justify-between">
-                  <h2 className="text-lg sm:text-xl font-semibold text-foreground">
+                  <h2 className="admin-dialog-title">
                     Purchase Orders - {showPOBreakdown.name}
                   </h2>
-                  <button onClick={() => setShowPOBreakdown(null)} className="p-2 text-muted-foreground hover:text-foreground rounded-lg">
+                  <button onClick={() => setShowPOBreakdown(null)} className="admin-dialog-close">
                     <XMarkIcon className="w-5 h-5" />
                   </button>
                 </div>
               </div>
               
-              <div className="p-4 sm:p-6 space-y-6">
-                <div className="bg-muted/50 p-4 rounded-lg">
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+              <div className="admin-dialog-body space-y-6">
+                <div className="admin-dialog-section-muted">
+                  <div className="grid grid-cols-2 gap-4 text-sm md:grid-cols-4">
                     <div><span className="font-medium">Current Stock:</span> {showPOBreakdown.stock_quantity || 0} {showPOBreakdown.unit}</div>
                     <div><span className="font-medium">Min Level:</span> {showPOBreakdown.min_stock_level || 0}</div>
                     <div><span className="font-medium">Price:</span> {formatCurrency(showPOBreakdown.price)}</div>
@@ -672,29 +838,29 @@ const InventoryManagement = () => {
 
         {/* Receive Item Modal */}
         {showReceiveItem && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-2 sm:p-4 z-50">
-            <div className="bg-card rounded-xl shadow-xl w-full max-w-2xl">
-              <div className="p-4 sm:p-6 border-b">
+          <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-[2px] flex items-center justify-center p-3 sm:p-6">
+            <div className="w-full max-w-2xl rounded-3xl border bg-card shadow-2xl">
+              <div className="admin-dialog-header admin-dialog-header-sticky">
                 <div className="flex items-center justify-between">
-                  <h2 className="text-lg sm:text-xl font-semibold text-foreground">
+                  <h2 className="admin-dialog-title">
                     Receive Item - {showReceiveItem.item_name}
                   </h2>
-                  <button onClick={() => setShowReceiveItem(null)} className="p-2 text-muted-foreground hover:text-foreground rounded-lg">
+                  <button onClick={() => setShowReceiveItem(null)} className="admin-dialog-close">
                     <XMarkIcon className="w-5 h-5" />
                   </button>
                 </div>
               </div>
               
-              <div className="p-4 sm:p-6 space-y-6">
-                <div className="bg-muted/50 p-4 rounded-lg">
-                  <div className="grid grid-cols-2 gap-4 text-sm">
+              <div className="admin-dialog-body space-y-6">
+                <div className="admin-dialog-section-muted">
+                  <div className="admin-dialog-grid-2 text-sm">
                     <div><span className="font-medium">PO Number:</span> {showReceiveItem.po_number}</div>
                     <div><span className="font-medium">Pending Quantity:</span> {showReceiveItem.pending_quantity} {showReceiveItem.unit}</div>
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-muted-foreground mb-1">Receive Quantity *</label>
+                  <label className="admin-dialog-label">Receive Quantity *</label>
                   <input 
                     type="number" 
                     step="0.001" 
@@ -708,7 +874,7 @@ const InventoryManagement = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-muted-foreground mb-1">Notes</label>
+                  <label className="admin-dialog-label">Notes</label>
                   <textarea 
                     rows={3} 
                     className="input-field" 
@@ -718,7 +884,7 @@ const InventoryManagement = () => {
                   />
                 </div>
 
-                <div className="flex flex-col sm:flex-row sm:justify-end gap-3 pt-4 border-t">
+                <div className="admin-dialog-footer admin-dialog-footer-sticky">
                   <Button type="button" variant="outline" onClick={() => setShowReceiveItem(null)}>Cancel</Button>
                   <Button 
                     type="button" 

@@ -215,7 +215,7 @@ const ItemManager = ({
                     <div className="relative">
                       <input
                         type="text"
-                        className="w-full pl-10 pr-10 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                        className="input-field input-with-both-icons w-full"
                         placeholder="Search products..."
                         value={productSearch[item.id] || item.product_name || ''}
                         onChange={(e) => {
@@ -232,8 +232,8 @@ const ItemManager = ({
                         }}
                         onFocus={() => setShowProductDropdown(prev => ({ ...prev, [item.id]: true }))}
                       />
-                      <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                      <ChevronDownIcon className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <MagnifyingGlassIcon className="input-icon-left" />
+                      <ChevronDownIcon className="input-icon-right" />
                     </div>
 
                     {/* Product Dropdown */}

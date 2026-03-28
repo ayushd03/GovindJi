@@ -12,6 +12,7 @@ import {
   ArrowPathIcon,
   DocumentTextIcon
 } from '@heroicons/react/24/outline';
+import { API_BASE_URL } from '../../../config/apiBaseUrl';
 
 const defaultRow = (party = null) => ({
   party,
@@ -40,7 +41,6 @@ const UnifiedVendorPaymentForm = forwardRef(({
   renderActions = true
 }, ref) => {
   const { toast } = useToast();
-  const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
   const [rows, setRows] = useState(() => {
     const count = Math.max(1, initialRows);

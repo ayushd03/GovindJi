@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { productsAPI } from '../services/api';
 import { getImageUrl, handleImageError } from '../utils/imageUtils';
+import { API_BASE_URL } from '../config/apiBaseUrl';
 import ImageUploadManager from './ImageUploadManager';
 import { XMarkIcon, TrashIcon } from '@heroicons/react/24/outline';
 import './EnhancedImageGalleryManager.css';
@@ -49,7 +50,6 @@ const EnhancedImageGalleryManager = ({ productId, isOpen, onClose, onImagesUpdat
           formData.append('processing_settings', JSON.stringify(settings));
         }
 
-        const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
         const response = await fetch(`${API_BASE_URL}/api/admin/products/${productId}/images/upload`, {
           method: 'POST',
           headers: {
@@ -77,7 +77,6 @@ const EnhancedImageGalleryManager = ({ productId, isOpen, onClose, onImagesUpdat
     const token = localStorage.getItem('authToken');
 
     try {
-      const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
       const response = await fetch(`${API_BASE_URL}/api/admin/products/${productId}/images/url`, {
         method: 'POST',
         headers: {
@@ -106,7 +105,6 @@ const EnhancedImageGalleryManager = ({ productId, isOpen, onClose, onImagesUpdat
 
     const token = localStorage.getItem('authToken');
     try {
-      const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
       const response = await fetch(`${API_BASE_URL}/api/admin/products/${productId}/images/${imageId}`, {
         method: 'DELETE',
         headers: {
@@ -126,7 +124,6 @@ const EnhancedImageGalleryManager = ({ productId, isOpen, onClose, onImagesUpdat
   const handleSetPrimary = async (imageId) => {
     const token = localStorage.getItem('authToken');
     try {
-      const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
       const response = await fetch(`${API_BASE_URL}/api/admin/products/${productId}/images/${imageId}/primary`, {
         method: 'PUT',
         headers: {
@@ -179,7 +176,6 @@ const EnhancedImageGalleryManager = ({ productId, isOpen, onClose, onImagesUpdat
     // Update backend
     const token = localStorage.getItem('authToken');
     try {
-      const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
       await fetch(`${API_BASE_URL}/api/admin/products/${productId}/images/reorder`, {
         method: 'PUT',
         headers: {

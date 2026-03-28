@@ -22,10 +22,10 @@ import { Toaster } from '../../components/ui/toaster';
 import { useExpensePreferences } from '../../hooks/useExpensePreferences';
 import { formatMobileDayCurrency } from '../../utils/currencyUtils';
 import ExpensesCalendar from './components/ExpensesCalendar';
+import { API_BASE_URL } from '../../config/apiBaseUrl';
 
 // Import sub-components
 import ExpenseForm from './components/UnifiedExpenseForm';
-import UnifiedVendorPaymentForm from './components/UnifiedVendorPaymentForm';
 
 // Constants
 const EXPENSE_CATEGORIES = [
@@ -92,7 +92,6 @@ const ExpenseManagement = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [selectedExpense, setSelectedExpense] = useState(null);
-  const [showPaymentModal, setShowPaymentModal] = useState(false);
   
   // Ref to prevent duplicate API calls
   const lastFetchParams = useRef(null);
@@ -121,26 +120,24 @@ const ExpenseManagement = () => {
     selectedPaymentMethod
   }), [searchTerm, selectedCategory, selectedPaymentMethod]);
 
-  const apiBaseUrl = process.env.REACT_APP_API_URL || 'http://localhost:3001';
-
   // Toast helper functions
-  const showSuccessToast = (message) => {
+  const showSuccessToast = useCallback((message) => {
     toast({ 
       title: 'Success', 
       description: message, 
       variant: 'success', 
       duration: 3000 
     });
-  };
+  }, [toast]);
   
-  const showErrorToast = (message) => {
+  const showErrorToast = useCallback((message) => {
     toast({ 
       title: 'Error', 
       description: message, 
       variant: 'destructive', 
       duration: 5000 
     });
-  };
+  }, [toast]);
 
   // API helper function
   const makeApiCall = useCallback(async (endpoint, options = {}) => {
@@ -154,7 +151,7 @@ const ExpenseManagement = () => {
     };
 
     try {
-      const response = await fetch(`${apiBaseUrl}${endpoint}`, {
+      const response = await fetch(`${API_BASE_URL}${endpoint}`, {
         ...defaultOptions,
         ...options
       });
@@ -169,27 +166,9 @@ const ExpenseManagement = () => {
     } catch (error) {
       throw error;
     }
-  }, [apiBaseUrl]);
-
-  // Load initial data
-  useEffect(() => {
-    const initializeComponent = async () => {
-      setIsLoading(true);
-      try {
-        await Promise.all([
-          loadDependencies(),
-          fetchExpenses()
-        ]);
-      } catch (error) {
-        showErrorToast('Failed to load expense management data. Please refresh the page.');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    initializeComponent();
   }, []);
 
+  // Load initial data
   // Persist view preferences on change
   useEffect(() => {
     setDefaultView(viewMode);
@@ -213,23 +192,8 @@ const ExpenseManagement = () => {
     localStorage.setItem('expenseViewMode', viewMode);
   }, [viewMode]);
 
-  // Hide AdminLayout's header with CSS
-  useEffect(() => {
-    // Find and hide the AdminLayout's RoleIndicator section
-    const adminHeader = document.querySelector('main.flex-1 > div.p-6 > div.flex.items-center.justify-end.mb-6');
-    if (adminHeader) {
-      adminHeader.style.display = 'none';
-    }
-    
-    return () => {
-      if (adminHeader) {
-        adminHeader.style.display = '';
-      }
-    };
-  }, []);
-
   // Load dependencies
-  const loadDependencies = async () => {
+  const loadDependencies = useCallback(async () => {
     try {
       const response = await makeApiCall('/api/admin/expenses/dependencies');
       const dependencyData = response.data || response;
@@ -237,10 +201,10 @@ const ExpenseManagement = () => {
     } catch (error) {
       console.error('Failed to load dependencies:', error);
     }
-  };
+  }, [makeApiCall]);
 
   // Fetch expenses with filters
-  const fetchExpenses = async (page = currentPage) => {
+  const fetchExpenses = useCallback(async (page = currentPage) => {
     try {
       const searchParams = new URLSearchParams({
         page: page.toString(),
@@ -274,7 +238,25 @@ const ExpenseManagement = () => {
       showErrorToast('Failed to load expenses');
       console.error('Failed to fetch expenses:', error);
     }
-  };
+  }, [currentPage, dateRange.end_date, dateRange.start_date, makeApiCall, searchTerm, selectedCategory, selectedPaymentMethod, showErrorToast]);
+
+  useEffect(() => {
+    const initializeComponent = async () => {
+      setIsLoading(true);
+      try {
+        await Promise.all([
+          loadDependencies(),
+          fetchExpenses()
+        ]);
+      } catch (error) {
+        showErrorToast('Failed to load expense management data. Please refresh the page.');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    initializeComponent();
+  }, [fetchExpenses, loadDependencies, showErrorToast]);
 
   // Refresh expenses when filters change (list only)
   useEffect(() => {
@@ -285,7 +267,7 @@ const ExpenseManagement = () => {
 
       return () => clearTimeout(timeoutId);
     }
-  }, [searchTerm, selectedCategory, selectedPaymentMethod, dateRange, activeTab, viewMode]);
+  }, [activeTab, dateRange, fetchExpenses, searchTerm, selectedCategory, selectedPaymentMethod, viewMode]);
 
   // Handle scope changes separately to avoid duplicate API calls
   useEffect(() => {
@@ -429,7 +411,7 @@ const ExpenseManagement = () => {
         ...(dateRange.end_date && { end_date: dateRange.end_date })
       });
 
-      const response = await fetch(`${apiBaseUrl}/api/admin/expenses/export?${searchParams}`, {
+      const response = await fetch(`${API_BASE_URL}/api/admin/expenses/export?${searchParams}`, {
         headers: { 'Authorization': `Bearer ${authToken}` }
       });
 
@@ -556,13 +538,13 @@ const ExpenseManagement = () => {
 
   return (
     <PermissionGuard permission={ADMIN_PERMISSIONS.VIEW_EXPENSES}>
-      <div className="flex flex-col -m-6 h-screen bg-gray-50">
+      <div className="admin-page">
         {/* Filters Modal */}
         {activeTab === 'view' && showFilters && (
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowFilters(false)}>
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[85vh] flex flex-col animate-fadeIn" onClick={(e) => e.stopPropagation()}>
-              <div className="p-6 border-b border-gray-200 flex items-center justify-between bg-gradient-to-r from-slate-50 to-white rounded-t-2xl">
-                <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+            <div className="w-full max-w-md max-h-[85vh] flex flex-col rounded-2xl border bg-card shadow-2xl animate-fadeIn" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between rounded-t-2xl border-b px-4 py-3 sm:px-5">
+                <h3 className="flex items-center gap-2 text-base font-semibold text-foreground">
                   <svg className="w-6 h-6 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
                   </svg>
@@ -570,7 +552,7 @@ const ExpenseManagement = () => {
                 </h3>
                 <button 
                   onClick={() => setShowFilters(false)} 
-                  className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
+                  className="admin-dialog-close"
                 >
                   <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd"/>
@@ -578,16 +560,16 @@ const ExpenseManagement = () => {
                 </button>
               </div>
               
-              <div className="flex-1 overflow-y-auto p-6 space-y-4">
+              <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4">
               {/* Search */}
               <div>
                 <label className="block text-xs font-semibold text-gray-700 mb-1.5">Search</label>
                 <div className="relative">
-                  <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <MagnifyingGlassIcon className="input-icon-left text-gray-400" />
                   <input
                     type="text"
                     placeholder="Search expenses..."
-                    className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+                    className="input-field input-with-left-icon"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                   />
@@ -598,7 +580,7 @@ const ExpenseManagement = () => {
               <div>
                 <label className="block text-xs font-semibold text-gray-700 mb-1.5">Category</label>
                 <select
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+                  className="input-field"
                   value={selectedCategory}
                   onChange={(e) => setSelectedCategory(e.target.value)}
                 >
@@ -613,7 +595,7 @@ const ExpenseManagement = () => {
               <div>
                 <label className="block text-xs font-semibold text-gray-700 mb-1.5">Date Range</label>
                 <select
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white mb-2"
+                  className="input-field mb-2"
                   value={scope}
                   onChange={(e) => setScope(e.target.value)}
                 >
@@ -626,13 +608,13 @@ const ExpenseManagement = () => {
                   <div className="space-y-2">
                     <input
                       type="date"
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+                      className="input-field"
                       value={dateRange.start_date}
                       onChange={(e) => setDateRange(prev => ({ ...prev, start_date: e.target.value }))}
                     />
                     <input
                       type="date"
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+                      className="input-field"
                       value={dateRange.end_date}
                       onChange={(e) => setDateRange(prev => ({ ...prev, end_date: e.target.value }))}
                     />
@@ -644,20 +626,20 @@ const ExpenseManagement = () => {
               <div className="pt-4 border-t border-gray-200 space-y-2">
                 <button
                   onClick={clearAllFilters}
-                  className="w-full px-4 py-2.5 text-sm font-semibold text-white bg-gradient-to-br from-red-500 to-red-600 rounded-lg hover:shadow-lg transition-all duration-200"
+                  className="btn-destructive w-full"
                 >
                   Clear All Filters
                 </button>
                 <button
                   onClick={handleExportExpenses}
-                  className="w-full px-4 py-2.5 text-sm font-semibold text-slate-700 bg-slate-50 hover:bg-slate-100 rounded-lg transition-all duration-200 flex items-center justify-center gap-2"
+                  className="btn-outline w-full flex items-center justify-center gap-2"
                 >
                   <ArrowDownTrayIcon className="w-4 h-4" />
                   Export to Excel
                 </button>
                 <button
                   onClick={() => setShowFilters(false)}
-                  className="w-full px-4 py-2.5 text-sm font-semibold text-gray-700 bg-white border-2 border-gray-300 rounded-lg hover:bg-gray-50 transition-all duration-200"
+                  className="btn-secondary w-full"
                 >
                   Close
                 </button>
@@ -669,16 +651,17 @@ const ExpenseManagement = () => {
 
         {/* Content based on active tab */}
         {activeTab === 'view' ? (
-          <div className="flex-1 overflow-hidden flex flex-col">
+          <div className="admin-section overflow-hidden">
+            <div className="flex min-h-[640px] flex-col">
             {/* Unified Header for List/Calendar Views */}
-            <div className="bg-gradient-to-r from-slate-700 via-slate-800 to-slate-900 px-3 sm:px-6 py-3 sm:py-4 flex items-center justify-between shadow-lg flex-wrap gap-2">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b bg-card px-4 py-3 sm:px-5">
               <div className="flex items-center gap-2 sm:gap-4 flex-1 min-w-0">
                 <button
                   onClick={() => setShowFilters(!showFilters)}
-                  className="p-1.5 sm:p-2 text-white/80 hover:text-white hover:bg-white/20 rounded-lg transition-all duration-200 flex-shrink-0"
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border/70 text-muted-foreground transition hover:bg-muted/40 hover:text-foreground flex-shrink-0"
                   title="Toggle Filters"
                 >
-                  <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
                   </svg>
                 </button>
@@ -687,32 +670,32 @@ const ExpenseManagement = () => {
                   <div className="flex items-center gap-1 sm:gap-2 flex-1 min-w-0">
                     <button
                       onClick={() => calendarNavRef.current?.prev && calendarNavRef.current.prev()}
-                      className="p-1 sm:p-2 text-white/80 hover:text-white hover:bg-white/20 rounded-lg transition-all duration-200 flex-shrink-0"
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border/70 text-muted-foreground transition hover:bg-muted/40 hover:text-foreground flex-shrink-0"
                     >
-                      <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                       </svg>
                     </button>
-                    <div className="text-base sm:text-xl md:text-2xl font-bold text-white text-center flex-1 min-w-0 truncate px-1">
+                    <div className="flex-1 min-w-0 truncate px-1 text-base font-semibold text-foreground sm:text-lg">
                       {calendarTitle || 'Calendar'}
                     </div>
                     <button
                       onClick={() => calendarNavRef.current?.next && calendarNavRef.current.next()}
-                      className="p-1 sm:p-2 text-white/80 hover:text-white hover:bg-white/20 rounded-lg transition-all duration-200 flex-shrink-0"
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border/70 text-muted-foreground transition hover:bg-muted/40 hover:text-foreground flex-shrink-0"
                     >
-                      <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                       </svg>
                     </button>
                     <button
                       onClick={() => calendarNavRef.current?.today && calendarNavRef.current.today()}
-                      className="px-2 py-1 sm:px-3 sm:py-1.5 text-xs sm:text-sm font-semibold text-white/90 hover:text-white hover:bg-white/20 rounded-lg transition-all duration-200 flex-shrink-0"
+                      className="btn-outline px-3 py-1.5 text-xs sm:text-sm flex-shrink-0"
                     >
                       Today
                     </button>
                   </div>
                 ) : (
-                  <div className="text-base sm:text-xl md:text-2xl font-bold text-white truncate">
+                  <div className="truncate text-base font-semibold text-foreground sm:text-lg">
                     Expense List
                   </div>
                 )}
@@ -720,13 +703,13 @@ const ExpenseManagement = () => {
 
               <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
                 {/* View Mode Toggle */}
-                <div className="bg-white/20 backdrop-blur-sm rounded-lg p-0.5 sm:p-1 flex items-center gap-0.5 sm:gap-1">
+                <div className="flex items-center gap-1 rounded-lg border border-border/70 bg-muted/20 p-1">
                   <button
                     onClick={() => setViewMode('list')}
-                    className={`px-2 py-1 sm:px-3 sm:py-1.5 text-xs sm:text-sm font-semibold rounded-md transition-all duration-200 flex items-center gap-1 sm:gap-1.5 ${
+                    className={`flex items-center gap-1 rounded-md px-2.5 py-1.5 text-xs font-semibold transition-all sm:text-sm ${
                       viewMode === 'list'
-                        ? 'bg-white text-slate-700 shadow-md'
-                        : 'text-white/90 hover:text-white hover:bg-white/10'
+                        ? 'bg-card text-foreground shadow-sm'
+                        : 'text-muted-foreground hover:bg-card/70 hover:text-foreground'
                     }`}
                   >
                     <ListBulletIcon className="w-3 h-3 sm:w-4 sm:h-4" />
@@ -734,10 +717,10 @@ const ExpenseManagement = () => {
                   </button>
                   <button
                     onClick={() => setViewMode('calendar')}
-                    className={`px-2 py-1 sm:px-3 sm:py-1.5 text-xs sm:text-sm font-semibold rounded-md transition-all duration-200 flex items-center gap-1 sm:gap-1.5 ${
+                    className={`flex items-center gap-1 rounded-md px-2.5 py-1.5 text-xs font-semibold transition-all sm:text-sm ${
                       viewMode === 'calendar'
-                        ? 'bg-white text-slate-700 shadow-md'
-                        : 'text-white/90 hover:text-white hover:bg-white/10'
+                        ? 'bg-card text-foreground shadow-sm'
+                        : 'text-muted-foreground hover:bg-card/70 hover:text-foreground'
                     }`}
                   >
                     <CalendarIcon className="w-3 h-3 sm:w-4 sm:h-4" />
@@ -748,7 +731,7 @@ const ExpenseManagement = () => {
                 {/* Add Expense Button */}
                 <button
                   onClick={() => setActiveTab('add')}
-                  className="px-2 py-1 sm:px-4 sm:py-2 text-xs sm:text-sm font-semibold bg-white text-slate-700 rounded-lg hover:bg-slate-50 transition-all duration-200 flex items-center gap-1 sm:gap-2 shadow-md hover:shadow-lg hover:scale-105 flex-shrink-0"
+                  className="btn-primary flex items-center gap-1 sm:gap-2 flex-shrink-0"
                 >
                   <PlusIcon className="w-3 h-3 sm:w-4 sm:h-4" />
                   <span className="hidden sm:inline">Add Expense</span>
@@ -759,21 +742,21 @@ const ExpenseManagement = () => {
 
             {/* View switch between List / Calendar */}
             {viewMode === 'list' ? (
-              <div className="flex-1 overflow-hidden flex flex-col">
+              <div className="flex min-h-0 flex-1 flex-col">
                 {/* Summary Bar - only for list view */}
-                <div className="bg-white px-6 py-3 border-b border-gray-200">
-                  <div className="flex items-center justify-between text-sm">
-                    <div className="flex items-center space-x-6">
+                <div className="border-b bg-muted/10 px-4 py-3 sm:px-5">
+                  <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
+                    <div className="flex flex-wrap items-center gap-4">
                       <div className="flex items-center space-x-2">
                         <DocumentTextIcon className="w-4 h-4 text-blue-600" />
-                        <span className="text-gray-600">Total: <span className="font-semibold text-gray-900">{formatMobileDayCurrency(totalExpenses)}</span></span>
+                        <span className="text-muted-foreground">Total: <span className="font-semibold text-foreground">{formatMobileDayCurrency(totalExpenses)}</span></span>
                       </div>
                       <div className="flex items-center space-x-2">
                         <ListBulletIcon className="w-4 h-4 text-green-600" />
-                        <span className="text-gray-600">Showing: <span className="font-semibold text-gray-900">{expenses.length}</span></span>
+                        <span className="text-muted-foreground">Showing: <span className="font-semibold text-foreground">{expenses.length}</span></span>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <span className="text-gray-600">Page: <span className="font-semibold text-gray-900">{currentPage} of {totalPages}</span></span>
+                        <span className="text-muted-foreground">Page: <span className="font-semibold text-foreground">{currentPage} of {totalPages}</span></span>
                       </div>
                     </div>
                     {/* Inline Pagination Controls */}
@@ -799,7 +782,7 @@ const ExpenseManagement = () => {
                 </div>
 
                 {/* List View */}
-              <div className="flex-1 bg-white overflow-auto">
+              <div className="flex-1 overflow-auto bg-background">
                 {expenses.length === 0 ? (
                   <div className="p-6 text-center">
                     <DocumentTextIcon className="w-8 h-8 text-gray-400 mx-auto mb-2" />
@@ -809,7 +792,7 @@ const ExpenseManagement = () => {
                 ) : (
                   <div className="divide-y">
                     {expenses.map((expense) => (
-                      <div key={expense.id} className="px-4 py-2 hover:bg-gray-50 transition-colors" style={{minHeight: '40px'}}>
+                      <div key={expense.id} className="px-4 py-2.5 transition-colors hover:bg-muted/40">
                         <div className="flex items-center justify-between">
                           <div className="flex-1 min-w-0 flex items-center space-x-4">
                             {/* Description and Category */}
@@ -865,7 +848,7 @@ const ExpenseManagement = () => {
               </div>
               </div>
             ) : (
-              <div className="flex-1 bg-white overflow-auto">
+              <div className="flex-1 overflow-auto bg-background">
                 <ExpensesCalendar
                   scope={scope}
                   dateRange={dateRange}
@@ -880,20 +863,22 @@ const ExpenseManagement = () => {
               </div>
             )}
           </div>
+          </div>
         ) : (
           /* Add Expense Form */
-          <div className="flex-1 overflow-hidden flex flex-col">
+          <div className="admin-section overflow-hidden">
+            <div className="flex min-h-[640px] flex-col">
             {/* Header for Add Expense View */}
-            <div className="bg-gradient-to-r from-slate-700 via-slate-800 to-slate-900 px-6 py-4 flex items-center justify-between shadow-lg">
+            <div className="flex items-center justify-between gap-3 border-b bg-card px-4 py-3 sm:px-5">
               <div className="flex items-center gap-4">
-                <h2 className="text-2xl font-bold text-white">Add New Expense</h2>
+                <h2 className="text-base font-semibold text-foreground sm:text-lg">Add New Expense</h2>
               </div>
 
               <div className="flex items-center gap-2">
                 {/* Back to View Button */}
                 <button
                   onClick={() => setActiveTab('view')}
-                  className="px-4 py-2 text-sm font-semibold bg-white/20 backdrop-blur-sm text-white rounded-lg hover:bg-white/30 transition-all duration-200 flex items-center gap-2"
+                  className="btn-outline flex items-center gap-2"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
@@ -904,10 +889,10 @@ const ExpenseManagement = () => {
             </div>
 
             {/* Form Content */}
-            <div className="flex-1 overflow-auto bg-white p-6">
+            <div className="flex-1 overflow-auto bg-background p-4 sm:p-5">
               <div className="w-full">
                 <div className="mb-6">
-                  <p className="text-sm text-gray-600">Fill in the details below to record a new expense</p>
+                  <p className="text-sm text-muted-foreground">Fill in the details below to record a new expense.</p>
                 </div>
                 
                 <ExpenseForm
@@ -918,20 +903,20 @@ const ExpenseManagement = () => {
                 />
                 
                 {/* Submit Button */}
-                <div className="mt-8 pt-6 border-t border-gray-200 flex justify-end gap-3 sticky bottom-0 bg-white py-4 -mx-6 px-6">
+                <div className="sticky bottom-0 mt-6 flex justify-end gap-3 border-t bg-background py-4">
                   <button
                     onClick={() => setActiveTab('view')}
-                    className="px-6 py-2.5 text-sm font-semibold text-gray-700 bg-white border-2 border-gray-300 rounded-xl hover:bg-gray-50 transition-all duration-200"
+                    className="btn-outline"
                   >
                     Cancel
                   </button>
                   <button
                     onClick={handleSubmitExpense}
                     disabled={!isComplete || hasErrors || isSubmitting}
-                    className={`px-6 py-2.5 text-sm font-semibold rounded-xl transition-all duration-200 flex items-center gap-2 ${
+                    className={`flex items-center gap-2 rounded-xl px-5 py-2 text-sm font-semibold transition-all duration-200 ${
                       !isComplete || hasErrors || isSubmitting
                         ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                        : 'bg-gradient-to-br from-slate-700 to-slate-800 text-white hover:shadow-lg hover:scale-105'
+                        : 'bg-primary text-primary-foreground hover:bg-primary/90'
                     }`}
                   >
                     {isSubmitting ? (
@@ -950,67 +935,68 @@ const ExpenseManagement = () => {
               </div>
             </div>
           </div>
+          </div>
         )}
 
         {/* Expense Detail Modal */}
         {selectedExpense && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-              <div className="p-6 border-b">
+          <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-[2px] flex items-center justify-center p-3 sm:p-6">
+            <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-3xl border bg-card shadow-2xl">
+              <div className="admin-dialog-header admin-dialog-header-sticky">
                 <div className="flex items-center justify-between">
-                  <h2 className="text-xl font-semibold text-gray-900">Expense Details</h2>
+                  <h2 className="admin-dialog-title">Expense Details</h2>
                   <button
                     onClick={() => setSelectedExpense(null)}
-                    className="p-2 text-gray-400 hover:text-gray-600 rounded-lg"
+                    className="admin-dialog-close"
                   >
                     <XMarkIcon className="w-5 h-5" />
                   </button>
                 </div>
               </div>
-              <div className="p-6 space-y-4">
+              <div className="admin-dialog-body space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="text-sm font-medium text-gray-600">Reference Number</label>
+                    <label className="text-sm font-medium text-muted-foreground">Reference Number</label>
                     <p className="text-base font-medium">{selectedExpense.reference_number || 'N/A'}</p>
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-gray-600">Amount</label>
-                    <p className="text-xl font-bold text-gray-900">{formatCurrency(selectedExpense.total_amount)}</p>
+                    <label className="text-sm font-medium text-muted-foreground">Amount</label>
+                    <p className="text-xl font-bold text-foreground">{formatCurrency(selectedExpense.total_amount)}</p>
                   </div>
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-gray-600">Description</label>
+                  <label className="text-sm font-medium text-muted-foreground">Description</label>
                   <p className="text-base">{selectedExpense.description}</p>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="text-sm font-medium text-gray-600">Category</label>
+                    <label className="text-sm font-medium text-muted-foreground">Category</label>
                     <span className={`inline-flex items-center px-2 py-1 rounded text-sm font-medium ${getCategoryColor(selectedExpense.expense_category)}`}>
                       {selectedExpense.expense_category}
                     </span>
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-gray-600">Date</label>
+                    <label className="text-sm font-medium text-muted-foreground">Date</label>
                     <p className="text-base">{formatDate(selectedExpense.transaction_date)}</p>
                   </div>
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-gray-600">Payment Method</label>
+                  <label className="text-sm font-medium text-muted-foreground">Payment Method</label>
                   <p className="text-base">{getPaymentMethodDisplay(selectedExpense.payment_method)}</p>
                 </div>
                 {selectedExpense.notes && (
                   <div>
-                    <label className="text-sm font-medium text-gray-600">Notes</label>
+                    <label className="text-sm font-medium text-muted-foreground">Notes</label>
                     <p className="text-base">{selectedExpense.notes}</p>
                   </div>
                 )}
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
-                    <label className="text-sm font-medium text-gray-600">Created</label>
+                    <label className="text-sm font-medium text-muted-foreground">Created</label>
                     <p>{formatDateTime(selectedExpense.created_at)}</p>
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-gray-600">Status</label>
+                    <label className="text-sm font-medium text-muted-foreground">Status</label>
                     <p className="capitalize">{selectedExpense.status || 'completed'}</p>
                   </div>
                 </div>

@@ -1,8 +1,8 @@
+import { API_BASE_URL } from '../config/apiBaseUrl';
+
 /**
  * Image utility functions for handling product and category images
  */
-
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
 /**
  * Get the correct image URL for display

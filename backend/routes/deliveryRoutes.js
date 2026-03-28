@@ -9,6 +9,36 @@ const router = express.Router();
 const deliveryService = require('../services/delivery/DeliveryService');
 
 /**
+ * GET /api/delivery/options
+ * Get customer-facing delivery options, fees, and ETA for a pincode
+ */
+router.get('/options', async (req, res) => {
+  try {
+    const { pincode, subtotal = 0 } = req.query;
+
+    if (!pincode || String(pincode).trim().length !== 6) {
+      return res.status(400).json({
+        success: false,
+        error: 'Valid 6-digit pincode is required'
+      });
+    }
+
+    const result = await deliveryService.getDeliveryOptions({
+      pincode: String(pincode).trim(),
+      orderSubtotal: subtotal
+    });
+
+    res.json(result);
+  } catch (error) {
+    console.error('[DeliveryRoutes] Delivery options lookup failed:', error.message);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
  * GET /api/delivery/track/:orderId
  * Track shipment by order ID
  */

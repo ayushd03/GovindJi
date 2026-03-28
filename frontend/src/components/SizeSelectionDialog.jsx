@@ -1,17 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { ShoppingCart, Package } from 'lucide-react';
+import { ShoppingCart } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from './ui/dialog';
 import { Button } from './ui/button';
-import { Badge } from './ui/badge';
 import { useCart } from '../context/CartContext';
 import { useProductImage } from '../hooks/useProductImage';
+import {
+  buildCartItem,
+  clampQuantityToStock,
+  formatCompactStockLabel,
+  getStockLevel,
+  getProductPricing,
+  getProductVariants,
+  getSelectedVariant,
+} from '../utils/productPricing';
 import { cn } from '../lib/utils';
 
 const SizeSelectionDialog = ({ isOpen, onClose, product, onAddToCart }) => {
@@ -20,52 +27,42 @@ const SizeSelectionDialog = ({ isOpen, onClose, product, onAddToCart }) => {
   const [isAdding, setIsAdding] = useState(false);
   const { addToCart } = useCart();
   const { primaryImage } = useProductImage(product?.id, product?.image_url);
-
-  // Use dynamic variants from product - only show if variants are configured
-  const sizes = React.useMemo(() => {
-    if (product?.variants && product.variants.length > 0) {
-      // Use configured variants from database
-      return product.variants.map(variant => ({
-        id: variant.id,
-        label: variant.variant_name,
-        price: parseFloat(variant.price),
-        popular: variant.is_default,
-        size_value: variant.size_value,
-        size_unit: variant.size_unit
-      }));
-    }
-    // No variants configured - return empty array
-    return [];
-  }, [product]);
+  const variants = getProductVariants(product);
+  const pricing = getProductPricing(product, selectedSize);
+  const selectedVariant = getSelectedVariant(product, selectedSize, { preferInStock: false });
+  const selectedStock = pricing.availableStock;
+  const lowStockThreshold = product?.min_stock_level || 5;
 
   useEffect(() => {
-    if (isOpen && sizes.length > 0) {
-      // Default to the popular/default option or first option
-      const defaultSize = sizes.find(size => size.popular) || sizes[0];
-      setSelectedSize(defaultSize.id);
+    if (isOpen && variants.length > 0) {
+      const defaultVariant = getSelectedVariant(product, null, { preferInStock: true });
+      setSelectedSize(defaultVariant?.id || '');
       setQuantity(1);
     }
-  }, [isOpen, sizes]);
+  }, [isOpen, product, variants.length]);
+
+  useEffect(() => {
+    if (!selectedVariant) {
+      return;
+    }
+
+    setQuantity((currentQuantity) => clampQuantityToStock(currentQuantity, selectedVariant.stock_quantity));
+  }, [selectedVariant]);
 
   const handleAddToCart = async () => {
-    if (!selectedSize || !product) return;
+    if (!selectedSize || !product || !selectedVariant || selectedStock <= 0) return;
 
     setIsAdding(true);
-
-    const selectedSizeData = sizes.find(size => size.id === selectedSize);
-    const productWithSize = {
+    const productWithSize = buildCartItem({
       ...product,
-      size: selectedSizeData.label,
-      size_value: selectedSizeData.size_value,
-      size_unit: selectedSizeData.size_unit,
-      variant_id: selectedSizeData.id,
-      price: selectedSizeData.price,
-      originalId: product.id,
-      id: `${product.id}-${selectedSize}`,
-      image_url: primaryImage || product.image_url
-    };
+      image_url: primaryImage || product.image_url,
+    }, selectedSize);
 
     try {
+      if (!productWithSize) {
+        throw new Error('Selected variant is unavailable');
+      }
+
       if (onAddToCart) {
         // Use custom onAddToCart if provided
         await onAddToCart(productWithSize, quantity);
@@ -84,11 +81,61 @@ const SizeSelectionDialog = ({ isOpen, onClose, product, onAddToCart }) => {
     }
   };
 
-  const selectedSizeData = sizes.find(size => size.id === selectedSize);
-  const totalPrice = selectedSizeData ? selectedSizeData.price * quantity : 0;
+  const totalPrice = selectedVariant ? pricing.selectedPrice * quantity : 0;
 
   // Don't show dialog if no variants configured
-  if (!isOpen || sizes.length === 0) return null;
+  if (!isOpen || variants.length === 0) return null;
+
+  const renderVariantButton = (variant) => {
+    const stockQuantity = variant.stock_quantity ?? 0;
+    const isDisabled = stockQuantity <= 0;
+    const isSelected = selectedSize === variant.id;
+    const stockLevel = getStockLevel(stockQuantity, lowStockThreshold);
+    const stockLabel = formatCompactStockLabel(stockQuantity, lowStockThreshold);
+
+    return (
+      <button
+        key={variant.id}
+        type="button"
+        onClick={() => {
+          if (!isDisabled) {
+            setSelectedSize(variant.id);
+            setQuantity(1);
+          }
+        }}
+        disabled={isDisabled}
+        className={cn(
+          "relative flex min-h-[94px] flex-col items-center justify-center gap-1 rounded-xl border px-2 py-2.5 text-center text-xs transition-all",
+          isDisabled
+            ? "cursor-not-allowed border-border bg-muted text-muted-foreground opacity-55"
+            : isSelected
+              ? "border-primary bg-primary text-primary-foreground shadow-sm"
+              : "border-border bg-background hover:border-primary/60 hover:shadow-sm"
+        )}
+      >
+        {variant.is_default && !isDisabled && (
+          <div className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-blue-500" />
+        )}
+
+        <div className="font-semibold leading-tight">{variant.variant_name}</div>
+        <div className="text-xs opacity-80">₹{Number.parseFloat(variant.price).toFixed(0)}</div>
+        <span
+          className={cn(
+            "inline-flex items-center justify-center rounded-full border px-2 py-0.5 text-[10px] font-semibold leading-4 whitespace-nowrap",
+            isSelected
+              ? "border-white/20 bg-white/12 text-white"
+              : stockLevel === 'out'
+                ? "border-rose-200 bg-rose-50 text-rose-700"
+                : stockLevel === 'low'
+                  ? "border-amber-200 bg-amber-50 text-amber-700"
+                  : "border-emerald-200 bg-emerald-50 text-emerald-700"
+          )}
+        >
+          {stockLabel}
+        </span>
+      </button>
+    );
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -120,43 +167,12 @@ const SizeSelectionDialog = ({ isOpen, onClose, product, onAddToCart }) => {
         {/* Size Selection - Compact Grid */}
         <div className="px-4 pb-3">
           <div className="grid grid-cols-3 gap-2">
-            {sizes.slice(0, 3).map((size) => (
-              <button
-                key={size.id}
-                onClick={() => setSelectedSize(size.id)}
-                className={cn(
-                  "relative p-2 rounded-md border text-center transition-all text-xs",
-                  selectedSize === size.id
-                    ? "border-primary bg-primary text-primary-foreground"
-                    : "border-border hover:border-primary"
-                )}
-              >
-                {size.popular && (
-                  <div className="absolute -top-1 -right-1 w-2 h-2 bg-blue-500 rounded-full"></div>
-                )}
-                <div className="font-semibold">{size.label}</div>
-                <div className="text-xs opacity-80">₹{size.price.toFixed(0)}</div>
-              </button>
-            ))}
+            {variants.slice(0, 3).map(renderVariantButton)}
           </div>
-          
-          {sizes.length > 3 && (
+
+          {variants.length > 3 && (
             <div className="grid grid-cols-2 gap-2 mt-2">
-              {sizes.slice(3).map((size) => (
-                <button
-                  key={size.id}
-                  onClick={() => setSelectedSize(size.id)}
-                  className={cn(
-                    "p-2 rounded-md border text-center transition-all text-xs",
-                    selectedSize === size.id
-                      ? "border-primary bg-primary text-primary-foreground"
-                      : "border-border hover:border-primary"
-                  )}
-                >
-                  <div className="font-semibold">{size.label}</div>
-                  <div className="text-xs opacity-80">₹{size.price.toFixed(0)}</div>
-                </button>
-              ))}
+              {variants.slice(3).map(renderVariantButton)}
             </div>
           )}
         </div>
@@ -177,7 +193,8 @@ const SizeSelectionDialog = ({ isOpen, onClose, product, onAddToCart }) => {
             <Button
               variant="outline"
               size="icon"
-              onClick={() => setQuantity(quantity + 1)}
+              onClick={() => setQuantity(clampQuantityToStock(quantity + 1, selectedVariant?.stock_quantity))}
+              disabled={selectedStock <= 0 || (selectedVariant && quantity >= selectedStock)}
               className="h-7 w-7"
             >
               +
@@ -194,7 +211,7 @@ const SizeSelectionDialog = ({ isOpen, onClose, product, onAddToCart }) => {
         <div className="p-4 pt-2 border-t">
           <Button
             onClick={handleAddToCart}
-            disabled={!selectedSize || isAdding}
+            disabled={!selectedSize || !selectedVariant || selectedStock <= 0 || isAdding}
             className="w-full"
             size="sm"
           >

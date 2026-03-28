@@ -1,150 +1,41 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { motion, useAnimation } from 'framer-motion';
-import { ArrowRight, Star, Shield, Truck, Heart, Award, Leaf, CheckCircle } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { ArrowRight, Award, Leaf, ShieldCheck, Star, Truck } from 'lucide-react';
 import ProductCard from '../components/ProductCard';
 import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
-import { Badge } from '../components/ui/badge';
-import { productsAPI, categoriesAPI } from '../services/api';
+import { categoriesAPI, productsAPI } from '../services/api';
 import { getImageUrl } from '../utils/imageUtils';
+
+const brandPoints = [
+  {
+    icon: Award,
+    title: 'Premium quality',
+    description: 'Handpicked dry fruits and nuts selected for freshness and taste.',
+  },
+  {
+    icon: Leaf,
+    title: 'Freshly packed',
+    description: 'A reliable range for daily use, festive gifting, and repeat orders.',
+  },
+  {
+    icon: Truck,
+    title: 'Clear delivery',
+    description: 'Delivery charges and timelines are visible before the final order step.',
+  },
+  {
+    icon: ShieldCheck,
+    title: 'Simple checkout',
+    description: 'Cleaner order flow with better summaries and order tracking.',
+  },
+];
 
 const Home = () => {
   const [featuredProducts, setFeaturedProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [isHovered, setIsHovered] = useState(false);
-  const [currentPosition, setCurrentPosition] = useState(-320);
-  const [isMounted, setIsMounted] = useState(false);
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragStartX, setDragStartX] = useState(0);
-  const [dragStartPosition, setDragStartPosition] = useState(0);
-  const controls = useAnimation();
-
-  // Set mounted state
-  useEffect(() => {
-    setIsMounted(true);
-    return () => setIsMounted(false);
-  }, []);
-
-  // Touch/drag handlers
-  const handleDragStart = (event, info) => {
-    if (isDragging) return;
-    setIsDragging(true);
-    setIsHovered(true);
-    controls.stop();
-    setDragStartX(info.point.x);
-    setDragStartPosition(currentPosition);
-  };
-
-  const handleDrag = (event, info) => {
-    if (!isDragging) return;
-    const deltaX = info.point.x - dragStartX;
-    const newPosition = dragStartPosition + deltaX;
-    controls.set({ x: newPosition });
-    setCurrentPosition(newPosition);
-  };
-
-  const handleDragEnd = (event, info) => {
-    if (!isDragging) return;
-    setIsDragging(false);
-    
-    const deltaX = info.point.x - dragStartX;
-    const velocity = info.velocity.x;
-    const cardWidth = 320;
-    
-    // Determine if swipe was significant enough
-    const threshold = cardWidth / 3;
-    let snapPosition = dragStartPosition;
-    
-    if (Math.abs(deltaX) > threshold || Math.abs(velocity) > 500) {
-      if (deltaX > 0 || velocity > 500) {
-        // Swiped right - go to previous
-        snapPosition = Math.min(dragStartPosition + cardWidth, -320);
-      } else {
-        // Swiped left - go to next
-        const maxPosition = -320 * (featuredProducts.length + 1);
-        snapPosition = Math.max(dragStartPosition - cardWidth, maxPosition);
-      }
-    }
-    
-    // Animate to snap position
-    controls.start({
-      x: snapPosition,
-      transition: {
-        type: "spring",
-        stiffness: 300,
-        damping: 30
-      }
-    });
-    setCurrentPosition(snapPosition);
-    
-    // Resume auto-animation after a delay
-    setTimeout(() => {
-      setIsHovered(false);
-    }, 2000);
-  };
-
-  // Animation function to start from current position
-  const startAnimation = async (fromPosition = -320) => {
-    if (!isMounted || featuredProducts.length === 0 || isDragging) return;
-    
-    const endPosition = -320 * (featuredProducts.length + 1);
-    const distance = Math.abs(endPosition - fromPosition);
-    const totalDistance = Math.abs(endPosition - (-320));
-    const remainingDuration = (distance / totalDistance) * featuredProducts.length * 6;
-    
-    try {
-      await controls.start({
-        x: endPosition,
-        transition: {
-          duration: remainingDuration,
-          ease: "linear"
-        }
-      });
-      
-      // Restart from beginning after reaching end
-      if (!isHovered && !isDragging && isMounted) {
-        try {
-          controls.set({ x: -320 });
-          setCurrentPosition(-320);
-          startAnimation(-320);
-        } catch (error) {
-          console.log('Animation reset error:', error);
-        }
-      }
-    } catch (error) {
-      // Handle animation errors gracefully
-      console.log('Animation error:', error);
-    }
-  };
-
-  // Start animation when products are loaded
-  useEffect(() => {
-    if (isMounted && featuredProducts.length > 0 && !isHovered) {
-      // Add a small delay to ensure component is mounted
-      const timer = setTimeout(() => {
-        startAnimation(currentPosition);
-      }, 100);
-      return () => clearTimeout(timer);
-    }
-  }, [featuredProducts, isMounted]);
-
-  // Handle hover state
-  useEffect(() => {
-    if (!isMounted) return;
-    
-    if (isHovered || isDragging) {
-      controls.stop();
-    } else if (featuredProducts.length > 0) {
-      // Continue from current position with a small delay
-      const timer = setTimeout(() => {
-        startAnimation(currentPosition);
-      }, 100);
-      return () => clearTimeout(timer);
-    }
-  }, [isHovered, isDragging, isMounted]);
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -153,19 +44,15 @@ const Home = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Fetch products and categories in parallel
         const [productsResponse, categoriesResponse] = await Promise.all([
           productsAPI.getAll(),
-          categoriesAPI.getAll()
+          categoriesAPI.getAll(),
         ]);
-        
-        setFeaturedProducts(productsResponse.data.slice(0, 8));
-        // Ensure categories is always an array
-        setCategories(Array.isArray(categoriesResponse.data) ? categoriesResponse.data : []);
-      } catch (err) {
-        setError('Failed to load data');
-        console.error('Error fetching data:', err);
-        // Set empty arrays on error
+
+        setFeaturedProducts((productsResponse.data || []).slice(0, 4));
+        setCategories(Array.isArray(categoriesResponse.data) ? categoriesResponse.data.slice(0, 5) : []);
+      } catch (requestError) {
+        setError('Failed to load storefront data.');
         setFeaturedProducts([]);
         setCategories([]);
       } finally {
@@ -176,369 +63,188 @@ const Home = () => {
     fetchData();
   }, []);
 
-  // Get category background from category data or fallback to gradient
-  const getCategoryBackground = (category) => {
-    // Use primary image if available, otherwise fallback to gradient
-    const primaryImage = category.primary_image || category.category_images?.[0]?.image_url;
-    const processedImage = primaryImage ? getImageUrl(primaryImage, 'category') : null;
-    const gradient = category.gradient_colors || 'from-gray-400 to-gray-600';
-    
-    return {
-      image: processedImage,
-      gradient: gradient
-    };
-  };
-
-  const features = [
-    {
-      icon: Award,
-      title: 'Premium Quality',
-      description: 'Hand-picked, finest quality dry fruits and nuts sourced from the best farms',
-      color: 'text-primary-accent'
-    },
-    {
-      icon: Leaf,
-      title: 'Fresh & Natural',
-      description: 'No artificial preservatives, 100% natural and fresh products',
-      color: 'text-green-500'
-    },
-    {
-      icon: Truck,
-      title: 'Fast Delivery',
-      description: 'Quick and reliable delivery to your doorstep nationwide',
-      color: 'text-blue-500'
-    },
-    {
-      icon: Shield,
-      title: 'Secure Shopping',
-      description: 'Safe and secure online shopping with encrypted payment',
-      color: 'text-purple-500'
-    }
-  ];
-
-  const fadeInUp = {
-    initial: { opacity: 0, y: 60 },
-    animate: { opacity: 1, y: 0 },
-    transition: { duration: 0.8, ease: "easeOut" }
-  };
-
-  const slideInFromRight = {
-    initial: { opacity: 0, x: 100 },
-    animate: { opacity: 1, x: 0 },
-    transition: { duration: 0.8, ease: "easeOut" }
-  };
-
-  const stagger = {
-    animate: {
-      transition: {
-        staggerChildren: 0.1
-      }
-    }
-  };
+  const categoryCards = useMemo(
+    () =>
+      categories.map((category) => {
+        const primaryImage = category.primary_image || category.category_images?.[0]?.image_url;
+        return {
+          ...category,
+          image: primaryImage ? getImageUrl(primaryImage, 'category') : null,
+          gradient: category.gradient_colors || 'from-[#526d41] to-[#2f4932]',
+        };
+      }),
+    [categories]
+  );
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <motion.div
-          animate={{ rotate: 360 }}
-          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-          className="w-12 h-12 border-4 border-primary-accent border-t-transparent rounded-full"
-        />
+      <div className="page-shell-soft">
+        <div className="page-container flex min-h-[70vh] items-center justify-center">
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+            className="h-10 w-10 rounded-full border-[3px] border-[#23442a]/15 border-t-[#23442a]"
+          />
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen">
-      {/* Hero Section */}
-      <motion.section 
-        className="relative min-h-screen flex items-center justify-center overflow-hidden pt-20"
-        style={{
-          backgroundImage: `url(${process.env.PUBLIC_URL}/hero_bgg.webp)`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          backgroundRepeat: 'no-repeat'
-        }}
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 1 }}
-      >
-        <div className="absolute inset-0 bg-black/30" />
-        
-        {/* Floating decorative elements */}
-        <motion.div
-          className="absolute top-20 left-10 w-20 h-20 bg-white/10 rounded-full blur-xl"
-          animate={{ y: [-20, 20, -20] }}
-          transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
+    <div className="page-shell-soft">
+      <section className="relative flex min-h-[86vh] items-center overflow-hidden pt-24">
+        <div
+          className="absolute inset-0 bg-cover bg-center"
+          style={{ backgroundImage: `url(${process.env.PUBLIC_URL}/hero_bgg.webp)` }}
         />
-        <motion.div
-          className="absolute bottom-32 right-16 w-32 h-32 bg-white/5 rounded-full blur-2xl"
-          animate={{ y: [20, -20, 20] }}
-          transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
-        />
+        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(17,24,39,0.66),rgba(17,24,39,0.5))]" />
 
-        <div className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-8 text-center text-white">
-          <motion.div
-            initial={{ opacity: 0, y: 50 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.2 }}
-          >
-            <motion.h1 
-              className="text-5xl md:text-7xl font-bold mb-6 leading-tight"
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8, delay: 0.4 }}
-            >
-              Welcome to{' '}
-              <span className="bg-gradient-to-r from-orange-400 to-blue-500 bg-clip-text text-transparent">
-                GovindJi
-              </span>
+        <div className="page-container relative z-10 py-16">
+          <div className="mx-auto max-w-4xl text-center text-white">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.34em] text-white/70">
+              GovindJi Dry Fruits
+            </p>
+            <h1 className="mt-6 font-heading text-[3.2rem] font-semibold leading-[0.96] tracking-[-0.05em] text-white sm:text-[4.5rem] lg:text-[5.2rem]">
+              Premium dry fruits,
               <br />
-              Dry Fruits
-            </motion.h1>
-            
-            <motion.p 
-              className="text-xl md:text-2xl mb-8 max-w-3xl mx-auto leading-relaxed"
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8, delay: 0.6 }}
-            >
-              Your one-stop shop for the finest dry fruits and nuts,
-              handpicked for exceptional quality and guaranteed freshness
-            </motion.p>
-            
-            <motion.div
-              className="flex flex-col sm:flex-row gap-4 justify-center items-center"
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8, delay: 0.8 }}
-            >
+              simply presented
+            </h1>
+            <p className="mx-auto mt-6 max-w-2xl text-base leading-8 text-white/84 sm:text-lg">
+              Handpicked dry fruits and nuts with a cleaner storefront, clearer delivery visibility,
+              and a simpler path from browsing to checkout.
+            </p>
+
+            <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <Link to="/products">
-                <Button
-                  size="lg"
-                  className="bg-white text-gray-800 hover:bg-white/90 px-8 py-4 rounded-full font-semibold text-lg shadow-2xl hover:shadow-3xl transition-all duration-300 inline-flex items-center space-x-2"
-                >
-                  <span>Shop Now</span>
-                  <ArrowRight className="w-5 h-5" />
+                <Button className="h-12 rounded-full bg-white px-7 text-sm font-semibold text-slate-900 hover:bg-white/92">
+                  Shop Now
+                  <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               </Link>
-              
-              <motion.div
-                className="flex items-center space-x-2 text-white/90"
-                whileHover={{ scale: 1.02 }}
-              >
-                <div className="flex space-x-1">
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <Star key={star} className="w-5 h-5 fill-yellow-400 text-yellow-400" />
-                  ))}
-                </div>
-                <span className="ml-2">Trusted by 10,000+ customers</span>
-              </motion.div>
-            </motion.div>
-          </motion.div>
-        </div>
-      </motion.section>
-
-      {/* Shop by Category Section */}
-      <motion.section
-        className="py-16 bg-gradient-to-br from-light-gray to-white"
-        {...fadeInUp}
-      >
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <motion.div className="text-center mb-16" {...fadeInUp}>
-            <h2 className="text-4xl md:text-5xl font-bold text-primary-text mb-4">
-              Shop by Category
-            </h2>
-            <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-              Explore our premium collection of handpicked dry fruits and nuts
-            </p>
-          </motion.div>
-          
-          <motion.div 
-            className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6"
-            variants={stagger}
-            initial="initial"
-            whileInView="animate"
-            viewport={{ once: true }}
-          >
-            {(categories || []).map((category, index) => {
-              const bgConfig = getCategoryBackground(category);
-              return (
-                <Link 
-                  to="/products" 
-                  state={{ selectedCategoryId: category.id }}
-                  key={category.id || category.name}
+              <Link to="/orders">
+                <Button
+                  variant="outline"
+                  className="h-12 rounded-full border border-white/24 bg-transparent px-7 text-sm font-semibold text-white hover:bg-white/10 hover:text-white"
                 >
-                  <motion.div
-                    variants={fadeInUp}
-                    whileHover={{ scale: 1.03, y: -3 }}
-                    className="group cursor-pointer"
-                  >
-                    <Card className="relative h-48 overflow-hidden border-0 shadow-md hover:shadow-lg transition-all duration-300">
-                      <div 
-                        className={`absolute inset-0 bg-gradient-to-br ${bgConfig.gradient}`}
-                        style={{
-                          backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.3), rgba(0, 0, 0, 0.5)), url('${bgConfig.image}')`,
-                          backgroundSize: 'cover',
-                          backgroundPosition: 'center',
-                          backgroundBlendMode: 'overlay'
-                        }}
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-                      <CardContent className="relative z-10 h-full p-6 flex flex-col justify-end text-center">
-                        <h3 className="text-white font-bold text-xl mb-2 drop-shadow-lg">
-                          {category.name}
-                        </h3>
-                        <Badge 
-                          variant="secondary" 
-                          className="mx-auto bg-white/20 text-white border-white/30 hover:bg-white/30"
-                        >
-                          Shop Now →
-                        </Badge>
-                      </CardContent>
-                    </Card>
-                  </motion.div>
-                </Link>
-              );
-            })}
-          </motion.div>
-        </div>
-      </motion.section>
+                  Track Orders
+                </Button>
+              </Link>
+            </div>
 
-      {/* Featured Products Section */}
-      <motion.section className="py-16 bg-white" {...fadeInUp}>
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <motion.div className="text-center mb-16" {...fadeInUp}>
-            <h2 className="text-4xl md:text-5xl font-bold text-primary-text mb-4">
-              Featured Products
-            </h2>
-            <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-              Discover our most popular and premium quality dry fruits
-            </p>
-          </motion.div>
-          
-          {error ? (
-            <motion.div 
-              className="text-center py-16"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-            >
-              <div className="text-red-500 text-lg font-medium">{error}</div>
-            </motion.div>
-          ) : (
-            <>
-              <div 
-                className="relative overflow-hidden mb-12 py-6"
-                onMouseEnter={() => setIsHovered(true)}
-                onMouseLeave={() => setIsHovered(false)}
-              >
-                <motion.div 
-                  className="flex gap-8 will-change-transform cursor-grab active:cursor-grabbing"
-                  animate={controls}
-                  drag="x"
-                  dragConstraints={{ left: -320 * (featuredProducts.length + 1), right: -320 }}
-                  dragElastic={0.1}
-                  onDragStart={handleDragStart}
-                  onDrag={handleDrag}  
-                  onDragEnd={handleDragEnd}
-                  onUpdate={(latest) => {
-                    if ((isHovered || isDragging) && latest.x !== undefined) {
-                      setCurrentPosition(latest.x);
-                    }
-                  }}
-                  style={{
-                    width: `${(featuredProducts.length * 2 + 2) * 320}px`
-                  }}
-                >
-                  {/* Duplicate products for seamless loop */}
-                  {[...featuredProducts, ...featuredProducts, ...featuredProducts.slice(0, 2)].map((product, index) => (
-                    <motion.div 
-                      key={`${product.id}-${index}`} 
-                      className="flex-shrink-0 w-80"
-                      whileHover={{ 
-                        scale: 1.02,
-                        zIndex: 10
-                      }}
-                      transition={{ 
-                        type: "spring",
-                        stiffness: 300,
-                        damping: 20
-                      }}
-                    >
-                      <ProductCard product={product} />
-                    </motion.div>
-                  ))}
-                </motion.div>
+            <div className="mt-8 flex items-center justify-center gap-3 text-sm text-white/82">
+              <div className="flex items-center gap-1 text-[#f2d08a]">
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <Star key={star} className="h-4 w-4 fill-current" />
+                ))}
               </div>
-              
-              <motion.div className="text-center" {...fadeInUp}>
-                <Link to="/products">
-                  <Button
-                    variant="outline"
-                    size="lg"
-                    className="inline-flex items-center space-x-2"
-                  >
-                    <span>View All Products</span>
-                    <ArrowRight className="w-5 h-5" />
-                  </Button>
-                </Link>
-              </motion.div>
-            </>
-          )}
+              <span>Trusted by repeat household buyers and gifting customers</span>
+            </div>
+          </div>
         </div>
-      </motion.section>
+      </section>
 
-      {/* Why Choose Us Section */}
-      <motion.section
-        className="py-16 bg-gradient-to-br from-orange-50 to-orange-100"
-        {...fadeInUp}
-      >
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <motion.div className="text-center mb-16" {...fadeInUp}>
-            <h2 className="text-4xl md:text-5xl font-bold text-primary-text mb-4">
-              Why Choose GovindJi Dry Fruits?
+      <section className="bg-white py-16 lg:py-18">
+        <div className="page-container">
+          <div className="mb-10 text-center">
+            <p className="page-eyebrow">Shop by Category</p>
+            <h2 className="mt-3 font-heading text-[2rem] font-semibold tracking-[-0.04em] text-foreground sm:text-[2.5rem]">
+              Browse by type
             </h2>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-              We're committed to providing you with the finest quality dry fruits 
-              and an exceptional shopping experience
-            </p>
-          </motion.div>
-          
-          <motion.div 
-            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8"
-            variants={stagger}
-            initial="initial"
-            whileInView="animate"
-            viewport={{ once: true }}
-          >
-            {features.map((feature, index) => {
-              const IconComponent = feature.icon;
+          </div>
+
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-5">
+            {categoryCards.map((category) => (
+              <Link
+                key={category.id || category.name}
+                to="/products"
+                state={{ selectedCategoryId: category.id }}
+                className="group"
+              >
+                <Card className="overflow-hidden rounded-[1.5rem] border-border/80 bg-white shadow-[0_14px_26px_rgba(15,23,42,0.05)] transition-all duration-300 group-hover:-translate-y-1 group-hover:shadow-[0_18px_34px_rgba(15,23,42,0.08)]">
+                  <div className="relative aspect-[4/4.8] overflow-hidden">
+                    {category.image ? (
+                      <img
+                        src={category.image}
+                        alt={category.name}
+                        className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+                      />
+                    ) : (
+                      <div className={`h-full w-full bg-gradient-to-br ${category.gradient}`} />
+                    )}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/10 to-transparent" />
+                    <div className="absolute inset-x-0 bottom-0 p-4">
+                      <p className="text-base font-semibold text-white">{category.name}</p>
+                    </div>
+                  </div>
+                </Card>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="bg-[#faf6ed] py-16 lg:py-18">
+        <div className="page-container">
+          <div className="mb-10 text-center">
+            <p className="page-eyebrow">Featured Products</p>
+            <h2 className="mt-3 font-heading text-[2rem] font-semibold tracking-[-0.04em] text-foreground sm:text-[2.5rem]">
+              Most ordered right now
+            </h2>
+          </div>
+
+          {error ? (
+            <div className="surface-card px-6 py-10 text-center">
+              <p className="text-base font-medium text-rose-600">{error}</p>
+            </div>
+          ) : (
+            <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
+              {featuredProducts.map((product) => (
+                <ProductCard key={product.id} product={product} />
+              ))}
+            </div>
+          )}
+
+          <div className="mt-10 text-center">
+            <Link to="/products">
+              <Button
+                variant="outline"
+                className="h-11 rounded-full border border-slate-300 bg-white px-6 text-sm font-semibold text-slate-900 hover:bg-slate-50"
+              >
+                View All Products
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      <section className="bg-white py-16 lg:py-18">
+        <div className="page-container">
+          <div className="mb-10 text-center">
+            <p className="page-eyebrow">Why Choose Us</p>
+            <h2 className="mt-3 font-heading text-[2rem] font-semibold tracking-[-0.04em] text-foreground sm:text-[2.5rem]">
+              Quality and clarity first
+            </h2>
+          </div>
+
+          <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+            {brandPoints.map((point) => {
+              const Icon = point.icon;
               return (
-                <motion.div
-                  key={feature.title}
-                  variants={fadeInUp}
-                  whileHover={{ y: -8 }}
-                  className="group"
-                >
-                  <Card className="text-center h-full border-0 shadow-md hover:shadow-xl transition-all duration-300">
-                    <CardContent className="p-6">
-                      <div className={`inline-flex items-center justify-center w-16 h-16 rounded-full bg-muted/30 ${feature.color} mb-6 group-hover:scale-110 transition-transform duration-300`}>
-                        <IconComponent className="w-8 h-8" />
-                      </div>
-                      <h3 className="text-xl font-semibold mb-4">
-                        {feature.title}
-                      </h3>
-                      <p className="text-muted-foreground leading-relaxed">
-                        {feature.description}
-                      </p>
-                    </CardContent>
-                  </Card>
-                </motion.div>
+                <Card key={point.title} className="rounded-[1.5rem] border-border/80 bg-[#fcfaf5]">
+                  <CardContent className="p-6">
+                    <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-[#23442a]/8 text-[#23442a]">
+                      <Icon className="h-5 w-5" />
+                    </span>
+                    <h3 className="mt-4 text-lg font-semibold text-foreground">{point.title}</h3>
+                    <p className="mt-2 text-sm leading-7 text-muted-foreground">{point.description}</p>
+                  </CardContent>
+                </Card>
               );
             })}
-          </motion.div>
+          </div>
         </div>
-      </motion.section>
+      </section>
     </div>
   );
 };

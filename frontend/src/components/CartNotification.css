@@ -16,6 +16,12 @@
   color: #155724;
 }
 
+.cart-notification.warning {
+  background-color: #fff4db;
+  border: 1px solid #f7d38b;
+  color: #8a5a00;
+}
+
 .notification-content {
   display: flex;
   align-items: center;

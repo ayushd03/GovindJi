@@ -33,7 +33,11 @@
       "Bash(timeout 5 npm start:*)",
       "WebFetch(domain:one.delhivery.com)",
       "WebFetch(domain:delhivery-express-api-doc.readme.io)",
-      "WebFetch(domain:help.delhivery.com)"
+      "WebFetch(domain:help.delhivery.com)",
+      "Bash(ls -la /Users/ayushdangwal/Personal/GovindJiDryFruits/GovindJiDryFruits/backend/*.js /Users/ayushdangwal/Personal/GovindJiDryFruits/GovindJiDryFruits/backend/utils/)",
+      "Bash(./deploy/enable-https-selfsigned.sh 13.202.138.102)",
+      "Bash(chmod:*)",
+      "Bash(./deploy/enable-https-letsencrypt.sh govindjidryfruits.com ayushd03@gmail.com)"
     ],
     "deny": []
   }

@@ -1,18 +1,18 @@
 import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import { PermissionProvider } from './context/PermissionContext';
+import { PermissionProvider, usePermissions } from './context/PermissionContext';
 import { CartProvider, useCart } from './context/CartContext';
 import Header from './components/Header';
 import Footer from './components/Footer';
 import AdminLayout from './components/AdminLayout';
 import CartNotification from './components/CartNotification';
 import CartPopup from './components/CartPopup';
+import { Toaster } from './components/ui/toaster';
 import Home from './pages/Home';
 import Products from './pages/Products';
 import ProductDetail from './pages/ProductDetail';
-import Login from './pages/Login';
-import Signup from './pages/Signup';
+import Auth from './pages/Auth';
 import Checkout from './pages/Checkout';
 import PaymentVerify from './pages/PaymentVerify';
 import OrderSuccess from './pages/OrderSuccess';
@@ -27,31 +27,83 @@ import PartyManagement from './pages/admin/PartyManagement';
 import PurchaseOrderManagement from './pages/admin/PurchaseOrderManagement';
 import EmployeeManagement from './pages/admin/EmployeeManagement';
 import ExpenseManagement from './pages/admin/ExpenseManagement';
+import { buildAuthPath } from './utils/authRouting';
 import './App.css';
+
+const AppLoadingScreen = () => (
+  <div className="page-shell-soft">
+    <div className="page-container flex min-h-[60vh] items-center justify-center">
+      <div className="surface-card px-8 py-10 text-center">
+        <div className="mx-auto h-10 w-10 animate-spin rounded-full border-[3px] border-[#23442a]/15 border-t-[#23442a]" />
+        <p className="mt-4 text-sm font-medium text-muted-foreground">Loading your storefront…</p>
+      </div>
+    </div>
+  </div>
+);
 
 const ProtectedRoute = ({ children }) => {
   const { isAuthenticated, loading } = useAuth();
+  const location = useLocation();
   
   if (loading) {
-    return <div>Loading...</div>;
+    return <AppLoadingScreen />;
   }
   
-  return isAuthenticated ? children : <Navigate to="/login" />;
+  return isAuthenticated ? (
+    children
+  ) : (
+    <Navigate
+      to={buildAuthPath({
+        mode: 'sign-in',
+        next: `${location.pathname}${location.search}${location.hash}`,
+      })}
+      replace
+    />
+  );
 };
 
 const AdminRoute = ({ children }) => {
   const { isAuthenticated, loading } = useAuth();
-  
+  const { canAccessAdminPanel } = usePermissions();
+  const location = useLocation();
+
   if (loading) {
-    return <div>Loading...</div>;
+    return <AppLoadingScreen />;
   }
-  
+
   if (!isAuthenticated) {
-    return <Navigate to="/login" />;
+    return (
+      <Navigate
+        to={buildAuthPath({
+          mode: 'sign-in',
+          next: `${location.pathname}${location.search}${location.hash}`,
+        })}
+        replace
+      />
+    );
   }
-  
-  // The actual permission check is now handled by AdminPanelGuard in AdminLayout
+
+  // Check admin/manager permissions before rendering
+  if (!canAccessAdminPanel()) {
+    return <Navigate to="/" replace />;
+  }
+
   return children;
+};
+
+const LegacyAuthRedirect = ({ mode }) => {
+  const location = useLocation();
+  const searchParams = new URLSearchParams(location.search);
+
+  return (
+    <Navigate
+      to={buildAuthPath({
+        mode,
+        next: searchParams.get('next') || location.state?.from?.pathname || '',
+      })}
+      replace
+    />
+  );
 };
 
 const AppContent = () => {
@@ -83,6 +135,7 @@ const AppContent = () => {
   return (
     <div className="App">
       <CartNotification />
+      <Toaster />
       <CartPopup isOpen={isCartPopupOpen} onClose={closeCartPopup} />
       <Routes>
         {/* Admin Routes */}
@@ -93,6 +146,7 @@ const AppContent = () => {
                 <Route path="/" element={<AdminDashboard />} />
                 <Route path="/products" element={<ProductManagement />} />
                 <Route path="/orders" element={<OrderManagement />} />
+                <Route path="/delhivery" element={<Navigate to="/admin/orders?panel=delivery" replace />} />
                 <Route path="/categories" element={<CategoryManagement />} />
                 <Route path="/inventory" element={<InventoryManagement />} />
                 <Route path="/customers" element={<CustomerManagement />} />
@@ -114,8 +168,10 @@ const AppContent = () => {
                 <Route path="/" element={<Home />} />
                 <Route path="/products" element={<Products />} />
                 <Route path="/products/:id" element={<ProductDetail />} />
-                <Route path="/login" element={<Login />} />
-                <Route path="/signup" element={<Signup />} />
+                <Route path="/auth" element={<Auth />} />
+                <Route path="/login" element={<LegacyAuthRedirect mode="sign-in" />} />
+                <Route path="/signup" element={<LegacyAuthRedirect mode="sign-up" />} />
+                <Route path="/forgot-password" element={<LegacyAuthRedirect mode="forgot-password" />} />
                 <Route
                   path="/checkout"
                   element={

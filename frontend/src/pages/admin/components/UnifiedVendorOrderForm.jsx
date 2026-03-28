@@ -1,14 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   PlusIcon,
   TrashIcon,
   CubeIcon,
   BuildingOfficeIcon,
   DocumentTextIcon,
-  CalendarIcon,
-  BanknotesIcon,
-  CheckCircleIcon,
-  XMarkIcon
+  CheckCircleIcon
 } from '@heroicons/react/24/outline';
 import { Button } from '../../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../../components/ui/card';
@@ -27,7 +24,6 @@ import ProductSelector from './ProductSelector';
  * - Reusable across tabs
  */
 const UnifiedVendorOrderForm = ({
-  mode = 'create', // 'create' or 'edit'
   initialData = null,
   onSubmit,
   onCancel,
@@ -46,18 +42,8 @@ const UnifiedVendorOrderForm = ({
   const [validationErrors, setValidationErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Initialize form with initial data or pre-selected vendor
-  useEffect(() => {
-    if (initialData) {
-      setFormData(initialData);
-    } else if (preSelectedVendor) {
-      // When vendor is pre-selected, add first item with that vendor
-      addItem(preSelectedVendor);
-    }
-  }, [initialData, preSelectedVendor]);
-
   // Create empty item
-  const createEmptyItem = (vendor = null) => ({
+  const createEmptyItem = useCallback((vendor = null) => ({
     id: Date.now() + Math.random(),
     vendor_id: vendor?.id || '',
     vendor_name: vendor?.name || '',
@@ -79,16 +65,27 @@ const UnifiedVendorOrderForm = ({
     has_miscellaneous_expenses: false,
     miscellaneous_amount: 0,
     miscellaneous_note: ''
-  });
+  }), []);
 
   // Add new item
-  const addItem = (vendor = null) => {
+  const addItem = useCallback((vendor = null) => {
     const newItem = createEmptyItem(vendor);
     setFormData(prev => ({
       ...prev,
       items: [...prev.items, newItem]
     }));
-  };
+  }, [createEmptyItem]);
+
+  // Initialize form with initial data or pre-selected vendor
+  useEffect(() => {
+    if (initialData) {
+      setFormData(initialData);
+    } else if (preSelectedVendor) {
+      setFormData(prev => (
+        prev.items.length > 0 ? prev : { ...prev, items: [createEmptyItem(preSelectedVendor)] }
+      ));
+    }
+  }, [createEmptyItem, initialData, preSelectedVendor]);
 
   // Remove item
   const removeItem = (itemId) => {

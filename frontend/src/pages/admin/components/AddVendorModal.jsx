@@ -1,10 +1,20 @@
 import React, { useState } from 'react';
 import {
-  XMarkIcon,
   BuildingOfficeIcon
 } from '@heroicons/react/24/outline';
 import { Button } from '../../../components/ui/button';
 import { useToast } from '../../../hooks/useToast';
+import {
+  AdminDialog,
+  AdminDialogBody,
+  AdminDialogContent,
+  AdminDialogDescription,
+  AdminDialogFooter,
+  AdminDialogHeader,
+  AdminDialogIconButton,
+  AdminDialogTitle,
+} from '../../../components/AdminDialog';
+import { API_BASE_URL } from '../../../config/apiBaseUrl';
 
 const PARTY_CATEGORIES = [
   'Raw Materials',
@@ -39,11 +49,16 @@ const AddVendorModal = ({
   defaultName = '',
   editingVendor = null, // For editing existing vendors
   mode = 'add', // 'add' or 'edit'
-  apiBaseUrl = process.env.REACT_APP_API_URL || 'http://localhost:3001'
+  apiBaseUrl = API_BASE_URL
 }) => {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState('basic');
   const [isLoading, setIsLoading] = useState(false);
+  const tabItems = [
+    { key: 'basic', label: 'Basic Details', description: 'Identity and contacts' },
+    { key: 'gst', label: 'GST & Address', description: 'Compliance and location' },
+    { key: 'financial', label: 'Financial Details', description: 'Opening balance and notes' }
+  ];
 
   const [formData, setFormData] = useState({
     name: defaultName,
@@ -176,84 +191,79 @@ const AddVendorModal = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-2 sm:p-4 z-50">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-4xl max-h-[95vh] sm:max-h-[90vh] overflow-y-auto">
-        <div className="p-4 sm:p-6 border-b">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <BuildingOfficeIcon className="w-6 h-6 text-primary" />
-              <h2 className="text-lg sm:text-xl font-semibold text-gray-900">
-                {mode === 'edit' ? 'Edit Vendor' : 'Add New Vendor'}
-              </h2>
+    <AdminDialog open={isOpen} onOpenChange={(open) => { if (!open) handleClose(); }}>
+      <AdminDialogContent size="lg">
+        <AdminDialogHeader sticky>
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10">
+                <BuildingOfficeIcon className="h-5 w-5 text-primary" />
+              </div>
+              <div className="space-y-1">
+                <AdminDialogTitle>{mode === 'edit' ? 'Edit Vendor' : 'Add New Vendor'}</AdminDialogTitle>
+                <AdminDialogDescription>
+                  Capture vendor identity, compliance, and opening balance details in one place.
+                </AdminDialogDescription>
+              </div>
             </div>
-            <button
-              onClick={handleClose}
-              className="p-2 text-gray-400 hover:text-gray-600 rounded-lg"
-            >
-              <XMarkIcon className="w-5 h-5" />
-            </button>
+            <AdminDialogIconButton onClick={handleClose} />
+          </div>
+          <div className="admin-dialog-tabs mt-4">
+            {tabItems.map((tab) => (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => setActiveTab(tab.key)}
+                className={`admin-dialog-tab ${
+                  activeTab === tab.key
+                    ? 'border-primary/30 bg-primary/10 text-foreground shadow-sm'
+                    : 'border-border/70 bg-muted/20 text-muted-foreground hover:border-border hover:bg-muted/40 hover:text-foreground'
+                }`}
+              >
+                <div className="text-sm font-semibold">{tab.label}</div>
+                <div className="mt-1 text-xs">{tab.description}</div>
+              </button>
+            ))}
+          </div>
+        </AdminDialogHeader>
+
+        <form onSubmit={handleSubmit}>
+        <AdminDialogBody className="admin-dialog-stack">
+          <div className="admin-dialog-section-muted">
+            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h3 className="text-sm font-semibold text-foreground">
+                  {tabItems.find((tab) => tab.key === activeTab)?.label}
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  {tabItems.find((tab) => tab.key === activeTab)?.description}
+                </p>
+              </div>
+              <div className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
+                {mode === 'edit' ? 'Updating existing vendor' : 'New vendor record'}
+              </div>
+            </div>
           </div>
 
-          {/* Tabs */}
-          <div className="mt-4 border-b">
-            <nav className="flex space-x-8">
-              <button
-                className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                  activeTab === 'basic'
-                    ? 'border-primary text-primary'
-                    : 'border-transparent text-gray-500 hover:text-gray-700'
-                }`}
-                onClick={() => setActiveTab('basic')}
-                type="button"
-              >
-                Basic Details
-              </button>
-              <button
-                className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                  activeTab === 'gst'
-                    ? 'border-primary text-primary'
-                    : 'border-transparent text-gray-500 hover:text-gray-700'
-                }`}
-                onClick={() => setActiveTab('gst')}
-                type="button"
-              >
-                GST & Address
-              </button>
-              <button
-                className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                  activeTab === 'financial'
-                    ? 'border-primary text-primary'
-                    : 'border-transparent text-gray-500 hover:text-gray-700'
-                }`}
-                onClick={() => setActiveTab('financial')}
-                type="button"
-              >
-                Financial Details
-              </button>
-            </nav>
-          </div>
-        </div>
-
-        <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-6">
           {/* Basic Details Tab */}
           {activeTab === 'basic' && (
             <div className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="admin-dialog-grid-2">
                 <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-1">Vendor Name *</label>
+                  <label className="admin-dialog-label">Vendor Name *</label>
                   <input
                     type="text"
                     required
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                    className="input-field"
                     value={formData.name}
                     onChange={(e) => setFormData({...formData, name: e.target.value})}
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-1">Category *</label>
+                  <label className="admin-dialog-label">Category *</label>
                   <select
                     required
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                    className="input-field"
                     value={formData.category}
                     onChange={(e) => setFormData({...formData, category: e.target.value})}
                   >
@@ -264,31 +274,31 @@ const AddVendorModal = ({
                   </select>
                 </div>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="admin-dialog-grid-2">
                 <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-1">Contact Person</label>
+                  <label className="admin-dialog-label">Contact Person</label>
                   <input
                     type="text"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                    className="input-field"
                     value={formData.contact_person}
                     onChange={(e) => setFormData({...formData, contact_person: e.target.value})}
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-1">Phone Number</label>
+                  <label className="admin-dialog-label">Phone Number</label>
                   <input
                     type="tel"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                    className="input-field"
                     value={formData.phone_number}
                     onChange={(e) => setFormData({...formData, phone_number: e.target.value})}
                   />
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-600 mb-1">Email</label>
+                <label className="admin-dialog-label">Email</label>
                 <input
                   type="email"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="input-field"
                   value={formData.email}
                   onChange={(e) => setFormData({...formData, email: e.target.value})}
                 />
@@ -299,11 +309,11 @@ const AddVendorModal = ({
           {/* GST & Address Tab */}
           {activeTab === 'gst' && (
             <div className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="admin-dialog-grid-2">
                 <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-1">GST Type</label>
+                  <label className="admin-dialog-label">GST Type</label>
                   <select
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                    className="input-field"
                     value={formData.gst_type}
                     onChange={(e) => setFormData({...formData, gst_type: e.target.value})}
                   >
@@ -313,10 +323,10 @@ const AddVendorModal = ({
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-1">GSTIN</label>
+                  <label className="admin-dialog-label">GSTIN</label>
                   <input
                     type="text"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                    className="input-field"
                     placeholder="e.g., 22AAAAA0000A1Z5"
                     value={formData.gstin}
                     onChange={(e) => setFormData({...formData, gstin: e.target.value})}
@@ -324,9 +334,9 @@ const AddVendorModal = ({
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-600 mb-1">State</label>
+                <label className="admin-dialog-label">State</label>
                 <select
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="input-field"
                   value={formData.state}
                   onChange={(e) => setFormData({...formData, state: e.target.value})}
                 >
@@ -337,19 +347,19 @@ const AddVendorModal = ({
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-600 mb-1">Billing Address</label>
+                <label className="admin-dialog-label">Billing Address</label>
                 <textarea
                   rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="input-field"
                   value={formData.address}
                   onChange={(e) => setFormData({...formData, address: e.target.value})}
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-600 mb-1">Shipping Address</label>
+                <label className="admin-dialog-label">Shipping Address</label>
                 <textarea
                   rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="input-field"
                   placeholder="Leave blank if same as billing address"
                   value={formData.shipping_address}
                   onChange={(e) => setFormData({...formData, shipping_address: e.target.value})}
@@ -361,41 +371,43 @@ const AddVendorModal = ({
           {/* Financial Details Tab */}
           {activeTab === 'financial' && (
             <div className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="admin-dialog-grid-2">
                 <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-1">Opening Balance</label>
+                  <label className="admin-dialog-label">Opening Balance</label>
                   <input
                     type="number"
                     step="0.01"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                    className="input-field"
                     value={formData.opening_balance}
                     onChange={(e) => setFormData({...formData, opening_balance: parseFloat(e.target.value) || 0})}
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-1">As of Date</label>
+                  <label className="admin-dialog-label">As of Date</label>
                   <input
                     type="date"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                    className="input-field"
                     value={formData.balance_as_of_date}
                     onChange={(e) => setFormData({...formData, balance_as_of_date: e.target.value})}
                   />
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-600 mb-1">Notes</label>
+                <label className="admin-dialog-label">Notes</label>
                 <textarea
                   rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="input-field"
                   value={formData.notes}
                   onChange={(e) => setFormData({...formData, notes: e.target.value})}
                 />
               </div>
             </div>
           )}
+        </AdminDialogBody>
 
-          {/* Action Buttons */}
-          <div className="flex flex-col-reverse sm:flex-row gap-3 pt-6 border-t">
+        <AdminDialogFooter sticky className="flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-muted-foreground">Use tabs to complete the vendor record without leaving the form.</p>
+          <div className="flex w-full flex-col-reverse gap-3 sm:w-auto sm:flex-row">
             <Button
               type="button"
               variant="outline"
@@ -415,9 +427,10 @@ const AddVendorModal = ({
               }
             </Button>
           </div>
+        </AdminDialogFooter>
         </form>
-      </div>
-    </div>
+      </AdminDialogContent>
+    </AdminDialog>
   );
 };
 
