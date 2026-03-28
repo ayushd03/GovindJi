@@ -68,7 +68,7 @@ const Footer = () => {
               <div className="flex items-start gap-3">
                 <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-white/45" />
                 <p className="leading-6">
-                  Bartan Bazar, Indore
+                  Near Bajaj Khaana Chowk, Marothia Bazar, Indore
                   <br />
                   MP 452002
                 </p>

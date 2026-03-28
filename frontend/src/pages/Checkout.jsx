@@ -114,6 +114,8 @@ const Checkout = () => {
   const handleSubmit = async (event) => {
     event.preventDefault();
     setError('');
+    let createdOrder = null;
+    let orderId = null;
 
     if (formData.zipCode.length !== 6) {
       setError('Enter a valid 6-digit pincode to view delivery options.');
@@ -163,8 +165,8 @@ const Checkout = () => {
       };
 
       const response = await ordersAPI.create(orderData);
-      const createdOrder = response.data?.order || response.data;
-      const orderId = createdOrder?.id;
+      createdOrder = response.data?.order || response.data;
+      orderId = createdOrder?.id;
 
       if (!orderId) {
         throw new Error('Failed to create order - no order ID returned');
@@ -193,6 +195,13 @@ const Checkout = () => {
       clearCart();
       navigate('/order-success', { state: { order: createdOrder } });
     } catch (err) {
+      if (formData.paymentMethod === 'phonepe' && orderId) {
+        try {
+          await ordersAPI.releaseUnpaid(orderId);
+        } catch (releaseError) {
+          console.error('Unable to release unpaid order after checkout failure:', releaseError);
+        }
+      }
       setError(err.response?.data?.error || 'Failed to process checkout. Please try again.');
       setLoading(false);
     }

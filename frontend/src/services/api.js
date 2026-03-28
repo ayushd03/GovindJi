@@ -162,6 +162,7 @@ export const categoriesAPI = {
 
 export const ordersAPI = {
   create: (orderData) => api.post('/api/orders', orderData),
+  releaseUnpaid: (orderId) => api.put(`/api/orders/${orderId}/release-unpaid`),
   getUserOrders: (userId) => api.get(`/api/orders/${userId}`),
   createCheckoutSession: (items) => api.post('/api/create-checkout-session', { items }),
 };
@@ -189,6 +190,7 @@ export const deliveryAPI = {
   getSettings: () => api.get('/api/admin/delivery/settings'),
   updateSettings: (settings) => api.put('/api/admin/delivery/settings', settings),
   createShipment: (orderId) => api.post(`/api/admin/delivery/create-shipment/${orderId}`),
+  retryPickup: (orderId) => api.post(`/api/admin/delivery/retry-pickup/${orderId}`),
   schedulePickup: (pickupData) => api.post('/api/admin/delivery/schedule-pickup', pickupData),
   getShipments: (params) => api.get('/api/admin/delivery/shipments', { params }),
   getShipmentByAwb: (awbNumber) => api.get(`/api/admin/delivery/shipment/${awbNumber}`),

@@ -8,9 +8,6 @@
 const cron = require('node-cron');
 const deliveryService = require('./DeliveryService');
 const deliverySettingsService = require('./DeliverySettingsService');
-const { createBackendSupabaseClient } = require('../../config/supabaseClient');
-
-const supabase = createBackendSupabaseClient({ preferServiceRole: true });
 
 class PickupScheduler {
   constructor() {
@@ -56,8 +53,6 @@ class PickupScheduler {
    */
   async scheduleDailyPickup() {
     try {
-      // Get all shipments created today that need pickup
-      const today = new Date().toISOString().split('T')[0];
       const settings = await deliverySettingsService.getSettings();
 
       if (!settings.is_enabled) {
@@ -70,20 +65,10 @@ class PickupScheduler {
         return;
       }
 
-      const { data: pendingShipments, error: fetchError } = await supabase
-        .from('shipments')
-        .select('*')
-        .in('status', ['PENDING', 'MANIFESTED'])
-        .gte('created_at', `${today}T00:00:00`)
-        .is('pickup_scheduled_date', null);
-
-      if (fetchError) {
-        console.error('[PickupScheduler] Error fetching pending shipments:', fetchError);
-        return;
-      }
+      const pendingShipments = await deliveryService.fetchShipmentsAwaitingPickup();
 
       if (!pendingShipments || pendingShipments.length === 0) {
-        console.log('[PickupScheduler] No pending shipments for pickup today');
+        console.log('[PickupScheduler] No manifested shipments are waiting for pickup');
         return;
       }
 
@@ -95,6 +80,8 @@ class PickupScheduler {
         console.log(
           `[PickupScheduler] ✅ Successfully scheduled pickup for ${pickupResult.scheduled_count} shipments on ${pickupResult.pickup_date} at ${pickupResult.pickup_time}`
         );
+      } else {
+        console.warn('[PickupScheduler] Pickup scheduling needs attention:', pickupResult.pickup_error);
       }
 
     } catch (error) {

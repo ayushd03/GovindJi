@@ -62,6 +62,14 @@ class DeliveryService {
     return next;
   }
 
+  getPickupEligibleShipmentStatuses() {
+    return ['MANIFESTED', 'PENDING'];
+  }
+
+  getOpenPickupRequestStatuses() {
+    return ['SCHEDULED', 'REQUESTED', 'CREATED'];
+  }
+
   buildDeliveryOption({
     mode,
     label,
@@ -533,10 +541,146 @@ class DeliveryService {
       if (error) throw error;
       if (!shipment) throw new Error('Shipment not found for this order');
 
+      if (shipment.awb_number && this.isGatewayReady()) {
+        try {
+          const liveTracking = await this.trackShipment(shipment.awb_number);
+          return {
+            ...shipment,
+            status: this.mapDelhiveryStatus(liveTracking.status),
+            current_location: liveTracking.status_location || shipment.current_location,
+            last_scan_status: liveTracking.status || shipment.last_scan_status,
+            last_scan_datetime: liveTracking.status_datetime || shipment.last_scan_datetime,
+            live_tracking: liveTracking,
+          };
+        } catch (trackingError) {
+          console.warn('[DeliveryService] Falling back to cached shipment data:', trackingError.message);
+        }
+      }
+
       return shipment;
 
     } catch (error) {
       console.error('[DeliveryService] Track by order ID failed:', error.message);
+      throw error;
+    }
+  }
+
+  async fetchShipmentsAwaitingPickup({ orderId = null, createdAfter = null } = {}) {
+    let query = this.supabase
+      .from('shipments')
+      .select('*')
+      .in('status', this.getPickupEligibleShipmentStatuses())
+      .is('pickup_request_id', null)
+      .is('pickup_scheduled_date', null)
+      .order('created_at', { ascending: true });
+
+    if (orderId) {
+      query = query.eq('order_id', orderId);
+    }
+
+    if (createdAfter) {
+      query = query.gte('created_at', createdAfter);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      throw error;
+    }
+
+    return data || [];
+  }
+
+  async getOpenPickupRequestForSlot(slot) {
+    const { data, error } = await this.supabase
+      .from('pickup_requests')
+      .select('*')
+      .eq('pickup_location', slot.pickup_location)
+      .eq('pickup_date', slot.pickup_date)
+      .eq('pickup_time', slot.pickup_time)
+      .in('status', this.getOpenPickupRequestStatuses())
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) {
+      throw error;
+    }
+
+    return data;
+  }
+
+  async syncPickupRequestPackageCount(pickupRequestId) {
+    const { count, error: countError } = await this.supabase
+      .from('shipments')
+      .select('id', { count: 'exact', head: true })
+      .eq('pickup_request_id', pickupRequestId);
+
+    if (countError) {
+      throw countError;
+    }
+
+    const nextPackageCount = Number.parseInt(count, 10) || 0;
+
+    const { error: updateError } = await this.supabase
+      .from('pickup_requests')
+      .update({
+        expected_package_count: nextPackageCount,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', pickupRequestId);
+
+    if (updateError) {
+      throw updateError;
+    }
+
+    return nextPackageCount;
+  }
+
+  async linkShipmentsToPickupRequest(shipmentIds, {
+    pickupRequestId,
+    slot,
+    status = 'PICKUP_SCHEDULED',
+    pickupError = null,
+    attemptedAt = new Date().toISOString(),
+  }) {
+    if (!shipmentIds || shipmentIds.length === 0) {
+      return;
+    }
+
+    const { error } = await this.supabase
+      .from('shipments')
+      .update({
+        pickup_request_id: pickupRequestId,
+        pickup_scheduled_date: slot.pickup_date,
+        pickup_scheduled_time: slot.pickup_time,
+        pickup_last_attempt_at: attemptedAt,
+        pickup_error: pickupError,
+        status,
+        updated_at: new Date().toISOString(),
+      })
+      .in('id', shipmentIds);
+
+    if (error) {
+      throw error;
+    }
+  }
+
+  async recordPickupAttemptFailure(shipmentIds, errorMessage, attemptedAt = new Date().toISOString()) {
+    if (!shipmentIds || shipmentIds.length === 0) {
+      return;
+    }
+
+    const { error } = await this.supabase
+      .from('shipments')
+      .update({
+        pickup_last_attempt_at: attemptedAt,
+        pickup_error: errorMessage,
+        updated_at: new Date().toISOString(),
+      })
+      .in('id', shipmentIds);
+
+    if (error) {
       throw error;
     }
   }
@@ -551,7 +695,7 @@ class DeliveryService {
       const result = await this.gateway.schedulePickup(pickupDetails);
 
       // Store pickup request in database
-      await this.supabase
+      const { data: pickupRequest, error: pickupRequestError } = await this.supabase
         .from('pickup_requests')
         .insert({
           pickup_location: pickupDetails.pickup_location,
@@ -561,9 +705,18 @@ class DeliveryService {
           status: 'SCHEDULED',
           delhivery_pickup_id: result.pickup_id,
           delhivery_response: result.response
-        });
+        })
+        .select()
+        .single();
 
-      return result;
+      if (pickupRequestError) {
+        throw pickupRequestError;
+      }
+
+      return {
+        ...result,
+        pickup_request: pickupRequest,
+      };
 
     } catch (error) {
       console.error('[DeliveryService] Pickup scheduling failed:', error.message);
@@ -574,90 +727,142 @@ class DeliveryService {
   async schedulePickupForShipments(shipments, settings = null) {
     this.ensureInitialized();
 
-    if (!shipments || shipments.length === 0) {
+    const pendingShipments = (shipments || []).filter((shipment) => (
+      this.getPickupEligibleShipmentStatuses().includes(shipment.status) &&
+      !shipment.pickup_request_id &&
+      !shipment.pickup_scheduled_date
+    ));
+
+    if (pendingShipments.length === 0) {
       return { success: true, reused_existing_request: false, scheduled_count: 0 };
     }
 
     const resolvedSettings = settings || await deliverySettingsService.getSettings();
     const slot = deliverySettingsService.calculateNextPickupSlot(resolvedSettings);
-    const shipmentIds = shipments.map((shipment) => shipment.id);
-    const existingStatuses = ['SCHEDULED', 'REQUESTED', 'CREATED'];
-
-    const { data: existingRequest, error: pickupRequestError } = await this.supabase
-      .from('pickup_requests')
-      .select('*')
-      .eq('pickup_location', slot.pickup_location)
-      .eq('pickup_date', slot.pickup_date)
-      .eq('pickup_time', slot.pickup_time)
-      .in('status', existingStatuses)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (pickupRequestError) {
-      throw pickupRequestError;
-    }
+    const attemptedAt = new Date().toISOString();
+    const shipmentIds = pendingShipments.map((shipment) => shipment.id);
+    const existingRequest = await this.getOpenPickupRequestForSlot(slot);
 
     let pickupResult = null;
     let reusedExistingRequest = false;
 
-    if (existingRequest) {
-      reusedExistingRequest = true;
-      pickupResult = {
+    try {
+      let pickupRequestId = existingRequest?.id || null;
+
+      if (existingRequest) {
+        reusedExistingRequest = true;
+        pickupResult = {
+          success: true,
+          pickup_id: existingRequest.delhivery_pickup_id,
+          response: existingRequest.delhivery_response
+        };
+      } else {
+        pickupResult = await this.schedulePickup({
+          pickup_date: slot.pickup_date,
+          pickup_time: slot.pickup_time,
+          pickup_location: slot.pickup_location,
+          expected_package_count: pendingShipments.length
+        });
+        pickupRequestId = pickupResult.pickup_request?.id || null;
+      }
+
+      await this.linkShipmentsToPickupRequest(shipmentIds, {
+        pickupRequestId,
+        slot,
+        attemptedAt,
+      });
+
+      if (pickupRequestId) {
+        await this.syncPickupRequestPackageCount(pickupRequestId);
+      }
+
+      return {
+        ...pickupResult,
         success: true,
-        pickup_id: existingRequest.delhivery_pickup_id,
-        response: existingRequest.delhivery_response
-      };
-    } else {
-      pickupResult = await this.schedulePickup({
+        pickup_request_id: pickupRequestId,
+        reused_existing_request: reusedExistingRequest,
         pickup_date: slot.pickup_date,
         pickup_time: slot.pickup_time,
         pickup_location: slot.pickup_location,
-        expected_package_count: shipments.length
-      });
+        scheduled_count: pendingShipments.length
+      };
+    } catch (error) {
+      await this.recordPickupAttemptFailure(shipmentIds, error.message, attemptedAt);
+      return {
+        success: false,
+        pickup_error: error.message,
+        reused_existing_request: reusedExistingRequest,
+        pickup_date: slot.pickup_date,
+        pickup_time: slot.pickup_time,
+        pickup_location: slot.pickup_location,
+        scheduled_count: 0
+      };
     }
-
-    const { error: shipmentUpdateError } = await this.supabase
-      .from('shipments')
-      .update({
-        pickup_scheduled_date: slot.pickup_date,
-        pickup_scheduled_time: slot.pickup_time,
-        status: 'PICKUP_SCHEDULED',
-        updated_at: new Date().toISOString()
-      })
-      .in('id', shipmentIds);
-
-    if (shipmentUpdateError) {
-      throw shipmentUpdateError;
-    }
-
-    return {
-      ...pickupResult,
-      reused_existing_request: reusedExistingRequest,
-      pickup_date: slot.pickup_date,
-      pickup_time: slot.pickup_time,
-      pickup_location: slot.pickup_location,
-      scheduled_count: shipments.length
-    };
   }
 
   async schedulePickupForOrder(orderId, settings = null) {
-    const { data: shipments, error } = await this.supabase
-      .from('shipments')
-      .select('*')
-      .eq('order_id', orderId)
-      .is('pickup_scheduled_date', null)
-      .in('status', ['MANIFESTED', 'PENDING']);
+    const shipments = await this.fetchShipmentsAwaitingPickup({ orderId });
+    return this.schedulePickupForShipments(shipments, settings);
+  }
 
-    if (error) {
-      throw error;
+  async ensureShipmentAndPickup(orderId, {
+    settings = null,
+    hasShipment = null,
+    schedulePickup = null,
+  } = {}) {
+    const resolvedSettings = settings || await deliverySettingsService.getSettings();
+    const result = {
+      success: true,
+      order_id: orderId,
+      shipment_created: false,
+      pickup_scheduled: false,
+      shipment: null,
+      pickup: null,
+      shipment_error: null,
+      pickup_error: null,
+    };
+
+    let shipmentAlreadyExists = Boolean(hasShipment);
+
+    if (resolvedSettings.auto_create_shipment && !shipmentAlreadyExists) {
+      try {
+        const shipmentResult = await this.autoCreateShipment(orderId);
+        result.shipment = shipmentResult;
+        result.shipment_created = !shipmentResult.message;
+        shipmentAlreadyExists = true;
+      } catch (error) {
+        result.success = false;
+        result.shipment_error = error.message;
+        return result;
+      }
     }
 
-    return this.schedulePickupForShipments(shipments || [], settings);
+    const shouldSchedulePickup = schedulePickup ?? resolvedSettings.auto_schedule_pickup;
+    if (!shouldSchedulePickup) {
+      return result;
+    }
+
+    const pickupResult = await this.schedulePickupForOrder(orderId, resolvedSettings);
+    result.pickup = pickupResult;
+    result.pickup_scheduled = Boolean(pickupResult?.scheduled_count);
+
+    if (pickupResult?.success === false) {
+      result.success = false;
+      result.pickup_error = pickupResult.pickup_error;
+    }
+
+    return result;
   }
 
   async processOrderForFulfillment(orderId, options = {}) {
-    this.ensureInitialized();
+    if (!this.isGatewayReady()) {
+      return {
+        success: false,
+        skipped: true,
+        order_id: orderId,
+        reason: 'Delhivery gateway is not initialized'
+      };
+    }
 
     const { data: order, error } = await this.supabase
       .from('orders')
@@ -717,19 +922,17 @@ class DeliveryService {
       };
     }
 
-    if (settings.auto_create_shipment && !order.has_shipment) {
-      const shipmentResult = await this.autoCreateShipment(orderId);
-      result.shipment_created = true;
-      result.shipment = shipmentResult;
-    }
+    const shipmentAndPickupResult = await this.ensureShipmentAndPickup(orderId, {
+      settings,
+      hasShipment: order.has_shipment,
+    });
 
-    if (settings.auto_schedule_pickup) {
-      const pickupResult = await this.schedulePickupForOrder(orderId, settings);
-      result.pickup_scheduled = Boolean(pickupResult?.scheduled_count);
-      result.pickup = pickupResult;
-    }
-
-    return result;
+    return {
+      ...result,
+      ...shipmentAndPickupResult,
+      status_updated: result.status_updated,
+      order_id: orderId,
+    };
   }
 
   /**

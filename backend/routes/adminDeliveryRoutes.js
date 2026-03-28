@@ -61,16 +61,39 @@ router.put('/settings', async (req, res) => {
 router.post('/create-shipment/:orderId', async (req, res) => {
   try {
     const { orderId } = req.params;
+    const settings = await deliverySettingsService.getSettings();
 
-    const result = await deliveryService.autoCreateShipment(orderId);
+    const result = await deliveryService.ensureShipmentAndPickup(orderId, {
+      settings,
+      schedulePickup: settings.auto_schedule_pickup,
+    });
 
     res.json({
-      success: true,
+      success: result.success,
       ...result
     });
 
   } catch (error) {
     console.error('[AdminDeliveryRoutes] Shipment creation failed:', error.message);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+router.post('/retry-pickup/:orderId', async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const settings = await deliverySettingsService.getSettings();
+    const result = await deliveryService.schedulePickupForOrder(orderId, settings);
+
+    res.json({
+      success: result.success,
+      ...result
+    });
+  } catch (error) {
+    console.error('[AdminDeliveryRoutes] Pickup retry failed:', error.message);
     res.status(500).json({
       success: false,
       error: error.message

@@ -14,6 +14,7 @@ import { Card, CardContent } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
 import { productsAPI, categoriesAPI } from '../services/api';
 import { getComparableProductPrice } from '../utils/productPricing';
+import './Products.css';
 
 const Products = () => {
   const [products, setProducts] = useState([]);
@@ -292,9 +293,9 @@ const Products = () => {
   }
 
   return (
-    <div className="page-shell-soft py-6">
-      <div className="page-container">
-        <div className="lg:grid lg:grid-cols-[248px_minmax(0,1fr)] lg:gap-4 xl:gap-5">
+    <div className="products-layout page-shell-soft py-6 lg:h-[calc(100vh-5rem)] lg:overflow-hidden">
+      <div className="page-container h-full">
+        <div className="lg:grid lg:h-full lg:grid-cols-[248px_minmax(0,1fr)] lg:gap-4 lg:overflow-hidden xl:gap-5">
           <div className="mb-3 lg:hidden">
             <Button
               variant="outline"
@@ -312,22 +313,22 @@ const Products = () => {
           </div>
 
           <motion.div 
-            className={`${showMobileFilters ? 'block' : 'hidden'} mb-6 lg:mb-0 lg:block`}
+            className={`${showMobileFilters ? 'block' : 'hidden'} mb-6 lg:mb-0 lg:block lg:self-start`}
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.4, delay: 0.15 }}
           >
-            <Card className="sticky top-6 overflow-hidden rounded-[1.45rem] border border-slate-200/80 bg-white shadow-[0_14px_28px_rgba(15,23,42,0.045)]">
-              <CardContent className="p-4">
-                <div className="space-y-4">
+            <Card className="sticky top-6 overflow-hidden rounded-[1.45rem] border border-slate-200/80 bg-white shadow-[0_14px_28px_rgba(15,23,42,0.045)] lg:max-h-[calc(100vh-8.5rem)]">
+              <CardContent className="p-0">
+                <div className="space-y-5 p-4 sm:p-5">
                   <div className="border-b border-slate-200 pb-4">
                     <div className="flex items-start justify-between gap-3">
-                      <div>
+                      <div className="min-w-0">
                         <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Filters</p>
                         <p className="mt-1 text-sm leading-6 text-slate-600">Search, categories, price and weight.</p>
                       </div>
                       {activeFiltersCount > 0 && (
-                        <Badge className="rounded-full border-0 bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600 shadow-none">
+                        <Badge className="shrink-0 rounded-full border-0 bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600 shadow-none">
                           {activeFiltersCount} active
                         </Badge>
                       )}
@@ -345,7 +346,7 @@ const Products = () => {
                   </div>
                 </div>
 
-                <div className="mt-4 space-y-4">
+                <div className="space-y-5 px-4 pb-4 sm:px-5 sm:pb-5">
                   <div>
                     <label className="mb-2.5 block text-sm font-semibold tracking-tight text-slate-900">
                       Search Products
@@ -375,24 +376,26 @@ const Products = () => {
                     <label className="mb-2.5 block text-sm font-semibold tracking-tight text-slate-900">
                       Categories
                     </label>
-                    <div className="max-h-44 space-y-1.5 overflow-y-auto pr-1">
+                    <div className="max-h-52 space-y-1.5 overflow-y-auto pr-1">
                       {categories.map((category) => {
                         const isSelected = filters.categories.includes(category.id);
                         return (
                           <div 
                             key={category.id} 
-                            className="flex items-center rounded-xl px-2.5 py-2 transition-colors hover:bg-slate-50"
+                            className={`flex items-start gap-3 rounded-xl px-2.5 py-2 transition-colors hover:bg-slate-50 ${
+                              isSelected ? 'bg-[#23442a]/[0.03]' : ''
+                            }`}
                           >
                             <input
                               type="checkbox"
                               id={`category-${category.id}`}
-                              className="h-4 w-4 cursor-pointer rounded border-2 border-slate-300 text-[#23442a] shadow-sm focus:border-[#23442a] focus:ring-[#23442a]"
+                              className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer rounded border-2 border-slate-300 text-[#23442a] shadow-sm focus:border-[#23442a] focus:ring-[#23442a]"
                               checked={isSelected}
                               onChange={() => toggleCategoryFilter(category.id)}
                             />
                             <label 
                               htmlFor={`category-${category.id}`}
-                              className={`ml-3 cursor-pointer text-sm leading-tight transition-colors ${
+                              className={`min-w-0 cursor-pointer text-sm leading-5 transition-colors ${
                                 isSelected 
                                   ? 'font-semibold text-slate-900'
                                   : 'text-slate-500'
@@ -456,7 +459,7 @@ const Products = () => {
             </Card>
           </motion.div>
 
-          <div>
+          <div className="products-results-scroll min-h-0 lg:h-full lg:overflow-y-auto lg:pr-2">
             {error ? (
               <motion.div 
                 initial={{ opacity: 0, y: 20 }}

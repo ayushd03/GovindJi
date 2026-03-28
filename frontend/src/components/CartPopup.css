@@ -29,7 +29,7 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 1rem;
-  padding: 1.4rem 1.25rem 1rem;
+  padding: 1.9rem 1.25rem 1rem;
   border-bottom: 1px solid rgba(15, 23, 42, 0.06);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.72));
   overflow: visible;
@@ -38,7 +38,7 @@
 .cart-drawer__heading {
   flex: 1;
   min-width: 0;
-  padding-top: 0.1rem;
+  padding-top: 0.3rem;
 }
 
 .cart-drawer__eyebrow {
@@ -54,36 +54,42 @@
   margin-top: 0.45rem;
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-end;
+  align-items: center;
   gap: 0.65rem;
 }
 
-.cart-drawer__title-row h2 {
+.cart-drawer__title {
   margin: 0;
-  display: block;
+  display: inline-block;
   flex: 1 1 12rem;
   min-width: 0;
+  font-family: var(--font-heading);
+  font-weight: 600;
   color: #16221a;
   font-size: clamp(1.42rem, 1.08rem + 0.9vw, 1.68rem);
-  line-height: 1.22;
+  line-height: 1.42;
   letter-spacing: -0.045em;
-  padding: 0 0 0.12rem;
+  padding: 0.22rem 0 0.24rem;
   overflow: visible;
+  text-rendering: geometricPrecision;
 }
 
 .cart-drawer__count {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   flex: 0 0 auto;
   border: 1px solid rgba(35, 68, 42, 0.12);
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.82);
   color: #23442a;
-  padding: 0.34rem 0.72rem;
+  padding: 0.38rem 0.72rem;
   font-size: 0.74rem;
   font-weight: 700;
+  line-height: 1;
   letter-spacing: 0.06em;
   text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .cart-drawer__subtitle {
@@ -434,8 +440,17 @@
     padding-right: 1rem;
   }
 
+  .cart-drawer__header {
+    padding-top: 1.6rem;
+  }
+
   .cart-drawer__title-row {
     align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .cart-drawer__title {
+    flex-basis: 100%;
   }
 
   .cart-drawer__subtitle {

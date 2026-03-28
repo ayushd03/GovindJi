@@ -83,7 +83,7 @@ const CartPopup = ({ isOpen, onClose }) => {
               <div className="cart-drawer__heading">
                 <p className="cart-drawer__eyebrow">Your Cart</p>
                 <div className="cart-drawer__title-row">
-                  <h2 id="cart-popup-title">Order review</h2>
+                  <h2 id="cart-popup-title" className="cart-drawer__title">Order review</h2>
                   {itemCount > 0 && <span className="cart-drawer__count">{itemCountLabel}</span>}
                 </div>
                 <p className="cart-drawer__subtitle">

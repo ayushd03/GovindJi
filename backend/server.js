@@ -27,6 +27,7 @@ const deliveryRoutes = require('./routes/deliveryRoutes');
 const adminDeliveryRoutes = require('./routes/adminDeliveryRoutes');
 const deliveryService = require('./services/delivery/DeliveryService');
 const pickupScheduler = require('./services/delivery/pickupScheduler');
+const orderRecoveryService = require('./services/order/OrderRecoveryService');
 
 const app = express();
 const port = process.env.PORT || 3001;
@@ -905,6 +906,7 @@ app.put('/api/admin/orders/:id/status', authenticateAdmin, asyncHandler(async (r
     const { id } = req.params;
     const { status } = req.body;
     const normalizedStatus = status === 'delivered' ? 'completed' : status;
+    let fulfillment = null;
 
     const { data, error } = await supabase
         .from('orders')
@@ -933,22 +935,38 @@ app.put('/api/admin/orders/:id/status', authenticateAdmin, asyncHandler(async (r
     // Auto-create shipment and schedule pickup when order status changes to processing
     if (normalizedStatus === 'processing') {
         try {
-            const fulfillmentResult = await deliveryService.processOrderForFulfillment(id);
-            logger.info('Order fulfillment automation completed', {
-                orderId: id,
-                shipmentCreated: fulfillmentResult.shipment_created,
-                pickupScheduled: fulfillmentResult.pickup_scheduled
-            });
-        } catch (shipmentError) {
-            // Log error but don't fail the status update
-            logger.error('Auto-shipment creation failed', shipmentError, {
+            fulfillment = await deliveryService.processOrderForFulfillment(id);
+
+            if (fulfillment.success) {
+                logger.info('Order fulfillment automation completed', {
+                    orderId: id,
+                    shipmentCreated: fulfillment.shipment_created,
+                    pickupScheduled: fulfillment.pickup_scheduled
+                });
+            } else {
+                logger.warn('Order fulfillment automation completed with warnings', {
+                    orderId: id,
+                    shipmentError: fulfillment.shipment_error,
+                    pickupError: fulfillment.pickup_error,
+                    reason: fulfillment.reason
+                });
+            }
+        } catch (fulfillmentError) {
+            fulfillment = {
+                success: false,
+                order_id: id,
+                shipment_error: fulfillmentError.message
+            };
+            logger.error('Order fulfillment automation failed unexpectedly', fulfillmentError, {
                 orderId: id
             });
-            // Admin can manually create shipment later
         }
     }
 
-    res.json(data);
+    res.json({
+        ...data,
+        fulfillment
+    });
 }));
 
 // Cancel an order: restores stock, cancels Delhivery shipment if any
@@ -1043,25 +1061,9 @@ app.post('/api/admin/cleanup-abandoned-orders', authenticateAdmin, asyncHandler(
 
     let cleaned = 0;
     for (const order of (abandonedOrders || [])) {
-        // Restore stock for each line item
-        await Promise.all(
-            (order.order_items || []).map(item =>
-                supabase.rpc('restore_stock', {
-                    p_product_id: item.product_id,
-                    p_quantity: item.quantity,
-                    p_variant_id: item.variant_id || null,
-                })
-            )
-        );
-        // Mark as cancelled with EXPIRED payment status
-        await supabase
-            .from('orders')
-            .update({
-                status: 'cancelled',
-                payment_status: 'EXPIRED',
-                updated_at: new Date().toISOString(),
-            })
-            .eq('id', order.id);
+        await orderRecoveryService.cancelUnpaidOrder(order.id, {
+            paymentStatus: 'EXPIRED',
+        });
         cleaned++;
     }
 
@@ -3265,8 +3267,10 @@ app.post('/api/orders', authenticateToken, asyncHandler(async (req, res) => {
     const shippingFee = Number.parseFloat(selectedDeliveryOption.fee) || 0;
     const serverTotal = subtotalAmount + shippingFee;
 
-    const resolvedPaymentMethod = payment_method || 'COD';
-    const resolvedPaymentStatus = payment_status || 'PENDING';
+    const resolvedPaymentMethod = ['COD', 'PHONEPE'].includes(String(payment_method || '').toUpperCase())
+        ? String(payment_method).toUpperCase()
+        : 'COD';
+    const resolvedPaymentStatus = 'PENDING';
     const resolvedOrderStatus = 'pending';
 
     if (
@@ -3347,6 +3351,18 @@ app.post('/api/orders', authenticateToken, asyncHandler(async (req, res) => {
 
     const decrementFailures = decrementResults.filter(r => r.error || r.data === false);
     if (decrementFailures.length > 0) {
+        const successfulDecrements = decrementResults
+            .filter(r => r.data === true)
+            .map(r => ({
+                product_id: r.item.product_id,
+                variant_id: r.item.variant_id || null,
+                quantity: r.item.quantity,
+            }));
+
+        if (successfulDecrements.length > 0) {
+            await orderRecoveryService.restoreStockForItems(successfulDecrements);
+        }
+
         // A race condition: stock was valid at check-time but gone by decrement-time.
         // Cancel the just-created order so it doesn't hold phantom reservations.
         logger.error('Stock decrement race condition — cancelling order', {
@@ -3381,7 +3397,14 @@ app.post('/api/orders', authenticateToken, asyncHandler(async (req, res) => {
 
     if (resolvedPaymentMethod === 'COD') {
         try {
-            await deliveryService.processOrderForFulfillment(order.id);
+            const fulfillment = await deliveryService.processOrderForFulfillment(order.id);
+            if (!fulfillment.success) {
+                logger.warn('Automatic COD fulfillment completed with warnings', {
+                    orderId: order.id,
+                    shipmentError: fulfillment.shipment_error,
+                    pickupError: fulfillment.pickup_error
+                });
+            }
         } catch (deliveryError) {
             logger.error('Automatic COD fulfillment setup failed', deliveryError, {
                 orderId: order.id
@@ -3390,6 +3413,45 @@ app.post('/api/orders', authenticateToken, asyncHandler(async (req, res) => {
     }
 
     res.status(201).json({ order, newOrderItems });
+}));
+
+app.put('/api/orders/:id/release-unpaid', authenticateToken, asyncHandler(async (req, res) => {
+    const { id } = req.params;
+
+    const { data: order, error } = await supabase
+        .from('orders')
+        .select('id, user_id, status, payment_status, payment_method')
+        .eq('id', id)
+        .single();
+
+    if (error || !order) {
+        return res.status(404).json({ error: 'Order not found' });
+    }
+
+    if (order.user_id !== req.user.id) {
+        return res.status(403).json({ error: 'Unauthorized' });
+    }
+
+    if (order.payment_method === 'COD') {
+        return res.status(400).json({ error: 'COD orders cannot be released through this flow' });
+    }
+
+    if (order.payment_status === 'PAID') {
+        return res.status(400).json({ error: 'Paid orders cannot be released' });
+    }
+
+    if (order.status !== 'pending' && order.status !== 'cancelled') {
+        return res.status(400).json({ error: 'Only unpaid pending orders can be released' });
+    }
+
+    const result = await orderRecoveryService.cancelUnpaidOrder(order.id, {
+        paymentStatus: 'FAILED',
+    });
+
+    res.json({
+        success: true,
+        ...result,
+    });
 }));
 
 app.get('/api/orders/:user_id', authenticateToken, asyncHandler(async (req, res) => {

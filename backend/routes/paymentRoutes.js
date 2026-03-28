@@ -3,14 +3,66 @@ const router = express.Router();
 const { v4: uuidv4 } = require('uuid');
 const paymentService = require('../services/payment/PaymentService');
 const deliveryService = require('../services/delivery/DeliveryService');
+const orderRecoveryService = require('../services/order/OrderRecoveryService');
 const { authenticateToken } = require('../middleware/authMiddleware');
 const { createBackendSupabaseClient } = require('../config/supabaseClient');
+
+const getPaymentFailureStatus = (state = '') => {
+  const normalizedState = String(state || '').toUpperCase();
+
+  if (normalizedState === 'EXPIRED') {
+    return 'EXPIRED';
+  }
+
+  if (['FAILED', 'CANCELLED', 'PAYMENT_ERROR'].includes(normalizedState)) {
+    return 'FAILED';
+  }
+
+  return null;
+};
+
+const getPaymentErrorMessage = (error, fallback = 'Payment initiation failed') => (
+  error?.error ||
+  error?.message ||
+  fallback
+);
+
+const ACTIVE_TRANSACTION_STATUSES = ['INITIATED', 'PENDING'];
+const TERMINAL_TRANSACTION_STATUSES = ['COMPLETED', 'FAILED', 'CANCELLED', 'EXPIRED'];
+
+const updateTransaction = async (supabase, merchantTransactionId, updates) => {
+  await supabase
+    .from('payment_transactions')
+    .update({
+      ...updates,
+      updated_at: new Date().toISOString()
+    })
+    .eq('merchant_transaction_id', merchantTransactionId);
+};
+
+const getInactiveOrderMessage = (order) => {
+  if (!order) {
+    return 'Order not found';
+  }
+
+  if (order.payment_status === 'PAID') {
+    return 'Order is already marked as paid';
+  }
+
+  if (order.status) {
+    return `Order is already ${order.status}`;
+  }
+
+  return 'Order can no longer accept payment';
+};
 
 /**
  * POST /api/payments/initiate
  * Initiate a payment transaction
  */
 router.post('/initiate', authenticateToken, async (req, res) => {
+  let transaction = null;
+
   try {
     const { orderId, amount, customerInfo, paymentMethod = 'PHONEPE' } = req.body;
 
@@ -40,6 +92,20 @@ router.post('/initiate', authenticateToken, async (req, res) => {
       return res.status(404).json({ success: false, error: 'Order not found' });
     }
 
+    if (order.payment_status === 'PAID') {
+      return res.status(400).json({
+        success: false,
+        error: 'This order has already been paid.'
+      });
+    }
+
+    if (['cancelled', 'completed', 'delivered'].includes(order.status)) {
+      return res.status(400).json({
+        success: false,
+        error: 'This order can no longer accept payment. Please place a new order.'
+      });
+    }
+
     const orderAmount = Number.parseFloat(order.total_amount);
     if (!Number.isFinite(orderAmount) || orderAmount <= 0) {
       return res.status(400).json({
@@ -57,8 +123,29 @@ router.post('/initiate', authenticateToken, async (req, res) => {
       });
     }
 
+    const { data: activeTransaction, error: activeTransactionError } = await req.supabase
+      .from('payment_transactions')
+      .select('merchant_transaction_id, status')
+      .eq('order_id', orderId)
+      .in('status', ACTIVE_TRANSACTION_STATUSES)
+      .order('updated_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (activeTransactionError) {
+      console.error('Active transaction lookup error:', activeTransactionError);
+      return res.status(500).json({ success: false, error: 'Failed to validate payment state' });
+    }
+
+    if (activeTransaction) {
+      return res.status(409).json({
+        success: false,
+        error: 'A payment attempt is already in progress for this order. Please complete or wait for that attempt to finish.'
+      });
+    }
+
     // Create payment transaction record
-    const { data: transaction, error: txError } = await req.supabase
+    const { data: createdTransaction, error: txError } = await req.supabase
       .from('payment_transactions')
       .insert({
         merchant_transaction_id: merchantTransactionId,
@@ -78,6 +165,8 @@ router.post('/initiate', authenticateToken, async (req, res) => {
       console.error('Transaction creation error:', txError);
       return res.status(500).json({ success: false, error: 'Failed to create transaction' });
     }
+
+    transaction = createdTransaction;
 
     console.log('Payment transaction created:', merchantTransactionId);
 
@@ -125,6 +214,10 @@ router.post('/initiate', authenticateToken, async (req, res) => {
         })
         .eq('merchant_transaction_id', merchantTransactionId);
 
+      await orderRecoveryService.cancelUnpaidOrder(orderId, {
+        paymentStatus: 'FAILED',
+      });
+
       console.error('Payment initiation failed:', paymentResponse.error);
 
       return res.status(500).json({
@@ -133,10 +226,31 @@ router.post('/initiate', authenticateToken, async (req, res) => {
       });
     }
   } catch (error) {
+    if (transaction?.merchant_transaction_id) {
+      await req.supabase
+        .from('payment_transactions')
+        .update({
+          status: 'FAILED',
+          error_details: { error: getPaymentErrorMessage(error) },
+          updated_at: new Date().toISOString()
+        })
+        .eq('merchant_transaction_id', transaction.merchant_transaction_id);
+    }
+
+    if (transaction?.order_id) {
+      try {
+        await orderRecoveryService.cancelUnpaidOrder(transaction.order_id, {
+          paymentStatus: 'FAILED',
+        });
+      } catch (recoveryError) {
+        console.error('Failed to recover order after payment initiation error:', recoveryError);
+      }
+    }
+
     console.error('Payment initiation error:', error);
     res.status(500).json({
       success: false,
-      error: 'Internal server error'
+      error: getPaymentErrorMessage(error, 'Internal server error')
     });
   }
 });
@@ -185,82 +299,82 @@ router.post('/callback', async (req, res) => {
       return res.status(404).json({ success: false, error: 'Transaction not found' });
     }
 
-    // Prevent double processing (idempotency guard for both success and failure)
-    if (transaction.status === 'COMPLETED' || transaction.status === 'FAILED') {
+    // Prevent double processing for already terminal transactions
+    if (TERMINAL_TRANSACTION_STATUSES.includes(transaction.status)) {
       console.log('Transaction already processed:', transaction.status);
       return res.json({ success: true, message: 'Already processed' });
     }
 
-    // Update payment transaction
-    const newStatus = paymentSuccess ? 'COMPLETED' : 'FAILED';
-    const updateData = {
-      status: newStatus,
-      phonepe_transaction_id: paymentData.transactionId,
-      callback_response: paymentData,
-      updated_at: new Date().toISOString()
-    };
+    const currentOrder = await orderRecoveryService.getOrderWithItems(transaction.order_id);
 
     if (paymentSuccess) {
-      updateData.completed_at = new Date().toISOString();
-    } else {
-      updateData.error_details = {
-        code: paymentCode,
-        message: paymentData.message
-      };
-    }
+      if (currentOrder?.payment_status === 'PAID') {
+        await updateTransaction(supabase, merchantTransactionId, {
+          status: 'COMPLETED',
+          phonepe_transaction_id: paymentData.transactionId,
+          callback_response: paymentData,
+          completed_at: transaction.completed_at || new Date().toISOString(),
+          error_details: null
+        });
+      } else if (!orderRecoveryService.canAcceptPayment(currentOrder)) {
+        await updateTransaction(supabase, merchantTransactionId, {
+          status: 'FAILED',
+          phonepe_transaction_id: paymentData.transactionId,
+          callback_response: paymentData,
+          error_details: {
+            code: 'IGNORED_SUCCESS',
+            message: getInactiveOrderMessage(currentOrder)
+          }
+        });
 
-    await supabase
-      .from('payment_transactions')
-      .update(updateData)
-      .eq('merchant_transaction_id', merchantTransactionId);
+        console.warn('Ignoring payment success for inactive order during callback', {
+          orderId: transaction.order_id,
+          orderStatus: currentOrder?.status,
+          paymentStatus: currentOrder?.payment_status
+        });
+      } else {
+        await updateTransaction(supabase, merchantTransactionId, {
+          status: 'COMPLETED',
+          phonepe_transaction_id: paymentData.transactionId,
+          callback_response: paymentData,
+          completed_at: new Date().toISOString(),
+          error_details: null
+        });
 
-    // Update order payment status
-    if (paymentSuccess) {
-      await supabase
-        .from('orders')
-        .update({
-          payment_status: 'PAID',
-          payment_method: 'PHONEPE',
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', transaction.order_id);
+        await supabase
+          .from('orders')
+          .update({
+            payment_status: 'PAID',
+            payment_method: 'PHONEPE',
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', transaction.order_id);
 
-      try {
-        await deliveryService.processOrderForFulfillment(transaction.order_id);
-      } catch (deliveryError) {
-        console.error('Automatic fulfillment after payment callback failed:', deliveryError);
+        try {
+          const fulfillmentResult = await deliveryService.processOrderForFulfillment(transaction.order_id);
+          if (!fulfillmentResult.success) {
+            console.warn('Automatic fulfillment after payment callback completed with warnings:', fulfillmentResult);
+          }
+        } catch (deliveryError) {
+          console.error('Automatic fulfillment after payment callback failed:', deliveryError);
+        }
       }
 
       console.log('Order payment completed:', transaction.order_id);
     } else {
-      // Cancel the order and restore stock — stock was already decremented at
-      // order creation time, so a failed payment must undo that reservation.
-      await supabase
-        .from('orders')
-        .update({
-          payment_status: 'FAILED',
-          status: 'cancelled',
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', transaction.order_id);
+      await updateTransaction(supabase, merchantTransactionId, {
+        status: 'FAILED',
+        phonepe_transaction_id: paymentData.transactionId,
+        callback_response: paymentData,
+        error_details: {
+          code: paymentCode,
+          message: paymentData.message
+        }
+      });
 
-      // Fetch order items to restore per-variant (or per-product) stock
-      const { data: orderItems } = await supabase
-        .from('order_items')
-        .select('product_id, variant_id, quantity')
-        .eq('order_id', transaction.order_id);
-
-      if (orderItems && orderItems.length > 0) {
-        await Promise.all(
-          orderItems.map(item =>
-            supabase.rpc('restore_stock', {
-              p_product_id: item.product_id,
-              p_quantity: item.quantity,
-              p_variant_id: item.variant_id || null,
-            })
-          )
-        );
-      }
+      await orderRecoveryService.cancelUnpaidOrder(transaction.order_id, {
+        paymentStatus: 'FAILED',
+      });
 
       console.log('Order payment failed, order cancelled, stock restored:', transaction.order_id);
     }
@@ -308,35 +422,83 @@ router.get('/status/:merchantTransactionId', authenticateToken, async (req, res)
 
         if (statusResponse.success && statusResponse.data) {
           const paymentState = statusResponse.data.state;
+          const failureStatus = getPaymentFailureStatus(paymentState);
+          const currentOrder = await orderRecoveryService.getOrderWithItems(transaction.order_id);
 
           // Update transaction based on PhonePe response
           if (paymentState === 'COMPLETED' && transaction.status !== 'COMPLETED') {
-            await req.supabase
-              .from('payment_transactions')
-              .update({
+            if (currentOrder?.payment_status === 'PAID') {
+              const completedAt = transaction.completed_at || new Date().toISOString();
+              await updateTransaction(req.supabase, merchantTransactionId, {
                 status: 'COMPLETED',
-                completed_at: new Date().toISOString(),
+                completed_at: completedAt,
                 payment_response: statusResponse.data,
-                updated_at: new Date().toISOString()
-              })
-              .eq('merchant_transaction_id', merchantTransactionId);
+                error_details: null
+              });
+              transaction.completed_at = completedAt;
+            } else if (!orderRecoveryService.canAcceptPayment(currentOrder)) {
+              await updateTransaction(req.supabase, merchantTransactionId, {
+                status: 'FAILED',
+                payment_response: statusResponse.data,
+                error_details: {
+                  state: 'IGNORED_SUCCESS',
+                  message: getInactiveOrderMessage(currentOrder)
+                }
+              });
 
-            await req.supabase
-              .from('orders')
-              .update({
-                payment_status: 'PAID',
-                updated_at: new Date().toISOString()
-              })
-              .eq('id', transaction.order_id);
+              console.warn('Ignoring payment success for inactive order during status sync', {
+                orderId: transaction.order_id,
+                orderStatus: currentOrder?.status,
+                paymentStatus: currentOrder?.payment_status
+              });
+            } else {
+              const completedAt = new Date().toISOString();
+              await updateTransaction(req.supabase, merchantTransactionId, {
+                status: 'COMPLETED',
+                completed_at: completedAt,
+                payment_response: statusResponse.data,
+                error_details: null
+              });
+              transaction.completed_at = completedAt;
 
-            try {
-              await deliveryService.processOrderForFulfillment(transaction.order_id);
-            } catch (deliveryError) {
-              console.error('Automatic fulfillment after payment status sync failed:', deliveryError);
+              await req.supabase
+                .from('orders')
+                .update({
+                  payment_status: 'PAID',
+                  updated_at: new Date().toISOString()
+                })
+                .eq('id', transaction.order_id);
+
+              try {
+                const fulfillmentResult = await deliveryService.processOrderForFulfillment(transaction.order_id);
+                if (!fulfillmentResult.success) {
+                  console.warn('Automatic fulfillment after payment status sync completed with warnings:', fulfillmentResult);
+                }
+              } catch (deliveryError) {
+                console.error('Automatic fulfillment after payment status sync failed:', deliveryError);
+              }
             }
 
-            transaction.status = 'COMPLETED';
-            console.log('Payment status updated to COMPLETED');
+            transaction.status = currentOrder?.payment_status === 'PAID' || orderRecoveryService.canAcceptPayment(currentOrder)
+              ? 'COMPLETED'
+              : 'FAILED';
+            console.log(`Payment status updated to ${transaction.status}`);
+          } else if (failureStatus && !['FAILED', 'EXPIRED'].includes(transaction.status)) {
+            await updateTransaction(req.supabase, merchantTransactionId, {
+              status: failureStatus,
+              payment_response: statusResponse.data,
+              error_details: {
+                state: paymentState,
+                message: statusResponse.data.message || 'Payment was not completed'
+              }
+            });
+
+            await orderRecoveryService.cancelUnpaidOrder(transaction.order_id, {
+              paymentStatus: failureStatus,
+            });
+
+            transaction.status = failureStatus;
+            console.log(`Payment status updated to ${failureStatus}`);
           }
         }
       } catch (statusError) {

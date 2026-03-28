@@ -58,6 +58,7 @@ const OrderManagement = () => {
   const [selectedOrderReadiness, setSelectedOrderReadiness] = useState(null);
   const [selectedOrderShipment, setSelectedOrderShipment] = useState(null);
   const [creatingShipment, setCreatingShipment] = useState(false);
+  const [retryingPickup, setRetryingPickup] = useState(false);
   const [cancelDialogOrder, setCancelDialogOrder] = useState(null);
   const [cancellingOrder, setCancellingOrder] = useState(false);
 
@@ -175,7 +176,7 @@ const OrderManagement = () => {
 
   const updateOrderStatus = async (orderId, newStatus) => {
     try {
-      await adminOrdersAPI.updateStatus(orderId, newStatus);
+      const response = await adminOrdersAPI.updateStatus(orderId, newStatus);
       setSelectedOrder((prev) => (
         prev && prev.id === orderId
           ? { ...prev, status: newStatus }
@@ -184,6 +185,15 @@ const OrderManagement = () => {
       fetchOrders();
       if (newStatus === 'processing' || newStatus === 'completed') {
         fetchDeliveryDetails(orderId);
+      }
+
+      const warning = getFulfillmentWarning(response.data?.fulfillment);
+      if (warning) {
+        toast({
+          title: 'Order updated with fulfillment warning',
+          description: warning,
+          variant: 'destructive'
+        });
       }
     } catch (error) {
       console.error('Error updating order status:', error);
@@ -199,19 +209,33 @@ const OrderManagement = () => {
     try {
       setCreatingShipment(true);
       const response = await deliveryAPI.createShipment(orderId);
+      const warning = response.data?.shipment_error || response.data?.pickup_error;
       setSelectedOrder((prev) => (
         prev
           ? {
               ...prev,
               has_shipment: true,
-              tracking_url: response.data?.tracking_url || prev.tracking_url
+              tracking_url: response.data?.tracking_url || response.data?.shipment?.tracking_url || prev.tracking_url
             }
           : prev
       ));
       await Promise.all([fetchOrders(), fetchDeliveryDetails(orderId)]);
+
+      if (warning) {
+        toast({
+          title: 'Shipment updated with pickup warning',
+          description: warning,
+          variant: 'destructive'
+        });
+        return;
+      }
+
+      const awbNumber = response.data?.shipment?.awb_number || response.data?.awb_number || '';
       toast({
-        title: 'Shipment created',
-        description: `AWB ${response.data?.awb_number || ''} has been created successfully.`.trim()
+        title: response.data?.shipment_created ? 'Shipment created' : 'Shipment refreshed',
+        description: response.data?.pickup_scheduled
+          ? `AWB ${awbNumber} is ready and pickup has been requested.`.trim()
+          : `AWB ${awbNumber} has been created successfully.`.trim()
       });
     } catch (error) {
       console.error('Error creating shipment:', error);
@@ -222,6 +246,47 @@ const OrderManagement = () => {
       });
     } finally {
       setCreatingShipment(false);
+    }
+  };
+
+  const retryPickupForOrder = async (orderId) => {
+    try {
+      setRetryingPickup(true);
+      const response = await deliveryAPI.retryPickup(orderId);
+      await Promise.all([fetchOrders(), fetchDeliveryDetails(orderId)]);
+
+      if (!response.data?.success) {
+        toast({
+          title: 'Pickup retry failed',
+          description: response.data?.pickup_error || 'Please review the courier configuration and try again.',
+          variant: 'destructive'
+        });
+        return;
+      }
+
+      if (!response.data?.scheduled_count) {
+        toast({
+          title: 'Pickup already up to date',
+          description: 'No manifested shipment is waiting for pickup on this order.'
+        });
+        return;
+      }
+
+      toast({
+        title: response.data?.reused_existing_request ? 'Pickup linked' : 'Pickup requested',
+        description: response.data?.pickup_date
+          ? `Pickup is scheduled for ${formatPickupSlot(response.data.pickup_date, response.data.pickup_time)}.`
+          : 'Pickup request recorded successfully.'
+      });
+    } catch (error) {
+      console.error('Error retrying pickup:', error);
+      toast({
+        title: 'Unable to retry pickup',
+        description: error.response?.data?.error || 'Please try again.',
+        variant: 'destructive'
+      });
+    } finally {
+      setRetryingPickup(false);
     }
   };
 
@@ -264,6 +329,12 @@ const OrderManagement = () => {
     });
   };
 
+  const getFulfillmentWarning = (fulfillment) => (
+    fulfillment?.shipment_error ||
+    fulfillment?.pickup_error ||
+    ''
+  );
+
   const handleOrderDetailsClose = () => {
     setSelectedOrder(null);
     setCancelDialogOrder(null);
@@ -289,6 +360,13 @@ const OrderManagement = () => {
     normalizeStatusValue(selectedOrder.status) === 'processing' &&
     !selectedOrderShipment &&
     selectedOrderReadiness?.ready
+  );
+  const canRetryPickup = Boolean(
+    canManage &&
+    selectedOrder &&
+    selectedOrderShipment &&
+    ['MANIFESTED', 'PENDING'].includes(selectedOrderShipment.status) &&
+    !selectedOrderShipment.pickup_scheduled_date
   );
 
   if (loading) {
@@ -573,17 +651,30 @@ const OrderManagement = () => {
                               <h4 className="text-md font-medium text-foreground">Delivery & courier</h4>
                               <p className="mt-1 text-sm text-muted-foreground">Keep shipment creation and pickup readiness visible before dispatch.</p>
                             </div>
-                            {canCreateShipment && (
-                              <button
-                                type="button"
-                                onClick={() => createShipmentForOrder(selectedOrder.id)}
-                                disabled={creatingShipment}
-                                className="btn-primary inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-60"
-                              >
-                                <TruckIcon className="h-4 w-4" />
-                                {creatingShipment ? 'Creating...' : 'Create shipment'}
-                              </button>
-                            )}
+                            <div className="flex flex-wrap gap-2">
+                              {canRetryPickup && (
+                                <button
+                                  type="button"
+                                  onClick={() => retryPickupForOrder(selectedOrder.id)}
+                                  disabled={retryingPickup}
+                                  className="btn-secondary inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                  <TruckIcon className="h-4 w-4" />
+                                  {retryingPickup ? 'Retrying pickup...' : 'Retry pickup'}
+                                </button>
+                              )}
+                              {canCreateShipment && (
+                                <button
+                                  type="button"
+                                  onClick={() => createShipmentForOrder(selectedOrder.id)}
+                                  disabled={creatingShipment}
+                                  className="btn-primary inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                  <TruckIcon className="h-4 w-4" />
+                                  {creatingShipment ? 'Creating...' : 'Create shipment'}
+                                </button>
+                              )}
+                            </div>
                           </div>
 
                           {deliveryDetailsLoading ? (
@@ -615,6 +706,11 @@ const OrderManagement = () => {
                                     <div className="flex justify-between gap-3"><span className="text-muted-foreground">Pickup</span><span className="text-right font-medium">{formatPickupSlot(selectedOrderShipment?.pickup_scheduled_date, selectedOrderShipment?.pickup_scheduled_time)}</span></div>
                                     <div className="flex justify-between gap-3"><span className="text-muted-foreground">Tracking</span><span className="text-right font-medium">{selectedOrder.tracking_url ? 'Available' : 'Not available'}</span></div>
                                   </div>
+                                  {selectedOrderShipment?.pickup_error && (
+                                    <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                                      {selectedOrderShipment.pickup_error}
+                                    </div>
+                                  )}
                                   {selectedOrder.tracking_url && (
                                     <a
                                       href={selectedOrder.tracking_url}

@@ -22,6 +22,11 @@ function PaymentVerify() {
   const timerRef = useRef(null);
   const maxPolls = 30;
 
+  const clearPaymentSession = useCallback(() => {
+    localStorage.removeItem('currentTransactionId');
+    localStorage.removeItem('currentOrderId');
+  }, []);
+
   const verifyPayment = useCallback(async () => {
     try {
       const txnId = searchParams.get('txnId') || localStorage.getItem('currentTransactionId');
@@ -45,14 +50,18 @@ function PaymentVerify() {
       if (response.transaction.status === 'COMPLETED') {
         setStatus('success');
         clearCart();
-        localStorage.removeItem('currentTransactionId');
-        localStorage.removeItem('currentOrderId');
+        clearPaymentSession();
         return;
       }
 
-      if (response.transaction.status === 'FAILED') {
+      if (['FAILED', 'EXPIRED', 'CANCELLED'].includes(response.transaction.status)) {
         setStatus('failed');
-        setError('Payment failed. Please try again.');
+        clearPaymentSession();
+        setError(
+          response.transaction.status === 'EXPIRED'
+            ? 'Payment session expired. Please place the order again.'
+            : 'Payment failed. Please try again.'
+        );
         return;
       }
 
@@ -70,7 +79,7 @@ function PaymentVerify() {
       setStatus('failed');
       setError(verificationError.response?.data?.error || 'Failed to verify payment.');
     }
-  }, [clearCart, searchParams]);
+  }, [clearCart, clearPaymentSession, searchParams]);
 
   useEffect(() => {
     verifyPayment();
@@ -89,9 +98,11 @@ function PaymentVerify() {
         localStorage.setItem('currentTransactionId', paymentResponse.merchantTransactionId);
         window.location.href = paymentResponse.paymentUrl;
       } else {
+        clearPaymentSession();
         navigate('/checkout');
       }
     } catch {
+      clearPaymentSession();
       navigate('/checkout');
     }
   };

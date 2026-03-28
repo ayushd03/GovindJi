@@ -729,6 +729,11 @@ const OrderFulfillmentPanel = ({ initialOpen = false }) => {
                                               ? `Pickup: ${formatDateTime(shipment.pickup_scheduled_date, shipment.pickup_scheduled_time)}`
                                               : 'Waiting for pickup scheduling'}
                                           </p>
+                                          {shipment.pickup_error && (
+                                            <p className="mt-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+                                              {shipment.pickup_error}
+                                            </p>
+                                          )}
                                         </div>
                                         <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
                                           {formatCourierStatusLabel(shipment.status)}

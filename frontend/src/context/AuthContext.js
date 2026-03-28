@@ -1,5 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { authAPI } from '../services/api';
+import { getApiErrorMessage } from '../utils/apiError';
 import { clearAuthData, getStoredUserData, storeAuthData } from '../utils/authUtils';
 
 const AuthContext = createContext();
@@ -243,7 +244,9 @@ export const AuthProvider = ({ children }) => {
       console.error('Login error:', error);
       return {
         success: false,
-        error: error.response?.data?.error || error.message || 'Login failed',
+        error: getApiErrorMessage(error, 'Login failed', {
+          unauthorizedMessage: 'Incorrect email or password',
+        }),
         code: error.response?.data?.code || 'login_failed',
       };
     }
@@ -275,7 +278,7 @@ export const AuthProvider = ({ children }) => {
       console.error('Signup error:', error);
       return {
         success: false,
-        error: error.response?.data?.error || error.message || 'Signup failed',
+        error: getApiErrorMessage(error, 'Signup failed'),
         code: error.response?.data?.code || 'signup_failed',
       };
     }
