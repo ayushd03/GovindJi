@@ -3,7 +3,11 @@ import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeftIcon,
   ClockIcon,
+  CubeIcon,
   MapPinIcon,
+  ShieldCheckIcon,
+  SparklesIcon,
+  TruckIcon,
 } from '@heroicons/react/24/outline';
 import { useCart } from '../context/CartContext';
 import ProductImageGallery from '../components/ProductImageGallery';
@@ -89,7 +93,6 @@ const ProductDetail = () => {
     }
   }, [product, selectedSize]);
 
-  // Scroll to top when component mounts
   useEffect(() => {
     window.scrollTo(0, 0);
   }, []);
@@ -249,6 +252,36 @@ const ProductDetail = () => {
       : 'product-detail-stock-pill product-detail-stock-pill--success';
 
   const availableVariantCount = variants.filter((variant) => (variant.stock_quantity ?? 0) > 0).length;
+  const deliveryHeadline = featuredDeliveryOption
+    ? `${getDeliveryModeLabel(featuredDeliveryOption.mode)} by ${formatDeliveryRange(
+      featuredDeliveryOption.estimated_delivery_start,
+      featuredDeliveryOption.estimated_delivery_end
+    )}`
+    : deliveryPincode.length < 6
+      ? 'Enter a pincode for delivery dates'
+      : deliveryOptionsLoading
+        ? 'Checking delivery timelines'
+        : deliveryOptionsError
+          ? 'Delivery estimate unavailable'
+          : 'Shipping options will appear here';
+
+  const overviewHighlights = [
+    {
+      icon: SparklesIcon,
+      label: 'Pack format',
+      value: selectedVariant?.variant_name || 'Standard pack',
+    },
+    {
+      icon: CubeIcon,
+      label: hasVariants ? 'Available packs' : 'Inventory',
+      value: hasVariants ? `${availableVariantCount} ready to order` : `${availableStock} units available`,
+    },
+    {
+      icon: TruckIcon,
+      label: 'Delivery',
+      value: deliveryHeadline,
+    },
+  ];
 
   const productFacts = [
     product.category_name || product.category_id
@@ -262,6 +295,26 @@ const ProductDetail = () => {
       ? { label: 'Pack options', value: `${availableVariantCount} available` }
       : { label: 'Stock', value: `${availableStock} units ready` },
   ].filter(Boolean);
+
+  const assuranceItems = [
+    {
+      icon: ShieldCheckIcon,
+      label: 'Checkout confidence',
+      value: 'Live inventory checks keep cart quantities aligned with current stock.',
+    },
+    {
+      icon: TruckIcon,
+      label: 'Shipping visibility',
+      value: 'Delivery fee, dispatch date, and ETA update based on pincode and selected quantity.',
+    },
+    {
+      icon: SparklesIcon,
+      label: 'Selection clarity',
+      value: hasVariants
+        ? 'Each pack size surfaces its own price, MRP, discount, and remaining stock.'
+        : 'Single-pack pricing is shown up front with no hidden configuration steps.',
+    },
+  ];
 
   return (
     <div className="page-shell-soft product-detail-shell">
@@ -286,7 +339,7 @@ const ProductDetail = () => {
               </div>
 
               <div className="product-detail-info-panel">
-                <div className="space-y-3">
+                <div className="product-detail-overview">
                   <div className="product-detail-badge-row">
                     {product.category_name && (
                       <span className="product-detail-badge">{product.category_name}</span>
@@ -296,43 +349,76 @@ const ProductDetail = () => {
                         SKU {product.sku}
                       </span>
                     )}
+                    {featuredDeliveryOption && (
+                      <span className="product-detail-badge product-detail-badge--success">
+                        {getDeliveryModeLabel(featuredDeliveryOption.mode)} available
+                      </span>
+                    )}
                   </div>
 
-                  <div className="space-y-2.5">
+                  <div className="product-detail-heading-block">
                     <h1 className="product-detail-title">{product.name}</h1>
                     {product.description && (
                       <p className="product-detail-description">{product.description}</p>
                     )}
                   </div>
+
+                  <div className="product-detail-overview-grid">
+                    {overviewHighlights.map((item) => {
+                      const Icon = item.icon;
+
+                      return (
+                        <div key={item.label} className="product-detail-overview-card">
+                          <div className="product-detail-overview-icon">
+                            <Icon className="h-4 w-4" />
+                          </div>
+                          <div>
+                            <p className="product-detail-overview-label">{item.label}</p>
+                            <p className="product-detail-overview-value">{item.value}</p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
 
                 <div className="product-detail-purchase-card">
                   <div className="product-detail-price-header">
-                    <div>
-                      <p className="product-detail-caption">Price</p>
+                    <div className="product-detail-price-block">
+                      <p className="product-detail-caption">Selling price</p>
                       <div className="product-detail-price-row">
                         <span className="product-detail-price">₹{pricing.selectedPrice.toFixed(2)}</span>
                         {pricing.hasMrp && (
-                          <span className="text-base font-medium text-slate-400 line-through">
+                          <span className="product-detail-price-strike">
                             ₹{pricing.selectedMrp.toFixed(2)}
                           </span>
                         )}
                         {pricing.discountPercent > 0 && (
-                          <span className="inline-flex rounded-full bg-slate-900 px-2 py-0.5 text-xs font-semibold text-white">
+                          <span className="product-detail-discount-pill">
                             {formatDiscountPercent(pricing.discountPercent)}% off
                           </span>
                         )}
-                        <span className="product-detail-unit">
-                          {hasVariants && selectedVariant
-                            ? `for ${selectedVariant.variant_name}`
-                            : product.unit
-                              ? `per ${product.unit}`
-                              : 'per pack'}
-                        </span>
                       </div>
+                      <p className="product-detail-price-note">
+                        {hasVariants && selectedVariant
+                          ? `Currently showing ${selectedVariant.variant_name}`
+                          : product.unit
+                            ? `Priced per ${product.unit}`
+                            : 'Priced per pack'}
+                        {pricing.hasMrp ? ' with visible MRP comparison.' : '.'}
+                      </p>
                     </div>
 
-                    <span className={stockPillClassName}>{stockSummary}</span>
+                    <div className="product-detail-stock-card">
+                      <span className={stockPillClassName}>{stockSummary}</span>
+                      <p className="product-detail-stock-copy">
+                        {isOutOfStock
+                          ? 'This selection cannot be purchased right now.'
+                          : isLowStock
+                            ? 'Inventory is running low for this configuration.'
+                            : 'In-stock quantity is reserved as you add it to cart.'}
+                      </p>
+                    </div>
                   </div>
 
                   {hasVariants && (
@@ -365,18 +451,22 @@ const ProductDetail = () => {
                               disabled={isDisabled}
                               className={optionClassName}
                             >
-                              <span className="product-detail-option-label">{variant.variant_name}</span>
-                              <span className="product-detail-option-price">₹{parseFloat(variant.price).toFixed(0)}</span>
-                              {variant.hasMrp && (
-                                <span className="text-xs text-slate-400 line-through">
-                                  MRP ₹{variant.mrp.toFixed(0)}
-                                </span>
-                              )}
-                              {variant.discountPercent > 0 && (
-                                <span className="text-[11px] font-semibold text-emerald-700">
-                                  {formatDiscountPercent(variant.discountPercent)}% off
-                                </span>
-                              )}
+                              <div className="product-detail-option-topline">
+                                <span className="product-detail-option-label">{variant.variant_name}</span>
+                                <span className="product-detail-option-price">₹{parseFloat(variant.price).toFixed(0)}</span>
+                              </div>
+                              <div className="product-detail-option-meta">
+                                {variant.hasMrp && (
+                                  <span className="product-detail-option-strike">
+                                    MRP ₹{variant.mrp.toFixed(0)}
+                                  </span>
+                                )}
+                                {variant.discountPercent > 0 && (
+                                  <span className="product-detail-option-discount">
+                                    {formatDiscountPercent(variant.discountPercent)}% off
+                                  </span>
+                                )}
+                              </div>
                               <span className="product-detail-option-stock">
                                 {formatCompactStockLabel(variant.stock_quantity, lowStockThreshold)}
                               </span>
@@ -423,6 +513,9 @@ const ProductDetail = () => {
                               +
                             </button>
                           </div>
+                          <p className="product-detail-quantity-hint">
+                            Maximum {availableStock} available for this selection.
+                          </p>
                         </div>
 
                         <div className="product-detail-action-group">
@@ -576,21 +669,62 @@ const ProductDetail = () => {
               </div>
             </div>
 
-            {productFacts.length > 0 && (
-              <div className="product-detail-meta-strip">
-                {productFacts.map((item) => (
-                  <div key={item.label} className="product-detail-meta-card">
-                    <p className="product-detail-meta-label">{item.label}</p>
-                    <p className="product-detail-meta-value">{item.value}</p>
+            <div className="product-detail-lower-grid">
+              {productFacts.length > 0 && (
+                <div className="product-detail-meta-panel">
+                  <div className="product-detail-section-header">
+                    <div>
+                      <h2 className="product-detail-section-title">Catalog details</h2>
+                      <p className="product-detail-section-copy">
+                        Core product information surfaced in a dense, scan-friendly layout.
+                      </p>
+                    </div>
                   </div>
-                ))}
+
+                  <div className="product-detail-meta-strip">
+                    {productFacts.map((item) => (
+                      <div key={item.label} className="product-detail-meta-card">
+                        <p className="product-detail-meta-label">{item.label}</p>
+                        <p className="product-detail-meta-value">{item.value}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="product-detail-assurance-panel">
+                <div className="product-detail-section-header">
+                  <div>
+                    <h2 className="product-detail-section-title">Page improvements</h2>
+                    <p className="product-detail-section-copy">
+                      Decision-critical details are grouped so users can compare, configure, and buy without hunting through the page.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="product-detail-assurance-grid">
+                  {assuranceItems.map((item) => {
+                    const Icon = item.icon;
+
+                    return (
+                      <div key={item.label} className="product-detail-assurance-card">
+                        <div className="product-detail-assurance-icon">
+                          <Icon className="h-5 w-5" />
+                        </div>
+                        <div>
+                          <p className="product-detail-assurance-label">{item.label}</p>
+                          <p className="product-detail-assurance-value">{item.value}</p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
-            )}
-        </section>
-      </div>
+            </div>
+          </section>
+        </div>
       </div>
 
-      {/* Size Selection Dialog */}
       <SizeSelectionDialog
         isOpen={showSizeDialog}
         onClose={() => {

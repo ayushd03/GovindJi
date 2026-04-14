@@ -42,6 +42,17 @@ const Header = () => {
     setIsUserMenuOpen(false);
   }, [location.pathname]);
 
+  useEffect(() => {
+    if (location.pathname === '/products' || location.pathname.startsWith('/products/')) {
+      const params = new URLSearchParams(location.search);
+      const searchFromUrl = params.get('search') || '';
+      setSearchTerm((previous) => (previous === searchFromUrl ? previous : searchFromUrl));
+      return;
+    }
+
+    setSearchTerm((previous) => (previous === '' ? previous : ''));
+  }, [location.pathname, location.search]);
+
   const handleLogout = () => {
     logout();
     navigate('/');
@@ -51,11 +62,14 @@ const Header = () => {
   const handleSearch = (event) => {
     event.preventDefault();
     const normalizedSearch = searchTerm.trim();
-    if (!normalizedSearch) {
-      return;
-    }
+    const nextPath = normalizedSearch
+      ? `/products?search=${encodeURIComponent(normalizedSearch)}`
+      : '/products';
+    const currentPathWithSearch = `${location.pathname}${location.search}`;
 
-    navigate(`/products?search=${encodeURIComponent(normalizedSearch)}`);
+    if (currentPathWithSearch !== nextPath) {
+      navigate(nextPath);
+    }
     setIsMenuOpen(false);
   };
 
@@ -64,7 +78,6 @@ const Header = () => {
       ? location.pathname === '/'
       : location.pathname === href || location.pathname.startsWith(`${href}/`)
   );
-  const isProductsPage = location.pathname === '/products' || location.pathname.startsWith('/products/');
 
   return (
     <>
@@ -86,18 +99,16 @@ const Header = () => {
             </Link>
 
             <div className="hidden min-w-0 justify-center lg:flex">
-              {!isProductsPage && (
-                <form onSubmit={handleSearch} className="relative w-full max-w-[460px] xl:max-w-[560px]">
-                  <input
-                    type="text"
-                    placeholder="Search products"
-                    value={searchTerm}
-                    onChange={(event) => setSearchTerm(event.target.value)}
-                    className="input-field w-full min-w-0 rounded-full border-border/80 bg-white/95 pl-10 pr-4 shadow-[0_10px_24px_rgba(15,23,42,0.05)]"
-                  />
-                  <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                </form>
-              )}
+              <form onSubmit={handleSearch} className="relative w-full max-w-[460px] xl:max-w-[560px]">
+                <input
+                  type="text"
+                  placeholder="Search products"
+                  value={searchTerm}
+                  onChange={(event) => setSearchTerm(event.target.value)}
+                  className="input-field w-full min-w-0 rounded-full border-border/80 bg-white/95 pl-10 pr-4 shadow-[0_10px_24px_rgba(15,23,42,0.05)]"
+                />
+                <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              </form>
             </div>
 
             <div className="hidden shrink-0 items-center justify-end gap-1.5 lg:flex xl:gap-2">
@@ -231,18 +242,16 @@ const Header = () => {
               className="border-t border-border/70 bg-[rgba(255,253,248,0.98)] lg:hidden"
             >
               <div className="page-container space-y-4 py-3.5">
-                {!isProductsPage && (
-                  <form onSubmit={handleSearch} className="relative">
-                    <input
-                      type="text"
-                      placeholder="Search products"
-                      value={searchTerm}
-                      onChange={(event) => setSearchTerm(event.target.value)}
-                      className="input-field w-full rounded-full border-border/80 bg-white pl-10 pr-4"
-                    />
-                    <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  </form>
-                )}
+                <form onSubmit={handleSearch} className="relative">
+                  <input
+                    type="text"
+                    placeholder="Search products"
+                    value={searchTerm}
+                    onChange={(event) => setSearchTerm(event.target.value)}
+                    className="input-field w-full rounded-full border-border/80 bg-white pl-10 pr-4"
+                  />
+                  <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                </form>
 
                 <div className="grid gap-2">
                   {navLinks.map((link) => (

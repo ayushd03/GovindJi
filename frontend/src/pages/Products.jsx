@@ -5,7 +5,6 @@ import {
   FunnelIcon,
   ViewColumnsIcon,
   ListBulletIcon,
-  MagnifyingGlassIcon,
 } from '@heroicons/react/24/outline';
 import ProductCard from '../components/ProductCard';
 import { Button } from '../components/ui/button';
@@ -463,27 +462,6 @@ const Products = () => {
           </motion.div>
 
           <div className="products-results-scroll min-h-0 lg:h-full lg:overflow-y-auto lg:pr-2">
-            <motion.div
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.25 }}
-              className="mb-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm"
-            >
-              <label className="mb-1.5 block text-sm font-semibold tracking-tight text-slate-900">
-                Search
-              </label>
-              <div className="relative">
-                <MagnifyingGlassIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                <input
-                  type="text"
-                  value={filters.search}
-                  onChange={(e) => handleFilterChange('search', e.target.value)}
-                  placeholder="Search products"
-                  className="h-10 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-sm text-slate-700 shadow-sm transition-all duration-200 focus:border-[#23442a]/35 focus:outline-none focus:ring-2 focus:ring-[#23442a]/15"
-                />
-              </div>
-            </motion.div>
-
             {isProductsLoading && !isInitialLoading && (
               <div className="mb-3 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-600 shadow-sm">
                 Updating results...

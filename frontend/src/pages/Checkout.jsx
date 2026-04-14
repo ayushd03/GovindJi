@@ -24,7 +24,7 @@ import {
 const paymentOptions = [
   {
     id: 'phonepe',
-    title: 'PhonePe / UPI / Card / Net Banking',
+    title: 'UPI / Card / Net Banking',
     description: 'Fast online checkout with payment verification.',
   },
   {

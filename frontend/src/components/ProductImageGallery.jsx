@@ -128,61 +128,65 @@ const ProductImageGallery = ({ productId, fallbackImageUrl = null }) => {
   return (
     <div className="product-gallery">
       <div className="product-gallery__frame">
-        <div className="product-gallery__media">
-          <img
-            src={currentImage.image_url}
-            alt={currentImage.alt_text || 'Product image'}
-            className="product-gallery__image"
-            onError={(e) => handleImageError(e, 'product')}
-          />
-
+        <div className="product-gallery__body">
           {hasMultipleImages && (
-            <>
-              <button
-                type="button"
-                className="product-gallery__nav product-gallery__nav--prev"
-                onClick={handlePrevious}
-                aria-label="Previous image"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </button>
-              <button
-                type="button"
-                className="product-gallery__nav product-gallery__nav--next"
-                onClick={handleNext}
-                aria-label="Next image"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </button>
-
-              <div className="product-gallery__counter">
-                {currentImageIndex + 1} / {images.length}
-              </div>
-            </>
+            <div className="product-gallery__thumbs" aria-label="Product image thumbnails">
+              {images.map((image, index) => (
+                <button
+                  key={image.id}
+                  type="button"
+                  className={`product-gallery__thumb ${index === currentImageIndex ? 'product-gallery__thumb--active' : ''}`}
+                  onClick={() => handleThumbnailClick(index)}
+                >
+                  <img
+                    src={image.image_url}
+                    alt={image.alt_text || `Product image ${index + 1}`}
+                    onError={(e) => handleImageError(e, 'product')}
+                  />
+                  {image.is_primary && (
+                    <span className="product-gallery__thumb-badge">Primary</span>
+                  )}
+                </button>
+              ))}
+            </div>
           )}
-        </div>
 
-        {hasMultipleImages && (
-          <div className="product-gallery__thumbs">
-            {images.map((image, index) => (
-              <button
-                key={image.id}
-                type="button"
-                className={`product-gallery__thumb ${index === currentImageIndex ? 'product-gallery__thumb--active' : ''}`}
-                onClick={() => handleThumbnailClick(index)}
-              >
-                <img
-                  src={image.image_url}
-                  alt={image.alt_text || `Product image ${index + 1}`}
-                  onError={(e) => handleImageError(e, 'product')}
-                />
-                {image.is_primary && (
-                  <span className="product-gallery__thumb-badge">Primary</span>
-                )}
-              </button>
-            ))}
+          <div className="product-gallery__media-wrap">
+            <div className="product-gallery__media">
+              <img
+                src={currentImage.image_url}
+                alt={currentImage.alt_text || 'Product image'}
+                className="product-gallery__image"
+                onError={(e) => handleImageError(e, 'product')}
+              />
+
+              {hasMultipleImages && (
+                <>
+                  <button
+                    type="button"
+                    className="product-gallery__nav product-gallery__nav--prev"
+                    onClick={handlePrevious}
+                    aria-label="Previous image"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    className="product-gallery__nav product-gallery__nav--next"
+                    onClick={handleNext}
+                    aria-label="Next image"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+
+                  <div className="product-gallery__counter">
+                    {currentImageIndex + 1} / {images.length}
+                  </div>
+                </>
+              )}
+            </div>
           </div>
-        )}
+        </div>
       </div>
 
       {currentImage.alt_text && (
