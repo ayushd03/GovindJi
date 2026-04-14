@@ -28,6 +28,7 @@ const adminDeliveryRoutes = require('./routes/adminDeliveryRoutes');
 const deliveryService = require('./services/delivery/DeliveryService');
 const pickupScheduler = require('./services/delivery/pickupScheduler');
 const orderRecoveryService = require('./services/order/OrderRecoveryService');
+const { buildVariantMutationPlan } = require('./services/productVariantSync');
 
 const app = express();
 const port = process.env.PORT || 3001;
@@ -74,6 +75,91 @@ const buildFrontendAuthUrl = (query = {}) => {
         }
     });
     return url.toString();
+};
+
+const ORDER_STATUS_VALUES = new Set([
+    'pending',
+    'processing',
+    'shipped',
+    'completed',
+    'cancelled'
+]);
+
+const parseOptionalNumber = (value, fallback = null) => {
+    if (value === null || value === undefined || value === '') {
+        return fallback;
+    }
+
+    const parsed = typeof value === 'number' ? value : Number.parseFloat(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const roundToPrecision = (value, precision = 1) => {
+    const multiplier = 10 ** precision;
+    return Math.round((value + Number.EPSILON) * multiplier) / multiplier;
+};
+
+const computeDiscountPercent = (mrpValue, priceValue) => {
+    const mrp = parseOptionalNumber(mrpValue, null);
+    const price = parseOptionalNumber(priceValue, null);
+
+    if (!mrp || !price || mrp <= 0 || price <= 0 || mrp <= price) {
+        return 0;
+    }
+
+    return roundToPrecision(((mrp - price) / mrp) * 100, 1);
+};
+
+const selectDefaultVariant = (variants = []) => {
+    if (!Array.isArray(variants) || variants.length === 0) {
+        return null;
+    }
+
+    return (
+        variants.find((variant) => variant?.is_default) ||
+        [...variants].sort((left, right) => (left?.display_order || 0) - (right?.display_order || 0))[0]
+    );
+};
+
+const normalizeVariantPricing = (variant = {}) => {
+    const price = parseOptionalNumber(variant.price, 0);
+    const mrp = parseOptionalNumber(variant.mrp, null);
+    const discountPercent = mrp
+        ? computeDiscountPercent(mrp, price)
+        : Math.max(parseOptionalNumber(variant.discount_percent ?? variant.discount, 0), 0);
+
+    return {
+        ...variant,
+        price,
+        mrp,
+        discount_percent: discountPercent,
+        discount: discountPercent
+    };
+};
+
+const enrichProductPricing = (product = {}, variants = []) => {
+    const normalizedVariants = Array.isArray(variants)
+        ? variants.map(normalizeVariantPricing)
+        : [];
+    const defaultVariant = selectDefaultVariant(normalizedVariants);
+    const productMrp = parseOptionalNumber(product.mrp, null);
+    const productDiscount = productMrp
+        ? computeDiscountPercent(productMrp, product.price)
+        : (
+            product.discount_type === 'percentage'
+                ? Math.max(parseOptionalNumber(product.discount_on_sale_price, 0), 0)
+                : 0
+        );
+    const effectiveMrp = defaultVariant ? defaultVariant.mrp : productMrp;
+    const effectiveDiscount = defaultVariant ? defaultVariant.discount_percent : productDiscount;
+
+    return {
+        ...product,
+        mrp: effectiveMrp,
+        discount: effectiveDiscount,
+        discount_percent: effectiveDiscount,
+        variants: normalizedVariants
+    };
 };
 
 const mapAuthFailure = (error, fallbackMessage = 'Invalid login credentials') => {
@@ -384,12 +470,21 @@ app.get('/api/admin/dashboard', authenticateAdmin, asyncHandler(async (req, res)
  */
 function calculateWeightGrams(weight, unit, explicitWeightGrams = null) {
     // If explicit weight_grams provided, use it (for non-weight units like "pieces")
-    if (explicitWeightGrams !== null && explicitWeightGrams !== undefined) {
-        return Math.round(parseFloat(explicitWeightGrams) || 0);
+    if (explicitWeightGrams !== null && explicitWeightGrams !== undefined && explicitWeightGrams !== '') {
+        const parsedExplicitWeight = Math.round(parseFloat(explicitWeightGrams) || 0);
+        if (parsedExplicitWeight <= 0) {
+            throw new Error('Shipping weight must be greater than 0 grams.');
+        }
+
+        return parsedExplicitWeight;
     }
 
     const weightValue = parseFloat(weight) || 0;
     const normalizedUnit = (unit || '').toLowerCase().trim();
+
+    if (weightValue <= 0) {
+        throw new Error('Shipping weight is required. Enter the pack weight or explicit grams.');
+    }
 
     // Convert based on unit
     switch (normalizedUnit) {
@@ -417,19 +512,7 @@ function calculateWeightGrams(weight, unit, explicitWeightGrams = null) {
             return Math.round(weightValue * 28.3495);
 
         default:
-            // For unknown units, apply heuristic:
-            // If weight < 100, assume kg; if >= 100, assume grams
-            if (weightValue > 0 && weightValue < 100) {
-                logger.warn('Unknown weight unit, assuming kilograms', { weight: weightValue, unit });
-                return Math.round(weightValue * 1000);
-            } else if (weightValue >= 100) {
-                logger.warn('Unknown weight unit, assuming grams', { weight: weightValue, unit });
-                return Math.round(weightValue);
-            }
-
-            // Default fallback
-            logger.warn('Could not calculate weight, using default 250g', { weight: weightValue, unit });
-            return 250;
+            throw new Error(`Shipping weight in grams is required for unit "${unit || 'unknown'}".`);
     }
 }
 
@@ -446,6 +529,10 @@ function calculateVariantWeightGrams(sizeValue, sizeUnit, explicitWeightGrams = 
     const normalizedUnit = (sizeUnit || '').toUpperCase().trim();
     const value = parseFloat(sizeValue) || 0;
 
+    if (value <= 0) {
+        throw new Error('Variant size must be greater than 0.');
+    }
+
     switch (normalizedUnit) {
         case 'GRAMS':
             return Math.round(value);
@@ -461,17 +548,16 @@ function calculateVariantWeightGrams(sizeValue, sizeUnit, explicitWeightGrams = 
 
         default:
             // For non-weight units (PIECES, LITERS, etc.), require explicit weight
-            if (explicitWeightGrams !== null && explicitWeightGrams !== undefined) {
-                return Math.round(parseFloat(explicitWeightGrams) || 0);
+            if (explicitWeightGrams !== null && explicitWeightGrams !== undefined && explicitWeightGrams !== '') {
+                const parsedExplicitWeight = Math.round(parseFloat(explicitWeightGrams) || 0);
+                if (parsedExplicitWeight <= 0) {
+                    throw new Error('Variant shipping weight must be greater than 0 grams.');
+                }
+
+                return parsedExplicitWeight;
             }
 
-            // No explicit weight provided for non-weight unit
-            logger.warn('Variant with non-weight unit requires explicit weight_grams', {
-                sizeValue,
-                sizeUnit,
-                message: 'Defaulting to 250g - admin should configure proper weight'
-            });
-            return 250;
+            throw new Error(`Variant shipping weight in grams is required for ${sizeUnit || 'this unit'}.`);
     }
 }
 
@@ -479,30 +565,36 @@ function calculateVariantWeightGrams(sizeValue, sizeUnit, explicitWeightGrams = 
 // Admin Product Management
 // ============================================================================
 
-// Admin-only: returns ALL products including inactive ones
-app.get('/api/admin/products', authenticateAdmin, asyncHandler(async (req, res) => {
-    const { data: products, error: productsError } = await supabase
-        .from('products')
-        .select('*')
-        .order('name', { ascending: true });
-
-    if (productsError) throw productsError;
-    res.json(products || []);
-}));
-
 app.post('/api/admin/products', authenticateAdmin, validateProduct, asyncHandler(async (req, res) => {
     const {
         name, description, price, image_url, category_id, stock_quantity, min_stock_level, sku, weight, unit,
         // New enhanced fields
         item_hsn, is_service, base_unit, secondary_unit, unit_conversion_value,
-        sale_price_without_tax, discount_on_sale_price, discount_type,
+        sale_price_without_tax, discount_on_sale_price, discount_type, mrp,
         opening_quantity_at_price, opening_quantity_as_of_date, stock_location,
         wholesale_prices,
         weight_grams  // Optional explicit weight in grams
     } = req.body;
 
-    // Calculate weight in grams for Delhivery integration
-    const calculatedWeightGrams = calculateWeightGrams(weight, unit || 'kg', weight_grams);
+    const normalizedPrice = parseOptionalNumber(price, 0);
+    const normalizedMrp = parseOptionalNumber(mrp, null);
+    const effectiveDiscount = normalizedMrp
+        ? computeDiscountPercent(normalizedMrp, normalizedPrice)
+        : parseOptionalNumber(discount_on_sale_price, 0);
+
+    if (normalizedMrp !== null && normalizedMrp < normalizedPrice) {
+        return sendError(res, 'MRP must be greater than or equal to the selling price', 400, { field: 'mrp' });
+    }
+
+    let calculatedWeightGrams = 0;
+
+    try {
+        calculatedWeightGrams = is_service
+            ? 0
+            : calculateWeightGrams(weight, unit || 'kg', weight_grams);
+    } catch (error) {
+        return sendError(res, error.message, 400, { field: 'weight_grams' });
+    }
 
     // Log weight calculation for debugging
     logger.info('Product weight calculated', {
@@ -519,7 +611,7 @@ app.post('/api/admin/products', authenticateAdmin, validateProduct, asyncHandler
         .insert([{
             name,
             description,
-            price,
+            price: normalizedPrice,
             image_url,
             category_id,
             stock_quantity,
@@ -531,12 +623,13 @@ app.post('/api/admin/products', authenticateAdmin, validateProduct, asyncHandler
             // New fields
             item_hsn,
             is_service: is_service || false,
+            mrp: normalizedMrp,
             base_unit: base_unit || 'KILOGRAMS',
             secondary_unit: secondary_unit || 'GRAMS',
             unit_conversion_value,
             sale_price_without_tax: sale_price_without_tax || false,
-            discount_on_sale_price,
-            discount_type: discount_type || 'percentage',
+            discount_on_sale_price: effectiveDiscount,
+            discount_type: 'percentage',
             opening_quantity_at_price,
             opening_quantity_as_of_date,
             stock_location
@@ -552,6 +645,7 @@ app.post('/api/admin/products', authenticateAdmin, validateProduct, asyncHandler
             .filter(wp => wp.quantity && wp.price) // Only insert valid entries
             .map(wp => ({
                 product_id: product.id,
+                variant_id: wp.variant_id || null,
                 quantity: parseFloat(wp.quantity),
                 price: parseFloat(wp.price)
             }));
@@ -562,12 +656,17 @@ app.post('/api/admin/products', authenticateAdmin, validateProduct, asyncHandler
                 .insert(wholesalePriceData);
 
             if (wholesaleError) {
-                logger.warn('Error inserting wholesale prices', {
+                await supabase
+                    .from('products')
+                    .delete()
+                    .eq('id', product.id);
+
+                logger.error('Product create rolled back after wholesale price failure', {
                     userId: req.user?.id,
                     productId: product.id,
                     error: wholesaleError
                 });
-                // Don't fail the entire request, just log the error
+                throw new Error('Failed to save wholesale prices. Product creation was rolled back.');
             }
         }
     }
@@ -595,24 +694,67 @@ app.put('/api/admin/products/:id', authenticateAdmin, validateProduct, asyncHand
     const { wholesale_prices, ...productUpdates } = req.body;
     productUpdates.updated_at = new Date().toISOString();
 
-    // Recalculate weight_grams if weight or unit is being updated
-    if (productUpdates.weight !== undefined || productUpdates.unit !== undefined || productUpdates.weight_grams !== undefined) {
-        // Fetch current product to get existing values
-        const { data: currentProduct, error: fetchError } = await supabase
+    const needsCurrentProduct = (
+        productUpdates.weight !== undefined ||
+        productUpdates.unit !== undefined ||
+        productUpdates.weight_grams !== undefined ||
+        productUpdates.price !== undefined ||
+        productUpdates.mrp !== undefined ||
+        productUpdates.is_service !== undefined
+    );
+    let currentProduct = null;
+
+    if (needsCurrentProduct) {
+        const { data, error: fetchError } = await supabase
             .from('products')
-            .select('weight, unit, weight_grams')
+            .select('price, mrp, weight, unit, weight_grams, is_service')
             .eq('id', id)
             .single();
 
         if (fetchError) throw fetchError;
+        currentProduct = data;
+    }
 
+    const finalIsService = productUpdates.is_service !== undefined
+        ? productUpdates.is_service
+        : currentProduct?.is_service;
+    const finalPrice = productUpdates.price !== undefined
+        ? parseOptionalNumber(productUpdates.price, 0)
+        : parseOptionalNumber(currentProduct?.price, 0);
+    const finalMrp = productUpdates.mrp !== undefined
+        ? parseOptionalNumber(productUpdates.mrp, null)
+        : parseOptionalNumber(currentProduct?.mrp, null);
+
+    if (finalMrp !== null && finalMrp < finalPrice) {
+        return sendError(res, 'MRP must be greater than or equal to the selling price', 400, { field: 'mrp' });
+    }
+
+    if (productUpdates.price !== undefined || productUpdates.mrp !== undefined) {
+        productUpdates.discount_on_sale_price = finalMrp
+            ? computeDiscountPercent(finalMrp, finalPrice)
+            : 0;
+        productUpdates.discount_type = 'percentage';
+        productUpdates.mrp = finalMrp;
+    }
+
+    if (finalIsService) {
+        productUpdates.weight_grams = 0;
+    }
+
+    // Recalculate weight_grams if weight or unit is being updated
+    if (productUpdates.weight !== undefined || productUpdates.unit !== undefined || productUpdates.weight_grams !== undefined) {
         // Use updated values if provided, otherwise use current values
         const finalWeight = productUpdates.weight !== undefined ? productUpdates.weight : currentProduct.weight;
         const finalUnit = productUpdates.unit !== undefined ? productUpdates.unit : currentProduct.unit;
         const explicitWeightGrams = productUpdates.weight_grams;
 
-        // Recalculate weight_grams
-        productUpdates.weight_grams = calculateWeightGrams(finalWeight, finalUnit, explicitWeightGrams);
+        try {
+            productUpdates.weight_grams = finalIsService
+                ? 0
+                : calculateWeightGrams(finalWeight, finalUnit, explicitWeightGrams);
+        } catch (error) {
+            return sendError(res, error.message, 400, { field: 'weight_grams' });
+        }
 
         logger.info('Product weight recalculated on update', {
             productId: id,
@@ -649,6 +791,7 @@ app.put('/api/admin/products/:id', authenticateAdmin, validateProduct, asyncHand
                 .filter(wp => wp.quantity && wp.price) // Only insert valid entries
                 .map(wp => ({
                     product_id: id,
+                    variant_id: wp.variant_id || null,
                     quantity: parseFloat(wp.quantity),
                     price: parseFloat(wp.price)
                 }));
@@ -659,12 +802,12 @@ app.put('/api/admin/products/:id', authenticateAdmin, validateProduct, asyncHand
                     .insert(wholesalePriceData);
 
                 if (wholesaleError) {
-                    logger.warn('Error updating wholesale prices', {
+                    logger.error('Error updating wholesale prices', {
                         userId: req.user?.id,
                         productId: id,
                         error: wholesaleError
                     });
-                    // Don't fail the entire request, just log the error
+                    throw new Error('Failed to save wholesale prices');
                 }
             }
         }
@@ -807,7 +950,7 @@ app.get('/api/admin/orders/:id/shipment-readiness', authenticateAdmin, asyncHand
     // Check each order item for weight configuration
     for (const item of order.order_items || []) {
         let itemWeight = 0;
-        let weightSource = 'default';
+        let weightSource = 'missing';
 
         // Determine weight source (variant > product > default)
         if (item.variant_id && item.product_variants?.weight_grams) {
@@ -827,17 +970,9 @@ app.get('/api/admin/orders/:id/shipment-readiness', authenticateAdmin, asyncHand
                 message: 'Weight not configured',
                 severity: 'error'
             });
-        } else if (itemWeight === 250) {
-            issues.push({
-                type: 'DEFAULT_WEIGHT',
-                product: item.products?.name,
-                variant: item.product_variants?.variant_name || null,
-                message: 'Using default weight (250g) - consider configuring actual weight',
-                severity: 'warning'
-            });
         }
 
-        const lineWeight = (itemWeight || 250) * item.quantity;
+        const lineWeight = itemWeight * item.quantity;
         totalWeight += lineWeight;
 
         itemDetails.push({
@@ -907,6 +1042,10 @@ app.put('/api/admin/orders/:id/status', authenticateAdmin, asyncHandler(async (r
     const { status } = req.body;
     const normalizedStatus = status === 'delivered' ? 'completed' : status;
     let fulfillment = null;
+
+    if (!ORDER_STATUS_VALUES.has(normalizedStatus)) {
+        return sendError(res, `Invalid order status "${status}"`, 400, { field: 'status' });
+    }
 
     const { data, error } = await supabase
         .from('orders')
@@ -2223,6 +2362,9 @@ app.get('/api/products', asyncHandler(async (req, res) => {
     const { data: variants, error: variantsError } = variantsResult;
     const { data: wholesalePrices, error: wholesaleError } = wholesalePricesResult;
 
+    if (variantsError) throw variantsError;
+    if (wholesaleError) throw wholesaleError;
+
     // Group variants by product_id
     const variantsByProduct = {};
     variants?.forEach(variant => {
@@ -2241,12 +2383,11 @@ app.get('/api/products', asyncHandler(async (req, res) => {
         wholesalePricesByProduct[wp.product_id].push(wp);
     });
 
-    // Attach variants and wholesale prices to products
-    const productsWithData = products.map(product => ({
+    // Attach variants, wholesale prices, and storefront pricing metadata
+    const productsWithData = products.map((product) => enrichProductPricing({
         ...product,
-        variants: variantsByProduct[product.id] || [],
         wholesale_prices: wholesalePricesByProduct[product.id] || []
-    }));
+    }, variantsByProduct[product.id] || []));
 
     logger.info('Products retrieved successfully', {
         productCount: productsWithData?.length,
@@ -2286,11 +2427,13 @@ app.get('/api/products/:id', asyncHandler(async (req, res) => {
     const { data: variants, error: variantsError } = variantsResult;
     const { data: wholesalePrices, error: wholesaleError } = wholesalePricesResult;
 
-    const productWithData = {
+    if (variantsError) throw variantsError;
+    if (wholesaleError) throw wholesaleError;
+
+    const productWithData = enrichProductPricing({
         ...product,
-        variants: variants || [],
         wholesale_prices: wholesalePrices || []
-    };
+    }, variants || []);
 
     logger.info('Product retrieved successfully', {
         productId: id,
@@ -2314,29 +2457,70 @@ app.get('/api/products/category/:category_name', async (req, res) => {
     const { data: productsData, error: productsError } = await supabase
         .from('products')
         .select('*')
-        .eq('category_id', categoryData.id);
+        .eq('category_id', categoryData.id)
+        .eq('is_active', true);
     
     if (productsError) return res.status(500).json({ error: productsError.message });
-    res.json(productsData);
+
+    const [variantsResult, wholesalePricesResult] = await Promise.all([
+        supabase
+            .from('product_variants')
+            .select('*')
+            .eq('is_active', true)
+            .order('product_id')
+            .order('display_order', { ascending: true }),
+        supabase
+            .from('wholesale_prices')
+            .select('*')
+            .order('quantity', { ascending: true })
+    ]);
+
+    if (variantsResult.error) return res.status(500).json({ error: variantsResult.error.message });
+    if (wholesalePricesResult.error) return res.status(500).json({ error: wholesalePricesResult.error.message });
+
+    const variantsByProduct = {};
+    (variantsResult.data || []).forEach((variant) => {
+        if (!variantsByProduct[variant.product_id]) {
+            variantsByProduct[variant.product_id] = [];
+        }
+        variantsByProduct[variant.product_id].push(variant);
+    });
+
+    const wholesalePricesByProduct = {};
+    (wholesalePricesResult.data || []).forEach((tier) => {
+        if (!wholesalePricesByProduct[tier.product_id]) {
+            wholesalePricesByProduct[tier.product_id] = [];
+        }
+        wholesalePricesByProduct[tier.product_id].push(tier);
+    });
+
+    res.json(productsData.map((product) => enrichProductPricing({
+        ...product,
+        wholesale_prices: wholesalePricesByProduct[product.id] || []
+    }, variantsByProduct[product.id] || [])));
 });
 
 // Admin Products Routes
-app.get('/api/admin/products', roleMiddleware.requirePermission(roleMiddleware.ADMIN_PERMISSIONS.VIEW_INVENTORY), async (req, res) => {
+app.get('/api/admin/products', roleMiddleware.requirePermission(roleMiddleware.ADMIN_PERMISSIONS.VIEW_PRODUCTS), async (req, res) => {
     try {
-        const [productsResult, variantsResult] = await Promise.all([
+        const [productsResult, variantsResult, wholesaleResult] = await Promise.all([
             supabase
                 .from('products')
                 .select(`*, category:category_id(id, name)`)
-                .eq('is_active', true)
                 .order('name'),
             supabase
                 .from('product_variants')
-                .select('id, product_id, variant_name, size_value, size_unit, price, stock_quantity, is_default, display_order')
-                .eq('is_active', true)
+                .select('id, product_id, variant_name, size_value, size_unit, price, mrp, discount_percent, stock_quantity, sku, is_active, is_default, display_order, weight_grams')
                 .order('display_order', { ascending: true }),
+            supabase
+                .from('wholesale_prices')
+                .select('*')
+                .order('quantity', { ascending: true }),
         ]);
 
         if (productsResult.error) throw productsResult.error;
+        if (variantsResult.error) throw variantsResult.error;
+        if (wholesaleResult.error) throw wholesaleResult.error;
 
         // Group variants by product for O(1) lookup
         const variantsByProduct = {};
@@ -2345,11 +2529,19 @@ app.get('/api/admin/products', roleMiddleware.requirePermission(roleMiddleware.A
             variantsByProduct[v.product_id].push(v);
         });
 
-        const enhancedProducts = productsResult.data.map(product => ({
+        const wholesaleByProduct = {};
+        (wholesaleResult.data || []).forEach((tier) => {
+            if (!wholesaleByProduct[tier.product_id]) {
+                wholesaleByProduct[tier.product_id] = [];
+            }
+            wholesaleByProduct[tier.product_id].push(tier);
+        });
+
+        const enhancedProducts = productsResult.data.map((product) => enrichProductPricing({
             ...product,
             category_name: product.category?.name || null,
-            variants: variantsByProduct[product.id] || [],
-        }));
+            wholesale_prices: wholesaleByProduct[product.id] || []
+        }, variantsByProduct[product.id] || []));
 
         res.json({ products: enhancedProducts });
     } catch (error) {
@@ -2387,73 +2579,210 @@ app.post('/api/admin/products/:id/variants', authenticateAdmin, asyncHandler(asy
         return res.status(400).json({ error: 'Variants must be an array' });
     }
 
-    // Delete existing variants
-    await supabase
+    const normalizedVariants = variants.map((variant, index) => ({
+        ...variant,
+        is_default: variant.is_default === true,
+        is_active: variant.is_active !== undefined ? variant.is_active : true,
+        display_order: variant.display_order !== undefined ? variant.display_order : index
+    }));
+
+    if (normalizedVariants.length > 0) {
+        const defaultVariantIndices = normalizedVariants
+            .map((variant, index) => (variant.is_default ? index : -1))
+            .filter((index) => index >= 0);
+
+        if (defaultVariantIndices.length === 0) {
+            normalizedVariants[0].is_default = true;
+        } else if (defaultVariantIndices.length > 1) {
+            const preservedDefaultIndex = defaultVariantIndices[0];
+            normalizedVariants.forEach((variant, index) => {
+                variant.is_default = index === preservedDefaultIndex;
+            });
+        }
+    }
+
+    const { data: existingVariants, error: existingVariantsError } = await supabase
         .from('product_variants')
-        .delete()
+        .select('id')
         .eq('product_id', id);
 
-    // Insert new variants if provided
-    if (variants.length > 0) {
-        const variantData = variants.map((variant, index) => {
-            // Calculate weight_grams for each variant
-            const weightGrams = calculateVariantWeightGrams(
-                variant.size_value,
-                variant.size_unit,
-                variant.weight_grams  // Explicit weight from frontend (optional)
-            );
+    if (existingVariantsError) throw existingVariantsError;
 
-            // Log weight calculation
-            logger.info('Variant weight calculated', {
-                productId: id,
-                variantName: variant.variant_name,
-                sizeValue: variant.size_value,
-                sizeUnit: variant.size_unit,
-                explicitWeightGrams: variant.weight_grams,
-                calculatedWeightGrams: weightGrams
-            });
+    let variantPlan;
+    try {
+        variantPlan = buildVariantMutationPlan(existingVariants || [], normalizedVariants);
+    } catch (error) {
+        return sendError(res, error.message, 400, { field: 'variants' });
+    }
 
-            return {
-                product_id: id,
-                variant_name: variant.variant_name,
-                size_value: parseFloat(variant.size_value),
-                size_unit: variant.size_unit,
-                price: parseFloat(variant.price),
-                stock_quantity: parseInt(variant.stock_quantity) || 0,
-                sku: variant.sku || null,
-                is_active: variant.is_active !== undefined ? variant.is_active : true,
-                is_default: variant.is_default || false,
-                display_order: variant.display_order !== undefined ? variant.display_order : index,
-                weight_grams: weightGrams
-            };
+    const buildPersistedVariantRecord = (variant, index) => {
+        const normalizedPrice = parseOptionalNumber(variant.price, 0);
+        const normalizedMrp = parseOptionalNumber(variant.mrp, null);
+
+        if (normalizedPrice <= 0) {
+            throw new Error(`Variant ${index + 1} price must be greater than 0.`);
+        }
+
+        if (normalizedMrp !== null && normalizedMrp < normalizedPrice) {
+            throw new Error(`Variant ${index + 1} MRP must be greater than or equal to its selling price.`);
+        }
+
+        const weightGrams = calculateVariantWeightGrams(
+            variant.size_value,
+            variant.size_unit,
+            variant.weight_grams
+        );
+        const discountPercent = normalizedMrp
+            ? computeDiscountPercent(normalizedMrp, normalizedPrice)
+            : 0;
+
+        logger.info('Variant weight calculated', {
+            productId: id,
+            variantName: variant.variant_name,
+            sizeValue: variant.size_value,
+            sizeUnit: variant.size_unit,
+            explicitWeightGrams: variant.weight_grams,
+            calculatedWeightGrams: weightGrams
         });
 
-        const { data, error } = await supabase
+        return {
+            product_id: id,
+            variant_name: variant.variant_name,
+            size_value: Number.parseFloat(variant.size_value),
+            size_unit: variant.size_unit,
+            price: normalizedPrice,
+            mrp: normalizedMrp,
+            discount_percent: discountPercent,
+            stock_quantity: Number.parseInt(variant.stock_quantity, 10) || 0,
+            sku: variant.sku || null,
+            is_active: variant.is_active,
+            is_default: variant.is_default,
+            display_order: variant.display_order,
+            weight_grams: weightGrams
+        };
+    };
+
+    const timestamp = new Date().toISOString();
+    let updatesToApply;
+    let insertsToApply;
+
+    try {
+        updatesToApply = variantPlan.updates.map((variant, index) => ({
+            id: variant.id,
+            ...buildPersistedVariantRecord(variant, index)
+        }));
+        insertsToApply = variantPlan.inserts.map((variant, index) => (
+            buildPersistedVariantRecord(variant, variantPlan.updates.length + index)
+        ));
+    } catch (error) {
+        return sendError(res, error.message, 400, { field: 'variants' });
+    }
+
+    for (const variantUpdate of updatesToApply) {
+        const { id: variantId, ...updatePayload } = variantUpdate;
+        const { error: updateError } = await supabase
             .from('product_variants')
-            .insert(variantData)
-            .select();
+            .update({
+                ...updatePayload,
+                updated_at: timestamp
+            })
+            .eq('id', variantId)
+            .eq('product_id', id);
 
-        if (error) throw error;
+        if (updateError) throw updateError;
+    }
 
-        // Log admin action
+    if (variantPlan.deleteIds.length > 0) {
+        const { error: deleteError } = await supabase
+            .from('product_variants')
+            .delete()
+            .in('id', variantPlan.deleteIds)
+            .eq('product_id', id);
+
+        if (deleteError) throw deleteError;
+    }
+
+    if (insertsToApply.length > 0) {
+        const { error: insertError } = await supabase
+            .from('product_variants')
+            .insert(insertsToApply);
+
+        if (insertError) throw insertError;
+    }
+
+    const { data, error } = await supabase
+        .from('product_variants')
+        .select('*')
+        .eq('product_id', id)
+        .order('display_order', { ascending: true });
+
+    if (error) throw error;
+
+    const defaultVariant = selectDefaultVariant((data || []).map(normalizeVariantPricing));
+
+    if (defaultVariant) {
+        const { error: productSyncError } = await supabase
+            .from('products')
+            .update({
+                price: defaultVariant.price,
+                mrp: defaultVariant.mrp,
+                discount_on_sale_price: defaultVariant.discount_percent || 0,
+                discount_type: 'percentage',
+                updated_at: timestamp
+            })
+            .eq('id', id);
+
+        if (productSyncError) throw productSyncError;
+    }
+
+    if (normalizedVariants.length > 0) {
         await supabase.from('admin_logs').insert([{
             admin_id: req.user.id,
             action: 'UPDATE_PRODUCT_VARIANTS',
             entity_type: 'product',
             entity_id: id,
-            details: { variant_count: variantData.length }
+            details: {
+                variant_count: data?.length || 0,
+                updated_variant_count: updatesToApply.length,
+                inserted_variant_count: insertsToApply.length,
+                deleted_variant_count: variantPlan.deleteIds.length
+            }
         }]);
 
         logger.info('Product variants updated', {
             userId: req.user?.id,
             productId: id,
-            variantCount: variantData.length
+            variantCount: data?.length || 0,
+            updatedVariantCount: updatesToApply.length,
+            insertedVariantCount: insertsToApply.length,
+            deletedVariantCount: variantPlan.deleteIds.length
         });
 
-        return res.json(data);
+        return res.json(data || []);
     }
 
-    res.json([]);
+    if (variantPlan.deleteIds.length > 0) {
+        await supabase.from('admin_logs').insert([{
+            admin_id: req.user.id,
+            action: 'UPDATE_PRODUCT_VARIANTS',
+            entity_type: 'product',
+            entity_id: id,
+            details: {
+                variant_count: 0,
+                updated_variant_count: 0,
+                inserted_variant_count: 0,
+                deleted_variant_count: variantPlan.deleteIds.length
+            }
+        }]);
+
+        logger.info('Product variants cleared', {
+            userId: req.user?.id,
+            productId: id,
+            deletedVariantCount: variantPlan.deleteIds.length
+        });
+    }
+
+    res.json(data || []);
 }));
 
 app.put('/api/admin/products/:productId/variants/:variantId', authenticateAdmin, asyncHandler(async (req, res) => {
@@ -2461,7 +2790,7 @@ app.put('/api/admin/products/:productId/variants/:variantId', authenticateAdmin,
     const variantUpdates = req.body;
 
     // Ensure we're only updating fields that should be updateable
-    const allowedFields = ['variant_name', 'size_value', 'size_unit', 'price', 'stock_quantity', 'sku', 'is_active', 'is_default', 'display_order', 'weight_grams'];
+    const allowedFields = ['variant_name', 'size_value', 'size_unit', 'price', 'mrp', 'stock_quantity', 'sku', 'is_active', 'is_default', 'display_order', 'weight_grams'];
     const updates = {};
     allowedFields.forEach(field => {
         if (variantUpdates[field] !== undefined) {
@@ -2472,24 +2801,39 @@ app.put('/api/admin/products/:productId/variants/:variantId', authenticateAdmin,
         updates.stock_quantity = parseInt(updates.stock_quantity) || 0;
     }
 
-    // Recalculate weight_grams if size_value, size_unit, or weight_grams is being updated
+    const { data: currentVariant, error: fetchError } = await supabase
+        .from('product_variants')
+        .select('size_value, size_unit, weight_grams, price, mrp, is_default')
+        .eq('id', variantId)
+        .single();
+
+    if (fetchError) throw fetchError;
+
+    const finalPrice = updates.price !== undefined
+        ? parseOptionalNumber(updates.price, 0)
+        : parseOptionalNumber(currentVariant.price, 0);
+    const finalMrp = updates.mrp !== undefined
+        ? parseOptionalNumber(updates.mrp, null)
+        : parseOptionalNumber(currentVariant.mrp, null);
+
+    if (finalPrice <= 0) {
+        return sendError(res, 'Variant price must be greater than 0', 400, { field: 'price' });
+    }
+
+    if (finalMrp !== null && finalMrp < finalPrice) {
+        return sendError(res, 'Variant MRP must be greater than or equal to the selling price', 400, { field: 'mrp' });
+    }
+
     if (updates.size_value !== undefined || updates.size_unit !== undefined || updates.weight_grams !== undefined) {
-        // Fetch current variant to get existing values
-        const { data: currentVariant, error: fetchError } = await supabase
-            .from('product_variants')
-            .select('size_value, size_unit, weight_grams')
-            .eq('id', variantId)
-            .single();
-
-        if (fetchError) throw fetchError;
-
-        // Use updated values if provided, otherwise use current values
         const finalSizeValue = updates.size_value !== undefined ? updates.size_value : currentVariant.size_value;
         const finalSizeUnit = updates.size_unit !== undefined ? updates.size_unit : currentVariant.size_unit;
         const explicitWeightGrams = updates.weight_grams;
 
-        // Recalculate weight_grams
-        updates.weight_grams = calculateVariantWeightGrams(finalSizeValue, finalSizeUnit, explicitWeightGrams);
+        try {
+            updates.weight_grams = calculateVariantWeightGrams(finalSizeValue, finalSizeUnit, explicitWeightGrams);
+        } catch (error) {
+            return sendError(res, error.message, 400, { field: 'weight_grams' });
+        }
 
         logger.info('Variant weight recalculated on update', {
             productId,
@@ -2503,6 +2847,20 @@ app.put('/api/admin/products/:productId/variants/:variantId', authenticateAdmin,
         });
     }
 
+    updates.price = finalPrice;
+    updates.mrp = finalMrp;
+    updates.discount_percent = finalMrp
+        ? computeDiscountPercent(finalMrp, finalPrice)
+        : 0;
+
+    if (updates.is_default === true) {
+        await supabase
+            .from('product_variants')
+            .update({ is_default: false })
+            .eq('product_id', productId)
+            .neq('id', variantId);
+    }
+
     updates.updated_at = new Date().toISOString();
 
     const { data, error } = await supabase
@@ -2514,6 +2872,21 @@ app.put('/api/admin/products/:productId/variants/:variantId', authenticateAdmin,
         .single();
 
     if (error) throw error;
+
+    if (data.is_default || currentVariant.is_default || updates.is_default === true) {
+        const { error: productSyncError } = await supabase
+            .from('products')
+            .update({
+                price: data.price,
+                mrp: data.mrp,
+                discount_on_sale_price: data.discount_percent || 0,
+                discount_type: 'percentage',
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', productId);
+
+        if (productSyncError) throw productSyncError;
+    }
 
     logger.info('Product variant updated', {
         userId: req.user?.id,
@@ -2580,6 +2953,7 @@ app.post('/api/admin/products/:id/wholesale-prices', authenticateAdmin, async (r
                 .filter(wp => wp.quantity && wp.price)
                 .map(wp => ({
                     product_id: id,
+                    variant_id: wp.variant_id || null,
                     quantity: parseFloat(wp.quantity),
                     price: parseFloat(wp.price)
                 }));
@@ -2612,8 +2986,30 @@ app.post('/api/admin/products/:id/wholesale-prices', authenticateAdmin, async (r
     }
 });
 
+app.get('/api/admin/logs', roleMiddleware.requireAdminRole, asyncHandler(async (req, res) => {
+    const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 25, 1), 100);
+    const start = (page - 1) * limit;
+    const end = start + limit - 1;
+
+    const { data, error, count } = await supabase
+        .from('admin_logs')
+        .select('*, admin:admin_id(id, email, name)', { count: 'exact' })
+        .order('created_at', { ascending: false })
+        .range(start, end);
+
+    if (error) throw error;
+
+    res.json({
+        logs: data || [],
+        total: count || 0,
+        page,
+        limit
+    });
+}));
+
 // Admin user creation route
-app.post('/api/admin/create-admin', asyncHandler(async (req, res) => {
+app.post('/api/admin/create-admin', roleMiddleware.requireAdminRole, asyncHandler(async (req, res) => {
     const { user_id, email, name } = req.body;
     
     // Check if user already exists in users table
@@ -2621,7 +3017,9 @@ app.post('/api/admin/create-admin', asyncHandler(async (req, res) => {
         .from('users')
         .select('*')
         .eq('id', user_id)
-        .single();
+        .maybeSingle();
+
+    if (checkError) throw checkError;
 
     if (existingUser) {
         // Update existing user to be admin

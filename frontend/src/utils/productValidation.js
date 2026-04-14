@@ -8,7 +8,15 @@ export const validateProductForm = (formData) => {
     errors.name = 'Product name is required';
   }
 
-  if (!formData.price || parseFloat(formData.price) <= 0) {
+  if (!formData.category_id) {
+    errors.category_id = 'Category is required';
+  }
+
+  if (!formData.sku?.trim()) {
+    errors.sku = 'SKU code is required';
+  }
+
+  if (!formData.is_service && (!formData.price || parseFloat(formData.price) <= 0)) {
     errors.price = 'Valid price is required';
   }
 
@@ -20,13 +28,17 @@ export const validateProductForm = (formData) => {
   }
 
   // Discount validation
+  if (formData.discount_type && formData.discount_type !== 'percentage') {
+    errors.discount_type = 'Only percentage discounts are supported';
+  }
+
   if (formData.discount_on_sale_price) {
     const discount = parseFloat(formData.discount_on_sale_price);
     if (discount < 0) {
       errors.discount_on_sale_price = 'Discount cannot be negative';
     }
     
-    if (formData.discount_type === 'percentage' && discount > 100) {
+    if (discount > 100) {
       errors.discount_on_sale_price = 'Percentage discount cannot exceed 100%';
     }
   }

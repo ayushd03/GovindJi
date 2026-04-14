@@ -22,6 +22,7 @@ import {
 import {
   buildCartItem,
   clampQuantityToStock,
+  formatDiscountPercent,
   formatCompactStockLabel,
   getProductPricing,
   getProductVariants,
@@ -311,6 +312,16 @@ const ProductDetail = () => {
                       <p className="product-detail-caption">Price</p>
                       <div className="product-detail-price-row">
                         <span className="product-detail-price">₹{pricing.selectedPrice.toFixed(2)}</span>
+                        {pricing.hasMrp && (
+                          <span className="text-base font-medium text-slate-400 line-through">
+                            ₹{pricing.selectedMrp.toFixed(2)}
+                          </span>
+                        )}
+                        {pricing.discountPercent > 0 && (
+                          <span className="inline-flex rounded-full bg-slate-900 px-2 py-0.5 text-xs font-semibold text-white">
+                            {formatDiscountPercent(pricing.discountPercent)}% off
+                          </span>
+                        )}
                         <span className="product-detail-unit">
                           {hasVariants && selectedVariant
                             ? `for ${selectedVariant.variant_name}`
@@ -330,7 +341,7 @@ const ProductDetail = () => {
                         <div>
                           <h2 className="product-detail-section-title">Choose pack size</h2>
                           <p className="product-detail-section-copy">
-                            Each pack shows the live selling price and current stock.
+                            Each pack shows the live selling price, MRP, and current stock.
                           </p>
                         </div>
                       </div>
@@ -355,9 +366,17 @@ const ProductDetail = () => {
                               className={optionClassName}
                             >
                               <span className="product-detail-option-label">{variant.variant_name}</span>
-                              <span className="product-detail-option-price">
-                                ₹{parseFloat(variant.price).toFixed(0)}
-                              </span>
+                              <span className="product-detail-option-price">₹{parseFloat(variant.price).toFixed(0)}</span>
+                              {variant.hasMrp && (
+                                <span className="text-xs text-slate-400 line-through">
+                                  MRP ₹{variant.mrp.toFixed(0)}
+                                </span>
+                              )}
+                              {variant.discountPercent > 0 && (
+                                <span className="text-[11px] font-semibold text-emerald-700">
+                                  {formatDiscountPercent(variant.discountPercent)}% off
+                                </span>
+                              )}
                               <span className="product-detail-option-stock">
                                 {formatCompactStockLabel(variant.stock_quantity, lowStockThreshold)}
                               </span>

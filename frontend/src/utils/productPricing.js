@@ -12,6 +12,62 @@ const parseIntegerValue = (value, fallback = 0) => {
   return Number.isFinite(parsed) ? Math.max(parsed, 0) : fallback;
 };
 
+const roundToPrecision = (value, precision = 1) => {
+  const multiplier = 10 ** precision;
+  return Math.round((value + Number.EPSILON) * multiplier) / multiplier;
+};
+
+const computeDiscountPercent = (mrp, price) => {
+  const normalizedMrp = parseFloatValue(mrp, 0);
+  const normalizedPrice = parseFloatValue(price, 0);
+
+  if (normalizedMrp <= 0 || normalizedPrice <= 0 || normalizedMrp <= normalizedPrice) {
+    return 0;
+  }
+
+  return roundToPrecision(((normalizedMrp - normalizedPrice) / normalizedMrp) * 100, 1);
+};
+
+const normalizeBasePricing = (product) => {
+  const selectedPrice = parseFloatValue(product?.price, 0);
+  const mrp = parseFloatValue(product?.mrp, 0);
+  const fallbackDiscount = Math.max(
+    parseFloatValue(
+      product?.discount_percent ??
+      product?.discount ??
+      (product?.discount_type === 'percentage' ? product?.discount_on_sale_price : 0),
+      0
+    ),
+    0
+  );
+  const derivedDiscount = computeDiscountPercent(mrp, selectedPrice);
+
+  return {
+    selectedPrice,
+    mrp: mrp > 0 ? mrp : 0,
+    discountPercent: derivedDiscount || fallbackDiscount,
+    hasMrp: mrp > selectedPrice && selectedPrice > 0,
+  };
+};
+
+const normalizeVariant = (variant) => {
+  const price = parseFloatValue(variant?.price, 0);
+  const mrp = parseFloatValue(variant?.mrp, 0);
+  const fallbackDiscount = Math.max(
+    parseFloatValue(variant?.discount_percent ?? variant?.discount ?? 0, 0),
+    0
+  );
+  const derivedDiscount = computeDiscountPercent(mrp, price);
+
+  return {
+    ...variant,
+    price,
+    mrp: mrp > 0 ? mrp : 0,
+    discountPercent: derivedDiscount || fallbackDiscount,
+    hasMrp: mrp > price && price > 0,
+  };
+};
+
 const getDefaultVariantFromList = (variants, { preferInStock = true } = {}) => {
   if (variants.length === 0) {
     return null;
@@ -46,7 +102,8 @@ export const getProductVariants = (product) => {
     .filter((variant) => variant.is_active !== false)
     .sort((left, right) => (
       parseIntegerValue(left.display_order, 0) - parseIntegerValue(right.display_order, 0)
-    ));
+    ))
+    .map(normalizeVariant);
 };
 
 export const getSelectedVariant = (product, variantId, options = {}) => {
@@ -69,7 +126,7 @@ export const getSelectedVariant = (product, variantId, options = {}) => {
 export const getProductPricing = (product, variantId) => {
   const variants = getProductVariants(product);
   const hasVariants = variants.length > 0;
-  const basePrice = parseFloatValue(product?.price, 0);
+  const basePricing = normalizeBasePricing(product);
 
   if (!hasVariants) {
     const availableStock = parseIntegerValue(product?.stock_quantity, 0);
@@ -79,9 +136,16 @@ export const getProductPricing = (product, variantId) => {
       variants: [],
       inStockVariants: [],
       selectedVariant: null,
-      selectedPrice: basePrice,
-      minPrice: basePrice,
-      maxPrice: basePrice,
+      selectedPrice: basePricing.selectedPrice,
+      selectedMrp: basePricing.hasMrp ? basePricing.mrp : 0,
+      discountPercent: basePricing.discountPercent,
+      hasMrp: basePricing.hasMrp,
+      displayPrice: basePricing.selectedPrice,
+      displayMrp: basePricing.hasMrp ? basePricing.mrp : 0,
+      displayDiscountPercent: basePricing.discountPercent,
+      displayHasMrp: basePricing.hasMrp,
+      minPrice: basePricing.selectedPrice,
+      maxPrice: basePricing.selectedPrice,
       hasPriceRange: false,
       availableStock,
       totalStock: availableStock,
@@ -99,9 +163,10 @@ export const getProductPricing = (product, variantId) => {
         getSelectedVariant(product, null, { preferInStock: true })
       )
     : getSelectedVariant(product, null, { preferInStock: true });
-  const selectedPrice = parseFloatValue(selectedVariant?.price, basePrice);
+  const selectedPrice = parseFloatValue(selectedVariant?.price, basePricing.selectedPrice);
   const minPrice = Math.min(...priceSourceVariants.map((variant) => parseFloatValue(variant.price, 0)));
   const maxPrice = Math.max(...priceSourceVariants.map((variant) => parseFloatValue(variant.price, 0)));
+  const displayVariant = priceSourceVariants.find((variant) => variant.price === minPrice) || selectedVariant;
   const availableStock = parseIntegerValue(selectedVariant?.stock_quantity, 0);
   const totalStock = variants.reduce(
     (runningTotal, variant) => runningTotal + parseIntegerValue(variant.stock_quantity, 0),
@@ -114,6 +179,13 @@ export const getProductPricing = (product, variantId) => {
     inStockVariants,
     selectedVariant,
     selectedPrice,
+    selectedMrp: selectedVariant?.hasMrp ? selectedVariant.mrp : 0,
+    discountPercent: selectedVariant?.discountPercent || 0,
+    hasMrp: Boolean(selectedVariant?.hasMrp),
+    displayPrice: minPrice,
+    displayMrp: displayVariant?.hasMrp ? displayVariant.mrp : 0,
+    displayDiscountPercent: displayVariant?.discountPercent || 0,
+    displayHasMrp: Boolean(displayVariant?.hasMrp),
     minPrice,
     maxPrice,
     hasPriceRange: minPrice !== maxPrice,
@@ -172,11 +244,23 @@ export const formatCompactStockLabel = (stockQuantity, lowStockThreshold = 5) =>
   return `${normalizedStock} in stock`;
 };
 
+export const formatDiscountPercent = (discountPercent) => {
+  const normalizedDiscount = Math.max(parseFloatValue(discountPercent, 0), 0);
+  if (normalizedDiscount === 0) {
+    return '0';
+  }
+
+  return Number.isInteger(normalizedDiscount)
+    ? normalizedDiscount.toFixed(0)
+    : normalizedDiscount.toFixed(1);
+};
+
 export const buildCartItem = (product, variantId) => {
   const baseProductId = product?.originalId || product?.id;
   const selectedVariant = variantId
     ? getSelectedVariant(product, variantId, { preferInStock: false })
     : null;
+  const basePricing = normalizeBasePricing(product);
 
   if (variantId && !selectedVariant) {
     return null;
@@ -187,7 +271,9 @@ export const buildCartItem = (product, variantId) => {
     originalId: baseProductId,
     name: product?.name,
     image_url: product?.image_url,
-    price: parseFloatValue(product?.price, 0),
+    price: basePricing.selectedPrice,
+    mrp: basePricing.hasMrp ? basePricing.mrp : null,
+    discount_percent: basePricing.discountPercent,
     stock_quantity: parseIntegerValue(product?.stock_quantity, null),
   };
 
@@ -203,6 +289,8 @@ export const buildCartItem = (product, variantId) => {
     size_value: selectedVariant.size_value,
     size_unit: selectedVariant.size_unit,
     price: parseFloatValue(selectedVariant.price, 0),
+    mrp: selectedVariant.hasMrp ? selectedVariant.mrp : null,
+    discount_percent: selectedVariant.discountPercent,
     stock_quantity: parseIntegerValue(selectedVariant.stock_quantity, null),
   };
 };

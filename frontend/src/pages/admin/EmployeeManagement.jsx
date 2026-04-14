@@ -30,6 +30,7 @@ import {
   AdminDialogTitle,
 } from '../../components/AdminDialog';
 import { API_BASE_URL } from '../../config/apiBaseUrl';
+import { ITEMS_PER_PAGE } from '../../constants/adminConstants';
 
 const EMPLOYEE_ROLES = [
   'Store Manager',
@@ -50,12 +51,13 @@ const EmployeeManagement = () => {
   const [error, setError] = useState(null);
   
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(10);
+  const [itemsPerPage] = useState(ITEMS_PER_PAGE);
   const [totalEmployees, setTotalEmployees] = useState(0);
   
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRole, setSelectedRole] = useState('');
   const [showFilters, setShowFilters] = useState(false);
+  const [validationErrors, setValidationErrors] = useState({});
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState(null);
@@ -147,6 +149,44 @@ const EmployeeManagement = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const errors = {};
+    const cleanedPhone = (formData.contact_number || '').replace(/\D/g, '');
+    const cleanedEmergencyPhone = (formData.emergency_phone || '').replace(/\D/g, '');
+
+    if (!formData.name.trim()) {
+      errors.name = 'Full name is required.';
+    }
+
+    if (!formData.role) {
+      errors.role = 'Select an employee role.';
+    }
+
+    if (!formData.start_date) {
+      errors.start_date = 'Start date is required.';
+    }
+
+    if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
+      errors.email = 'Enter a valid email address.';
+    }
+
+    if (cleanedPhone && cleanedPhone.length !== 10) {
+      errors.contact_number = 'Enter a valid 10-digit phone number.';
+    }
+
+    if (cleanedEmergencyPhone && cleanedEmergencyPhone.length !== 10) {
+      errors.emergency_phone = 'Enter a valid 10-digit emergency phone number.';
+    }
+
+    if (formData.salary !== '' && Number(formData.salary) < 0) {
+      errors.salary = 'Salary cannot be negative.';
+    }
+
+    setValidationErrors(errors);
+
+    if (Object.keys(errors).length > 0) {
+      return;
+    }
+
     try {
       const token = localStorage.getItem('authToken');
       const url = editingEmployee ? `${API_BASE_URL}/api/admin/employees/${editingEmployee.id}` : `${API_BASE_URL}/api/admin/employees`;
@@ -204,6 +244,7 @@ const EmployeeManagement = () => {
       setEditingEmployee(null);
       setFormData({ name: '', role: '', contact_number: '', email: '', start_date: '', salary: '', address: '', emergency_contact: '', emergency_phone: '', notes: '' });
     }
+    setValidationErrors({});
     setIsModalOpen(true);
   };
 
@@ -211,6 +252,7 @@ const EmployeeManagement = () => {
     setIsModalOpen(false);
     setEditingEmployee(null);
     setFormData({ name: '', role: '', contact_number: '', email: '', start_date: '', salary: '', address: '', emergency_contact: '', emergency_phone: '', notes: '' });
+    setValidationErrors({});
   };
 
   const formatDate = (dateString) => dateString ? new Date(dateString).toLocaleDateString() : '';
@@ -363,36 +405,120 @@ const EmployeeManagement = () => {
                 <div className="admin-dialog-section">
                   <h3 className="text-lg font-medium text-foreground mb-4">Basic Information</h3>
                   <div className="admin-dialog-grid-2">
-                    <div><label className="admin-dialog-label">Full Name *</label><input type="text" required className="input-field" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} /></div>
+                    <div>
+                      <label className="admin-dialog-label">Full Name *</label>
+                      <input
+                        type="text"
+                        required
+                        className={`input-field ${validationErrors.name ? 'border-destructive focus:ring-destructive' : ''}`}
+                        value={formData.name}
+                        onChange={(e) => {
+                          setFormData({ ...formData, name: e.target.value });
+                          setValidationErrors((prev) => ({ ...prev, name: undefined }));
+                        }}
+                      />
+                      {validationErrors.name && <p className="mt-1 text-xs text-destructive">{validationErrors.name}</p>}
+                    </div>
                     <div>
                       <label className="admin-dialog-label">Role *</label>
-                      <select required className="input-field" value={formData.role} onChange={(e) => setFormData({ ...formData, role: e.target.value })}>
+                      <select
+                        required
+                        className={`input-field ${validationErrors.role ? 'border-destructive focus:ring-destructive' : ''}`}
+                        value={formData.role}
+                        onChange={(e) => {
+                          setFormData({ ...formData, role: e.target.value });
+                          setValidationErrors((prev) => ({ ...prev, role: undefined }));
+                        }}
+                      >
                         <option value="">Select Role</option>
                         {EMPLOYEE_ROLES.map(role => <option key={role} value={role}>{role}</option>)}
                       </select>
+                      {validationErrors.role && <p className="mt-1 text-xs text-destructive">{validationErrors.role}</p>}
                     </div>
                   </div>
                 </div>
                 <div className="admin-dialog-section">
                   <h3 className="text-lg font-medium text-foreground mb-4">Contact Information</h3>
                   <div className="admin-dialog-grid-2">
-                    <div><label className="admin-dialog-label">Phone Number</label><input type="tel" className="input-field" value={formData.contact_number} onChange={(e) => setFormData({ ...formData, contact_number: e.target.value })} /></div>
-                    <div><label className="admin-dialog-label">Email</label><input type="email" className="input-field" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} /></div>
+                    <div>
+                      <label className="admin-dialog-label">Phone Number</label>
+                      <input
+                        type="tel"
+                        className={`input-field ${validationErrors.contact_number ? 'border-destructive focus:ring-destructive' : ''}`}
+                        value={formData.contact_number}
+                        onChange={(e) => {
+                          setFormData({ ...formData, contact_number: e.target.value });
+                          setValidationErrors((prev) => ({ ...prev, contact_number: undefined }));
+                        }}
+                      />
+                      {validationErrors.contact_number && <p className="mt-1 text-xs text-destructive">{validationErrors.contact_number}</p>}
+                    </div>
+                    <div>
+                      <label className="admin-dialog-label">Email</label>
+                      <input
+                        type="email"
+                        className={`input-field ${validationErrors.email ? 'border-destructive focus:ring-destructive' : ''}`}
+                        value={formData.email}
+                        onChange={(e) => {
+                          setFormData({ ...formData, email: e.target.value });
+                          setValidationErrors((prev) => ({ ...prev, email: undefined }));
+                        }}
+                      />
+                      {validationErrors.email && <p className="mt-1 text-xs text-destructive">{validationErrors.email}</p>}
+                    </div>
                   </div>
                   <div className="mt-4"><label className="admin-dialog-label">Address</label><textarea rows={3} className="input-field" value={formData.address} onChange={(e) => setFormData({ ...formData, address: e.target.value })} /></div>
                 </div>
                 <div className="admin-dialog-section">
                   <h3 className="text-lg font-medium text-foreground mb-4">Employment Details</h3>
                   <div className="admin-dialog-grid-2">
-                    <div><label className="admin-dialog-label">Start Date *</label><input type="date" required className="input-field" value={formData.start_date} onChange={(e) => setFormData({ ...formData, start_date: e.target.value })} /></div>
-                    <div><label className="admin-dialog-label">Monthly Salary (₹)</label><input type="number" step="0.01" className="input-field" value={formData.salary} onChange={(e) => setFormData({ ...formData, salary: e.target.value })} /></div>
+                    <div>
+                      <label className="admin-dialog-label">Start Date *</label>
+                      <input
+                        type="date"
+                        required
+                        className={`input-field ${validationErrors.start_date ? 'border-destructive focus:ring-destructive' : ''}`}
+                        value={formData.start_date}
+                        onChange={(e) => {
+                          setFormData({ ...formData, start_date: e.target.value });
+                          setValidationErrors((prev) => ({ ...prev, start_date: undefined }));
+                        }}
+                      />
+                      {validationErrors.start_date && <p className="mt-1 text-xs text-destructive">{validationErrors.start_date}</p>}
+                    </div>
+                    <div>
+                      <label className="admin-dialog-label">Monthly Salary (₹)</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        className={`input-field ${validationErrors.salary ? 'border-destructive focus:ring-destructive' : ''}`}
+                        value={formData.salary}
+                        onChange={(e) => {
+                          setFormData({ ...formData, salary: e.target.value });
+                          setValidationErrors((prev) => ({ ...prev, salary: undefined }));
+                        }}
+                      />
+                      {validationErrors.salary && <p className="mt-1 text-xs text-destructive">{validationErrors.salary}</p>}
+                    </div>
                   </div>
                 </div>
                 <div className="admin-dialog-section">
                   <h3 className="text-lg font-medium text-foreground mb-4">Emergency Contact</h3>
                   <div className="admin-dialog-grid-2">
                     <div><label className="admin-dialog-label">Emergency Contact Name</label><input type="text" className="input-field" value={formData.emergency_contact} onChange={(e) => setFormData({ ...formData, emergency_contact: e.target.value })} /></div>
-                    <div><label className="admin-dialog-label">Emergency Phone Number</label><input type="tel" className="input-field" value={formData.emergency_phone} onChange={(e) => setFormData({ ...formData, emergency_phone: e.target.value })} /></div>
+                    <div>
+                      <label className="admin-dialog-label">Emergency Phone Number</label>
+                      <input
+                        type="tel"
+                        className={`input-field ${validationErrors.emergency_phone ? 'border-destructive focus:ring-destructive' : ''}`}
+                        value={formData.emergency_phone}
+                        onChange={(e) => {
+                          setFormData({ ...formData, emergency_phone: e.target.value });
+                          setValidationErrors((prev) => ({ ...prev, emergency_phone: undefined }));
+                        }}
+                      />
+                      {validationErrors.emergency_phone && <p className="mt-1 text-xs text-destructive">{validationErrors.emergency_phone}</p>}
+                    </div>
                   </div>
                 </div>
                 <div className="admin-dialog-section">

@@ -23,26 +23,14 @@ import { useExpensePreferences } from '../../hooks/useExpensePreferences';
 import { formatMobileDayCurrency } from '../../utils/currencyUtils';
 import ExpensesCalendar from './components/ExpensesCalendar';
 import { API_BASE_URL } from '../../config/apiBaseUrl';
+import {
+  EXPENSE_CATEGORIES,
+  ITEMS_PER_PAGE,
+  VENDOR_TRANSACTION_CATEGORIES,
+} from '../../constants/adminConstants';
 
 // Import sub-components
 import ExpenseForm from './components/UnifiedExpenseForm';
-
-// Constants
-const EXPENSE_CATEGORIES = [
-  'Store Utilities',
-  'Office Supplies',
-  'Marketing',
-  'Maintenance',
-  'Transportation',
-  'Miscellaneous',
-  'Vendor Order',
-  'Vendor Payment',
-  'Employee Payout'
-];
-
-// Removed unused PAYMENT_METHODS constant
-
-const ITEMS_PER_PAGE = 10;
 
 const ExpenseManagement = () => {
   const { toast } = useToast();
@@ -494,8 +482,8 @@ const ExpenseManagement = () => {
 
   const getCategoryColor = (category) => {
     const categoryColorMap = {
-      'Vendor Order': 'bg-blue-100 text-blue-800',
-      'Vendor Payment': 'bg-purple-100 text-purple-800',
+      'Vendor Order': 'bg-orange-100 text-orange-800',
+      'Vendor Payment': 'bg-emerald-100 text-emerald-800',
       'Employee Payout': 'bg-green-100 text-green-800',
       'Store Utilities': 'bg-orange-100 text-orange-800',
       'Marketing': 'bg-pink-100 text-pink-800',
@@ -585,9 +573,16 @@ const ExpenseManagement = () => {
                   onChange={(e) => setSelectedCategory(e.target.value)}
                 >
                   <option value="">All Categories</option>
-                  {EXPENSE_CATEGORIES.map(category => (
-                    <option key={category} value={category}>{category}</option>
-                  ))}
+                  <optgroup label="Expenses">
+                    {EXPENSE_CATEGORIES.map((category) => (
+                      <option key={category} value={category}>{category}</option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="Vendor Transactions">
+                    {VENDOR_TRANSACTION_CATEGORIES.map((category) => (
+                      <option key={category} value={category}>{category}</option>
+                    ))}
+                  </optgroup>
                 </select>
               </div>
 

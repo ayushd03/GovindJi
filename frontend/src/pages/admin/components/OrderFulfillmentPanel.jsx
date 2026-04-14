@@ -80,6 +80,7 @@ const OrderFulfillmentPanel = ({ initialOpen = false }) => {
   const [isOpen, setIsOpen] = useState(initialOpen);
   const [showPackageDefaults, setShowPackageDefaults] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState(defaultForm);
   const [nextSlot, setNextSlot] = useState(null);
@@ -94,7 +95,12 @@ const OrderFulfillmentPanel = ({ initialOpen = false }) => {
 
   const fetchData = useCallback(async () => {
     try {
-      setLoading(true);
+      // Only set loading for initial load, use isRefreshing for subsequent refreshes
+      if (!isOpen) {
+        setLoading(true);
+      } else {
+        setIsRefreshing(true);
+      }
 
       const [settingsResponse, shipmentsResponse, pickupResponse] = await Promise.all([
         deliveryAPI.getSettings(),
@@ -114,8 +120,9 @@ const OrderFulfillmentPanel = ({ initialOpen = false }) => {
       });
     } finally {
       setLoading(false);
+      setIsRefreshing(false);
     }
-  }, [toast]);
+  }, [toast, isOpen]);
 
   useEffect(() => {
     fetchData();
@@ -267,10 +274,11 @@ const OrderFulfillmentPanel = ({ initialOpen = false }) => {
                       <div className="flex flex-wrap gap-3 pr-10 sm:pr-12">
                         <button
                           onClick={fetchData}
-                          className="btn-secondary inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium"
+                          disabled={isRefreshing}
+                          className="btn-secondary inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-60"
                         >
-                          <ArrowPathIcon className="h-4 w-4" />
-                          Refresh
+                          <ArrowPathIcon className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                          {isRefreshing ? 'Refreshing...' : 'Refresh'}
                         </button>
                         <button
                           onClick={handleSave}

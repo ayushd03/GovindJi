@@ -1,4 +1,7 @@
 const { logger, sendError } = require('./errorHandler');
+const { createBackendSupabaseClient } = require('../config/supabaseClient');
+
+const supabase = createBackendSupabaseClient();
 
 // Helper function to validate and sanitize date fields
 const sanitizeDateField = (value, fieldName) => {
@@ -66,16 +69,20 @@ const sanitizeNumericField = (value, fieldName, options = {}) => {
 };
 
 // Product validation middleware
-const validateProduct = (req, res, next) => {
+const validateProduct = async (req, res, next) => {
     const { 
         name, 
         price,
+        category_id,
+        sku,
+        mrp,
         base_unit,
         secondary_unit,
         unit_conversion_value,
         discount_type,
         wholesale_prices,
-        opening_quantity_as_of_date
+        opening_quantity_as_of_date,
+        variants
     } = req.body;
 
     // Basic required field validation
@@ -87,7 +94,64 @@ const validateProduct = (req, res, next) => {
         return sendError(res, 'Product name is required', 400, { field: 'name' });
     }
 
-    if (!price || price <= 0) {
+    if (!category_id || (typeof category_id === 'string' && !category_id.trim())) {
+        logger.warn('Product validation failed: missing category', {
+            userId: req.user?.id,
+            requestData: req.body
+        });
+        return sendError(res, 'Category is required', 400, { field: 'category_id' });
+    }
+
+    if (!sku || (typeof sku === 'string' && !sku.trim())) {
+        logger.warn('Product validation failed: missing sku', {
+            userId: req.user?.id,
+            requestData: req.body
+        });
+        return sendError(res, 'SKU code is required', 400, { field: 'sku' });
+    }
+
+    if (typeof req.body.name === 'string') {
+        req.body.name = req.body.name.trim();
+    }
+
+    if (typeof req.body.category_id === 'string') {
+        req.body.category_id = req.body.category_id.trim();
+    }
+
+    if (typeof req.body.sku === 'string') {
+        req.body.sku = req.body.sku.trim();
+    }
+
+    const parsedPrice = typeof price === 'string' ? Number.parseFloat(price) : price;
+    const hasInlineVariants = Array.isArray(variants) && variants.length > 0;
+    let hasExistingVariants = false;
+
+    if (req.params?.id && (price === undefined || price === null || price === '' || !(parsedPrice > 0))) {
+        try {
+            const { count, error } = await supabase
+                .from('product_variants')
+                .select('id', { count: 'exact', head: true })
+                .eq('product_id', req.params.id);
+
+            if (error) {
+                logger.warn('Product validation variant lookup failed', {
+                    userId: req.user?.id,
+                    productId: req.params.id,
+                    error: error.message
+                });
+            } else {
+                hasExistingVariants = (count || 0) > 0;
+            }
+        } catch (error) {
+            logger.warn('Product validation variant lookup threw', {
+                userId: req.user?.id,
+                productId: req.params.id,
+                error: error.message
+            });
+        }
+    }
+
+    if (!(parsedPrice > 0) && !req.body.is_service && !hasInlineVariants && !hasExistingVariants) {
         logger.warn('Product validation failed: invalid price', {
             userId: req.user?.id,
             price: price,
@@ -110,13 +174,13 @@ const validateProduct = (req, res, next) => {
     }
 
     // Discount type validation
-    if (discount_type && !['percentage', 'amount'].includes(discount_type)) {
+    if (discount_type && discount_type !== 'percentage') {
         logger.warn('Product validation failed: invalid discount type', {
             userId: req.user?.id,
             discount_type,
-            validTypes: ['percentage', 'amount']
+            validTypes: ['percentage']
         });
-        return sendError(res, 'Discount type must be either "percentage" or "amount"', 400, { field: 'discount_type' });
+        return sendError(res, 'Only percentage discounts are supported for products', 400, { field: 'discount_type' });
     }
 
     // Wholesale prices validation
@@ -177,8 +241,11 @@ const validateProduct = (req, res, next) => {
     // Numeric field validation and sanitization
     try {
         // Required numeric fields
-        if ('price' in req.body) {
-            req.body.price = sanitizeNumericField(req.body.price, 'price', { allowZero: false, allowNegative: false });
+        if ('price' in req.body && req.body.price !== '' && req.body.price !== null && req.body.price !== undefined) {
+            req.body.price = sanitizeNumericField(req.body.price, 'price', {
+                allowZero: Boolean(req.body.is_service),
+                allowNegative: false
+            });
         }
         
         // Optional numeric fields with defaults
@@ -201,6 +268,14 @@ const validateProduct = (req, res, next) => {
         if ('discount_on_sale_price' in req.body) {
             req.body.discount_on_sale_price = sanitizeNumericField(req.body.discount_on_sale_price, 'discount_on_sale_price', { allowZero: true, allowNegative: false, defaultValue: 0 });
         }
+
+        if ('mrp' in req.body) {
+            req.body.mrp = sanitizeNumericField(req.body.mrp, 'mrp', { allowZero: false, allowNegative: false, defaultValue: null });
+        }
+
+        if ('weight_grams' in req.body) {
+            req.body.weight_grams = sanitizeNumericField(req.body.weight_grams, 'weight_grams', { allowZero: true, allowNegative: false, defaultValue: null });
+        }
         
         if ('opening_quantity_at_price' in req.body) {
             req.body.opening_quantity_at_price = sanitizeNumericField(req.body.opening_quantity_at_price, 'opening_quantity_at_price', { allowZero: true, allowNegative: false, defaultValue: null });
@@ -214,6 +289,34 @@ const validateProduct = (req, res, next) => {
         });
         return sendError(res, error.message, 400);
     }
+
+    if (req.body.mrp !== null && req.body.mrp !== undefined && req.body.price !== undefined) {
+        if (req.body.mrp < req.body.price) {
+            logger.warn('Product validation failed: mrp below price', {
+                userId: req.user?.id,
+                mrp: req.body.mrp,
+                price: req.body.price
+            });
+            return sendError(res, 'MRP must be greater than or equal to the selling price', 400, { field: 'mrp' });
+        }
+    }
+
+    const hasMrp = req.body.mrp !== undefined && req.body.mrp !== null;
+
+    if (
+        req.body.discount_on_sale_price !== undefined &&
+        req.body.discount_on_sale_price !== null &&
+        !hasMrp &&
+        req.body.discount_on_sale_price > 100
+    ) {
+        logger.warn('Product validation failed: discount percentage above 100', {
+            userId: req.user?.id,
+            discount_on_sale_price: req.body.discount_on_sale_price
+        });
+        return sendError(res, 'Percentage discount cannot exceed 100', 400, { field: 'discount_on_sale_price' });
+    }
+
+    req.body.discount_type = 'percentage';
 
     next();
 };

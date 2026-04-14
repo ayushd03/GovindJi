@@ -21,6 +21,7 @@ import { useToast } from '../../hooks/useToast';
 import { Toaster } from '../../components/ui/toaster';
 import UnifiedVendorOrderForm from './components/UnifiedVendorOrderForm';
 import { API_BASE_URL } from '../../config/apiBaseUrl';
+import { ITEMS_PER_PAGE } from '../../constants/adminConstants';
 
 const PO_STATUSES = [
   { value: 'draft', label: 'Draft', icon: PencilIcon, color: 'bg-gray-100 text-gray-800' },
@@ -38,7 +39,7 @@ const PurchaseOrderManagement = () => {
   const [error, setError] = useState(null);
   
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(10);
+  const [itemsPerPage] = useState(ITEMS_PER_PAGE);
   const [totalPOs, setTotalPOs] = useState(0);
   
   const [searchTerm, setSearchTerm] = useState('');

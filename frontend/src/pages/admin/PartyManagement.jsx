@@ -42,33 +42,12 @@ import {
   getTransactionSubText 
 } from '../../utils/financeColors';
 import { API_BASE_URL } from '../../config/apiBaseUrl';
-
-const PARTY_CATEGORIES = [
-  'Raw Materials',
-  'Packaging',
-  'Dairy',
-  'Services',
-  'Equipment',
-  'Miscellaneous'
-];
-
-const GST_TYPES = [
-  'Unregistered/Consumer',
-  'Registered',
-  'Composition',
-  'Overseas'
-];
-
-const INDIAN_STATES = [
-  'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chhattisgarh',
-  'Goa', 'Gujarat', 'Haryana', 'Himachal Pradesh', 'Jharkhand', 'Karnataka',
-  'Kerala', 'Madhya Pradesh', 'Maharashtra', 'Manipur', 'Meghalaya', 'Mizoram',
-  'Nagaland', 'Odisha', 'Punjab', 'Rajasthan', 'Sikkim', 'Tamil Nadu',
-  'Telangana', 'Tripura', 'Uttar Pradesh', 'Uttarakhand', 'West Bengal',
-  'Delhi', 'Jammu and Kashmir', 'Ladakh', 'Puducherry', 'Chandigarh',
-  'Andaman and Nicobar Islands', 'Dadra and Nagar Haveli and Daman and Diu',
-  'Lakshadweep'
-];
+import {
+  GST_TYPES,
+  INDIAN_STATES,
+  ITEMS_PER_PAGE,
+  PARTY_CATEGORIES,
+} from '../../constants/adminConstants';
 
 const PartyManagement = () => {
   const { toast } = useToast();
@@ -80,7 +59,7 @@ const PartyManagement = () => {
   const [viewMode, setViewMode] = useState('active'); // 'active' or 'archived'
 
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(10);
+  const [itemsPerPage] = useState(ITEMS_PER_PAGE);
   const [totalParties, setTotalParties] = useState(0);
   const [totalArchivedParties, setTotalArchivedParties] = useState(0);
   

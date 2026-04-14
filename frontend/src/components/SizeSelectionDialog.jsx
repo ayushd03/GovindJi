@@ -13,6 +13,7 @@ import { useProductImage } from '../hooks/useProductImage';
 import {
   buildCartItem,
   clampQuantityToStock,
+  formatDiscountPercent,
   formatCompactStockLabel,
   getStockLevel,
   getProductPricing,
@@ -118,7 +119,18 @@ const SizeSelectionDialog = ({ isOpen, onClose, product, onAddToCart }) => {
         )}
 
         <div className="font-semibold leading-tight">{variant.variant_name}</div>
-        <div className="text-xs opacity-80">₹{Number.parseFloat(variant.price).toFixed(0)}</div>
+        <div className="space-y-0.5 text-center">
+          <div className="text-xs font-semibold opacity-90">₹{Number.parseFloat(variant.price).toFixed(0)}</div>
+          {variant.hasMrp && (
+            <div className={cn(
+              'flex flex-col items-center text-[10px]',
+              isSelected ? 'text-white/85' : 'text-muted-foreground'
+            )}>
+              <span className="line-through">MRP ₹{variant.mrp.toFixed(0)}</span>
+              <span>{formatDiscountPercent(variant.discountPercent)}% off</span>
+            </div>
+          )}
+        </div>
         <span
           className={cn(
             "inline-flex items-center justify-center rounded-full border px-2 py-0.5 text-[10px] font-semibold leading-4 whitespace-nowrap",

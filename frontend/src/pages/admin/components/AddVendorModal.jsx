@@ -15,32 +15,11 @@ import {
   AdminDialogTitle,
 } from '../../../components/AdminDialog';
 import { API_BASE_URL } from '../../../config/apiBaseUrl';
-
-const PARTY_CATEGORIES = [
-  'Raw Materials',
-  'Packaging',
-  'Dairy',
-  'Services',
-  'Equipment',
-  'Miscellaneous'
-];
-
-const GST_TYPES = [
-  'Unregistered/Consumer',
-  'Registered',
-  'Composition',
-  'Overseas'
-];
-
-const INDIAN_STATES = [
-  'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chhattisgarh',
-  'Goa', 'Gujarat', 'Haryana', 'Himachal Pradesh', 'Jharkhand', 'Karnataka',
-  'Kerala', 'Madhya Pradesh', 'Maharashtra', 'Manipur', 'Meghalaya', 'Mizoram',
-  'Nagaland', 'Odisha', 'Punjab', 'Rajasthan', 'Sikkim', 'Tamil Nadu', 'Telangana',
-  'Tripura', 'Uttar Pradesh', 'Uttarakhand', 'West Bengal',
-  'Andaman and Nicobar Islands', 'Chandigarh', 'Dadra and Nagar Haveli and Daman and Diu',
-  'Delhi', 'Jammu and Kashmir', 'Ladakh', 'Lakshadweep', 'Puducherry'
-];
+import {
+  GST_TYPES,
+  INDIAN_STATES,
+  PARTY_CATEGORIES,
+} from '../../../constants/adminConstants';
 
 const AddVendorModal = ({
   isOpen,
@@ -54,6 +33,7 @@ const AddVendorModal = ({
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState('basic');
   const [isLoading, setIsLoading] = useState(false);
+  const [validationErrors, setValidationErrors] = useState({});
   const tabItems = [
     { key: 'basic', label: 'Basic Details', description: 'Identity and contacts' },
     { key: 'gst', label: 'GST & Address', description: 'Compliance and location' },
@@ -128,6 +108,7 @@ const AddVendorModal = ({
       notes: ''
     });
     setActiveTab('basic');
+    setValidationErrors({});
   };
 
   const handleClose = () => {
@@ -135,8 +116,65 @@ const AddVendorModal = ({
     onClose();
   };
 
+  const updateField = (field, value) => {
+    setFormData((previous) => ({
+      ...previous,
+      [field]: value
+    }));
+    setValidationErrors((previous) => ({
+      ...previous,
+      [field]: undefined
+    }));
+  };
+
+  const validateForm = () => {
+    const errors = {};
+    const cleanedPhone = (formData.phone_number || '').replace(/\D/g, '');
+    const normalizedEmail = (formData.email || '').trim();
+    const normalizedGstin = (formData.gstin || '').trim().toUpperCase();
+
+    if (!formData.name.trim()) {
+      errors.name = 'Vendor name is required.';
+    }
+
+    if (!formData.category) {
+      errors.category = 'Choose a vendor category.';
+    }
+
+    if (cleanedPhone && cleanedPhone.length !== 10) {
+      errors.phone_number = 'Enter a valid 10-digit phone number.';
+    }
+
+    if (normalizedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      errors.email = 'Enter a valid email address.';
+    }
+
+    if (normalizedGstin && !/^\d{2}[A-Z0-9]{13}$/.test(normalizedGstin)) {
+      errors.gstin = 'Enter a valid 15-character GSTIN.';
+    }
+
+    if (Number(formData.opening_balance) < 0) {
+      errors.opening_balance = 'Opening balance cannot be negative.';
+    }
+
+    setValidationErrors(errors);
+
+    if (errors.name || errors.category || errors.phone_number || errors.email) {
+      setActiveTab('basic');
+    } else if (errors.gstin) {
+      setActiveTab('gst');
+    } else if (errors.opening_balance) {
+      setActiveTab('financial');
+    }
+
+    return Object.keys(errors).length === 0;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!validateForm()) {
+      return;
+    }
     setIsLoading(true);
 
     try {
@@ -254,24 +292,26 @@ const AddVendorModal = ({
                   <input
                     type="text"
                     required
-                    className="input-field"
+                    className={`input-field ${validationErrors.name ? 'border-destructive focus:ring-destructive' : ''}`}
                     value={formData.name}
-                    onChange={(e) => setFormData({...formData, name: e.target.value})}
+                    onChange={(e) => updateField('name', e.target.value)}
                   />
+                  {validationErrors.name && <p className="mt-1 text-xs text-destructive">{validationErrors.name}</p>}
                 </div>
                 <div>
                   <label className="admin-dialog-label">Category *</label>
                   <select
                     required
-                    className="input-field"
+                    className={`input-field ${validationErrors.category ? 'border-destructive focus:ring-destructive' : ''}`}
                     value={formData.category}
-                    onChange={(e) => setFormData({...formData, category: e.target.value})}
+                    onChange={(e) => updateField('category', e.target.value)}
                   >
                     <option value="">Select Category</option>
                     {PARTY_CATEGORIES.map(category => (
                       <option key={category} value={category}>{category}</option>
                     ))}
                   </select>
+                  {validationErrors.category && <p className="mt-1 text-xs text-destructive">{validationErrors.category}</p>}
                 </div>
               </div>
               <div className="admin-dialog-grid-2">
@@ -281,27 +321,29 @@ const AddVendorModal = ({
                     type="text"
                     className="input-field"
                     value={formData.contact_person}
-                    onChange={(e) => setFormData({...formData, contact_person: e.target.value})}
+                    onChange={(e) => updateField('contact_person', e.target.value)}
                   />
                 </div>
                 <div>
                   <label className="admin-dialog-label">Phone Number</label>
                   <input
                     type="tel"
-                    className="input-field"
+                    className={`input-field ${validationErrors.phone_number ? 'border-destructive focus:ring-destructive' : ''}`}
                     value={formData.phone_number}
-                    onChange={(e) => setFormData({...formData, phone_number: e.target.value})}
+                    onChange={(e) => updateField('phone_number', e.target.value)}
                   />
+                  {validationErrors.phone_number && <p className="mt-1 text-xs text-destructive">{validationErrors.phone_number}</p>}
                 </div>
               </div>
               <div>
                 <label className="admin-dialog-label">Email</label>
                 <input
                   type="email"
-                  className="input-field"
+                  className={`input-field ${validationErrors.email ? 'border-destructive focus:ring-destructive' : ''}`}
                   value={formData.email}
-                  onChange={(e) => setFormData({...formData, email: e.target.value})}
+                  onChange={(e) => updateField('email', e.target.value)}
                 />
+                {validationErrors.email && <p className="mt-1 text-xs text-destructive">{validationErrors.email}</p>}
               </div>
             </div>
           )}
@@ -315,7 +357,7 @@ const AddVendorModal = ({
                   <select
                     className="input-field"
                     value={formData.gst_type}
-                    onChange={(e) => setFormData({...formData, gst_type: e.target.value})}
+                    onChange={(e) => updateField('gst_type', e.target.value)}
                   >
                     {GST_TYPES.map(type => (
                       <option key={type} value={type}>{type}</option>
@@ -326,11 +368,12 @@ const AddVendorModal = ({
                   <label className="admin-dialog-label">GSTIN</label>
                   <input
                     type="text"
-                    className="input-field"
+                    className={`input-field ${validationErrors.gstin ? 'border-destructive focus:ring-destructive' : ''}`}
                     placeholder="e.g., 22AAAAA0000A1Z5"
                     value={formData.gstin}
-                    onChange={(e) => setFormData({...formData, gstin: e.target.value})}
+                    onChange={(e) => updateField('gstin', e.target.value.toUpperCase())}
                   />
+                  {validationErrors.gstin && <p className="mt-1 text-xs text-destructive">{validationErrors.gstin}</p>}
                 </div>
               </div>
               <div>
@@ -338,7 +381,7 @@ const AddVendorModal = ({
                 <select
                   className="input-field"
                   value={formData.state}
-                  onChange={(e) => setFormData({...formData, state: e.target.value})}
+                  onChange={(e) => updateField('state', e.target.value)}
                 >
                   <option value="">Select State</option>
                   {INDIAN_STATES.map(state => (
@@ -352,7 +395,7 @@ const AddVendorModal = ({
                   rows={3}
                   className="input-field"
                   value={formData.address}
-                  onChange={(e) => setFormData({...formData, address: e.target.value})}
+                  onChange={(e) => updateField('address', e.target.value)}
                 />
               </div>
               <div>
@@ -362,7 +405,7 @@ const AddVendorModal = ({
                   className="input-field"
                   placeholder="Leave blank if same as billing address"
                   value={formData.shipping_address}
-                  onChange={(e) => setFormData({...formData, shipping_address: e.target.value})}
+                  onChange={(e) => updateField('shipping_address', e.target.value)}
                 />
               </div>
             </div>
@@ -377,10 +420,11 @@ const AddVendorModal = ({
                   <input
                     type="number"
                     step="0.01"
-                    className="input-field"
+                    className={`input-field ${validationErrors.opening_balance ? 'border-destructive focus:ring-destructive' : ''}`}
                     value={formData.opening_balance}
-                    onChange={(e) => setFormData({...formData, opening_balance: parseFloat(e.target.value) || 0})}
+                    onChange={(e) => updateField('opening_balance', parseFloat(e.target.value) || 0)}
                   />
+                  {validationErrors.opening_balance && <p className="mt-1 text-xs text-destructive">{validationErrors.opening_balance}</p>}
                 </div>
                 <div>
                   <label className="admin-dialog-label">As of Date</label>
@@ -388,7 +432,7 @@ const AddVendorModal = ({
                     type="date"
                     className="input-field"
                     value={formData.balance_as_of_date}
-                    onChange={(e) => setFormData({...formData, balance_as_of_date: e.target.value})}
+                    onChange={(e) => updateField('balance_as_of_date', e.target.value)}
                   />
                 </div>
               </div>
@@ -398,7 +442,7 @@ const AddVendorModal = ({
                   rows={3}
                   className="input-field"
                   value={formData.notes}
-                  onChange={(e) => setFormData({...formData, notes: e.target.value})}
+                  onChange={(e) => updateField('notes', e.target.value)}
                 />
               </div>
             </div>

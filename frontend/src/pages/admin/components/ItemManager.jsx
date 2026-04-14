@@ -11,6 +11,12 @@ import { Button } from '../../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../../components/ui/card';
 import { cn } from '../../../lib/utils';
 
+const getProductUnitPrice = (product) => {
+  const rawPrice = product?.price ?? product?.selling_price;
+  const normalizedPrice = typeof rawPrice === 'number' ? rawPrice : Number.parseFloat(rawPrice);
+  return Number.isFinite(normalizedPrice) ? normalizedPrice : 0;
+};
+
 const ItemManager = ({
   items = [],
   onItemsChange,
@@ -89,7 +95,7 @@ const ItemManager = ({
       product_id: product.id,
       product_name: product.name,
       description: product.description || '',
-      unit_price: product.selling_price || 0
+      unit_price: getProductUnitPrice(product)
     });
     setShowProductDropdown(prev => ({ ...prev, [itemId]: false }));
     setProductSearch(prev => ({ ...prev, [itemId]: '' }));
@@ -254,7 +260,7 @@ const ItemManager = ({
                                 )}
                               </div>
                               <p className="text-sm font-medium">
-                                {formatCurrency(product.selling_price)}
+                                {formatCurrency(getProductUnitPrice(product))}
                               </p>
                             </div>
                           </button>

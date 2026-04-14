@@ -1,62 +1,45 @@
 const express = require('express');
 const router = express.Router();
+const roleMiddleware = require('../middleware/roleMiddleware');
+const { extractAuthToken } = require('../middleware/authMiddleware');
+const { createBackendSupabaseClient } = require('../config/supabaseClient');
 
-// Note: authenticateAdmin middleware should be imported from your auth middleware
-// const { authenticateAdmin } = require('../middleware/auth');
-
-// Temporary middleware for development - replace with actual admin auth
-const authenticateAdmin = async (req, res, next) => {
+const attachScopedSupabase = (req, res, next) => {
   try {
-    const token = req.headers.authorization?.replace('Bearer ', '');
-    if (!token) {
-      return res.status(401).json({ success: false, error: 'No token provided' });
-    }
-
-    // Initialize supabase client
     if (!req.supabase) {
-      const { createClient } = require('@supabase/supabase-js');
-      req.supabase = createClient(
-        process.env.SUPABASE_URL,
-        process.env.SUPABASE_ANON_KEY,
-        {
-          global: {
-            headers: { Authorization: `Bearer ${token}` }
-          }
-        }
-      );
+      const token = extractAuthToken(req);
+      req.supabase = createBackendSupabaseClient({
+        options: {
+          auth: {
+            autoRefreshToken: false,
+            persistSession: false,
+            detectSessionInUrl: false,
+          },
+          global: token
+            ? {
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                },
+              }
+            : undefined,
+        },
+      });
     }
 
-    // Get user from token
-    const { data: { user }, error } = await req.supabase.auth.getUser();
-
-    if (error || !user) {
-      return res.status(401).json({ success: false, error: 'Invalid token' });
-    }
-
-    // Check if user has admin or manager role
-    const { data: userData, error: userError } = await req.supabase
-      .from('users')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    if (userError || !userData || (userData.role !== 'admin' && userData.role !== 'manager')) {
-      return res.status(403).json({ success: false, error: 'Admin access required' });
-    }
-
-    req.user = user;
     next();
   } catch (error) {
-    console.error('Admin auth error:', error);
-    res.status(401).json({ success: false, error: 'Authentication failed' });
+    console.error('Admin payments supabase attach error:', error);
+    res.status(500).json({ success: false, error: 'Failed to initialize payment admin session' });
   }
 };
+
+router.use(roleMiddleware.authenticateAdmin, attachScopedSupabase);
 
 /**
  * GET /api/admin/payments
  * Get all payment transactions with filtering
  */
-router.get('/payments', authenticateAdmin, async (req, res) => {
+router.get('/payments', async (req, res) => {
   try {
     const { status, payment_method, page = 1, limit = 50 } = req.query;
     const offset = (page - 1) * limit;
@@ -116,7 +99,7 @@ router.get('/payments', authenticateAdmin, async (req, res) => {
  * GET /api/admin/payments/stats/summary
  * Get payment statistics
  */
-router.get('/payments/stats/summary', authenticateAdmin, async (req, res) => {
+router.get('/payments/stats/summary', async (req, res) => {
   try {
     const { data, error } = await req.supabase
       .from('payment_transactions')
@@ -178,7 +161,7 @@ router.get('/payments/stats/summary', authenticateAdmin, async (req, res) => {
  * GET /api/admin/payments/:id
  * Get payment transaction details
  */
-router.get('/payments/:id', authenticateAdmin, async (req, res) => {
+router.get('/payments/:id', async (req, res) => {
   try {
     const { id } = req.params;
 

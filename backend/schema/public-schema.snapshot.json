@@ -1,0 +1,732 @@
+{
+  "source": "live-public-schema-2026-03-29",
+  "generatedAt": "2026-03-29T18:24:18.259Z",
+  "notes": [
+    "Baseline snapshot reconstructed from backend/reports/schema-analysis.json liveSchema output.",
+    "This snapshot only includes live public tables that are missing from repo migrations and were observable in the latest report.",
+    "Later migrations remain authoritative when they overlap this baseline.",
+    "admin_logs and transaction_attachments were intentionally excluded because the latest live report marked public.admin_logs and public.transaction_attachments as missing relations."
+  ],
+  "tables": {
+    "categories": {
+      "name": "categories",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "references": null
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "references": null
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "references": null
+        },
+        "display_order": {
+          "name": "display_order",
+          "type": "integer",
+          "references": null
+        },
+        "gradient_colors": {
+          "name": "gradient_colors",
+          "type": "text",
+          "references": null
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "references": null
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "references": null
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "references": null
+        }
+      }
+    },
+    "category_images": {
+      "name": "category_images",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "references": null
+        },
+        "category_id": {
+          "name": "category_id",
+          "type": "text",
+          "references": null
+        },
+        "image_url": {
+          "name": "image_url",
+          "type": "text",
+          "references": null
+        },
+        "image_type": {
+          "name": "image_type",
+          "type": "text",
+          "references": null
+        },
+        "sort_order": {
+          "name": "sort_order",
+          "type": "integer",
+          "references": null
+        },
+        "alt_text": {
+          "name": "alt_text",
+          "type": "text",
+          "references": null
+        },
+        "is_primary": {
+          "name": "is_primary",
+          "type": "boolean",
+          "references": null
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "references": null
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "references": null
+        }
+      }
+    },
+    "employees": {
+      "name": "employees",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "references": null
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "references": null
+        },
+        "role": {
+          "name": "role",
+          "type": "text",
+          "references": null
+        },
+        "contact_number": {
+          "name": "contact_number",
+          "type": "text",
+          "references": null
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "references": null
+        },
+        "start_date": {
+          "name": "start_date",
+          "type": "date",
+          "references": null
+        },
+        "salary": {
+          "name": "salary",
+          "type": "integer",
+          "references": null
+        },
+        "address": {
+          "name": "address",
+          "type": "unknown",
+          "references": null
+        },
+        "emergency_contact": {
+          "name": "emergency_contact",
+          "type": "unknown",
+          "references": null
+        },
+        "emergency_phone": {
+          "name": "emergency_phone",
+          "type": "unknown",
+          "references": null
+        },
+        "notes": {
+          "name": "notes",
+          "type": "unknown",
+          "references": null
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "references": null
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "references": null
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "references": null
+        }
+      }
+    },
+    "parties": {
+      "name": "parties",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "references": null
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "references": null
+        },
+        "contact_person": {
+          "name": "contact_person",
+          "type": "text",
+          "references": null
+        },
+        "phone_number": {
+          "name": "phone_number",
+          "type": "text",
+          "references": null
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "references": null
+        },
+        "address": {
+          "name": "address",
+          "type": "unknown",
+          "references": null
+        },
+        "shipping_address": {
+          "name": "shipping_address",
+          "type": "unknown",
+          "references": null
+        },
+        "gstin": {
+          "name": "gstin",
+          "type": "unknown",
+          "references": null
+        },
+        "gst_type": {
+          "name": "gst_type",
+          "type": "text",
+          "references": null
+        },
+        "state": {
+          "name": "state",
+          "type": "unknown",
+          "references": null
+        },
+        "party_type": {
+          "name": "party_type",
+          "type": "text",
+          "references": null
+        },
+        "category": {
+          "name": "category",
+          "type": "text",
+          "references": null
+        },
+        "opening_balance": {
+          "name": "opening_balance",
+          "type": "integer",
+          "references": null
+        },
+        "balance_as_of_date": {
+          "name": "balance_as_of_date",
+          "type": "unknown",
+          "references": null
+        },
+        "credit_limit": {
+          "name": "credit_limit",
+          "type": "unknown",
+          "references": null
+        },
+        "credit_limit_type": {
+          "name": "credit_limit_type",
+          "type": "text",
+          "references": null
+        },
+        "current_balance": {
+          "name": "current_balance",
+          "type": "integer",
+          "references": null
+        },
+        "notes": {
+          "name": "notes",
+          "type": "text",
+          "references": null
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "references": null
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "references": null
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "references": null
+        }
+      }
+    },
+    "party_transactions": {
+      "name": "party_transactions",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "string:uuid",
+          "references": null
+        },
+        "party_id": {
+          "name": "party_id",
+          "type": "string:uuid",
+          "references": null
+        },
+        "transaction_type": {
+          "name": "transaction_type",
+          "type": "string:character varying",
+          "references": null
+        },
+        "transaction_date": {
+          "name": "transaction_date",
+          "type": "string:date",
+          "references": null
+        },
+        "reference_id": {
+          "name": "reference_id",
+          "type": "string:uuid",
+          "references": null
+        },
+        "reference_number": {
+          "name": "reference_number",
+          "type": "string:character varying",
+          "references": null
+        },
+        "debit_amount": {
+          "name": "debit_amount",
+          "type": "number:numeric",
+          "references": null
+        },
+        "credit_amount": {
+          "name": "credit_amount",
+          "type": "number:numeric",
+          "references": null
+        },
+        "balance": {
+          "name": "balance",
+          "type": "number:numeric",
+          "references": null
+        },
+        "description": {
+          "name": "description",
+          "type": "string:text",
+          "references": null
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "string:uuid",
+          "references": null
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "string:timestamp with time zone",
+          "references": null
+        }
+      }
+    },
+    "product_images": {
+      "name": "product_images",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "references": null
+        },
+        "product_id": {
+          "name": "product_id",
+          "type": "text",
+          "references": null
+        },
+        "image_url": {
+          "name": "image_url",
+          "type": "text",
+          "references": null
+        },
+        "image_type": {
+          "name": "image_type",
+          "type": "text",
+          "references": null
+        },
+        "sort_order": {
+          "name": "sort_order",
+          "type": "integer",
+          "references": null
+        },
+        "alt_text": {
+          "name": "alt_text",
+          "type": "text",
+          "references": null
+        },
+        "is_primary": {
+          "name": "is_primary",
+          "type": "boolean",
+          "references": null
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "references": null
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "references": null
+        }
+      }
+    },
+    "purchase_order_items": {
+      "name": "purchase_order_items",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "references": null
+        },
+        "purchase_order_id": {
+          "name": "purchase_order_id",
+          "type": "text",
+          "references": null
+        },
+        "product_id": {
+          "name": "product_id",
+          "type": "text",
+          "references": null
+        },
+        "item_name": {
+          "name": "item_name",
+          "type": "text",
+          "references": null
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "references": null
+        },
+        "quantity": {
+          "name": "quantity",
+          "type": "integer",
+          "references": null
+        },
+        "unit": {
+          "name": "unit",
+          "type": "text",
+          "references": null
+        },
+        "price_per_unit": {
+          "name": "price_per_unit",
+          "type": "integer",
+          "references": null
+        },
+        "discount_percentage": {
+          "name": "discount_percentage",
+          "type": "integer",
+          "references": null
+        },
+        "discount_amount": {
+          "name": "discount_amount",
+          "type": "integer",
+          "references": null
+        },
+        "tax_percentage": {
+          "name": "tax_percentage",
+          "type": "integer",
+          "references": null
+        },
+        "tax_amount": {
+          "name": "tax_amount",
+          "type": "integer",
+          "references": null
+        },
+        "total_amount": {
+          "name": "total_amount",
+          "type": "integer",
+          "references": null
+        },
+        "received_quantity": {
+          "name": "received_quantity",
+          "type": "integer",
+          "references": null
+        },
+        "pending_quantity": {
+          "name": "pending_quantity",
+          "type": "integer",
+          "references": null
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "references": null
+        },
+        "has_miscellaneous_expenses": {
+          "name": "has_miscellaneous_expenses",
+          "type": "boolean",
+          "references": null
+        },
+        "miscellaneous_amount": {
+          "name": "miscellaneous_amount",
+          "type": "integer",
+          "references": null
+        },
+        "miscellaneous_note": {
+          "name": "miscellaneous_note",
+          "type": "unknown",
+          "references": null
+        },
+        "first_received_at": {
+          "name": "first_received_at",
+          "type": "unknown",
+          "references": null
+        },
+        "last_received_at": {
+          "name": "last_received_at",
+          "type": "unknown",
+          "references": null
+        },
+        "receiving_notes": {
+          "name": "receiving_notes",
+          "type": "unknown",
+          "references": null
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "references": null
+        },
+        "vendor_id": {
+          "name": "vendor_id",
+          "type": "unknown",
+          "references": null
+        },
+        "vendor_name": {
+          "name": "vendor_name",
+          "type": "text",
+          "references": null
+        },
+        "category_id": {
+          "name": "category_id",
+          "type": "unknown",
+          "references": null
+        },
+        "item_hsn": {
+          "name": "item_hsn",
+          "type": "text",
+          "references": null
+        },
+        "sku": {
+          "name": "sku",
+          "type": "text",
+          "references": null
+        }
+      }
+    },
+    "purchase_orders": {
+      "name": "purchase_orders",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "references": null
+        },
+        "po_number": {
+          "name": "po_number",
+          "type": "text",
+          "references": null
+        },
+        "party_id": {
+          "name": "party_id",
+          "type": "text",
+          "references": null
+        },
+        "order_date": {
+          "name": "order_date",
+          "type": "date",
+          "references": null
+        },
+        "expected_delivery_date": {
+          "name": "expected_delivery_date",
+          "type": "unknown",
+          "references": null
+        },
+        "total_amount": {
+          "name": "total_amount",
+          "type": "integer",
+          "references": null
+        },
+        "tax_amount": {
+          "name": "tax_amount",
+          "type": "integer",
+          "references": null
+        },
+        "discount_amount": {
+          "name": "discount_amount",
+          "type": "integer",
+          "references": null
+        },
+        "final_amount": {
+          "name": "final_amount",
+          "type": "integer",
+          "references": null
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "references": null
+        },
+        "payment_terms": {
+          "name": "payment_terms",
+          "type": "unknown",
+          "references": null
+        },
+        "delivery_address": {
+          "name": "delivery_address",
+          "type": "unknown",
+          "references": null
+        },
+        "notes": {
+          "name": "notes",
+          "type": "text",
+          "references": null
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "text",
+          "references": null
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "references": null
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "references": null
+        },
+        "discount_rate": {
+          "name": "discount_rate",
+          "type": "integer",
+          "references": null
+        },
+        "subtotal": {
+          "name": "subtotal",
+          "type": "integer",
+          "references": null
+        },
+        "tax_rate": {
+          "name": "tax_rate",
+          "type": "integer",
+          "references": null
+        },
+        "priority": {
+          "name": "priority",
+          "type": "text",
+          "references": null
+        }
+      }
+    },
+    "reviews": {
+      "name": "reviews",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "string:uuid",
+          "references": null
+        },
+        "product_id": {
+          "name": "product_id",
+          "type": "string:uuid",
+          "references": null
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "string:uuid",
+          "references": null
+        },
+        "rating": {
+          "name": "rating",
+          "type": "integer:integer",
+          "references": null
+        },
+        "comment": {
+          "name": "comment",
+          "type": "string:text",
+          "references": null
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "string:timestamp with time zone",
+          "references": null
+        }
+      }
+    },
+    "users": {
+      "name": "users",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "references": null
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "references": null
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "references": null
+        },
+        "password": {
+          "name": "password",
+          "type": "text",
+          "references": null
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "references": null
+        },
+        "role": {
+          "name": "role",
+          "type": "text",
+          "references": null
+        },
+        "is_admin": {
+          "name": "is_admin",
+          "type": "boolean",
+          "references": null
+        }
+      }
+    }
+  }
+}

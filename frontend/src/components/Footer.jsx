@@ -1,7 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowUp, Mail, MapPin, Phone } from 'lucide-react';
-import { buildAuthPath } from '../utils/authRouting';
 
 const shopLinks = [
   { name: 'Home', href: '/' },
@@ -9,9 +8,10 @@ const shopLinks = [
   { name: 'My Orders', href: '/orders' },
 ];
 
-const accountLinks = [
-  { name: 'Sign In', href: buildAuthPath({ mode: 'sign-in' }) },
-  { name: 'Create Account', href: buildAuthPath({ mode: 'sign-up' }) },
+const policiesLinks = [
+  { name: 'Privacy Policy', href: '/privacy' },
+  { name: 'Terms & Conditions', href: '/terms' },
+  { name: 'Shipping & Returns', href: '/shipping' },
 ];
 
 const Footer = () => {
@@ -20,7 +20,7 @@ const Footer = () => {
   };
 
   return (
-    <footer className="mt-14 border-t border-border/70 bg-[#17311f] text-white">
+    <footer className="selection-inverse mt-14 border-t border-border/70 bg-[#17311f] text-white">
       <div className="page-container py-12">
         <div className="grid gap-8 lg:grid-cols-[1.25fr_0.75fr_0.75fr_1fr]">
           <div className="space-y-4">
@@ -50,9 +50,9 @@ const Footer = () => {
           </div>
 
           <div>
-            <h4 className="text-[11px] font-semibold uppercase tracking-[0.2em] text-white/55">Account</h4>
+            <h4 className="text-[11px] font-semibold uppercase tracking-[0.2em] text-white/55">Legal</h4>
             <ul className="mt-4 space-y-3 text-sm text-white/75">
-              {accountLinks.map((link) => (
+              {policiesLinks.map((link) => (
                 <li key={link.name}>
                   <Link to={link.href} className="hover:text-white">
                     {link.name}
@@ -81,7 +81,6 @@ const Footer = () => {
                 <Mail className="h-4 w-4 shrink-0 text-white/45" />
                 <span>info@govindji.com</span>
               </a>
-              <p className="pl-7 text-white/55">Mon-Fri, 9:00 am to 6:00 pm</p>
             </div>
           </div>
         </div>
@@ -89,7 +88,7 @@ const Footer = () => {
 
       <div className="border-t border-white/10 bg-[#132819]">
         <div className="page-container flex flex-col gap-3 py-4 text-sm text-white/55 sm:flex-row sm:items-center sm:justify-between">
-          <p>&copy; 2025 GovindJi Dry Fruits. All rights reserved.</p>
+          <p>&copy; 2026 GovindJi Dry Fruits. All rights reserved.</p>
           <button
             onClick={scrollToTop}
             className="inline-flex items-center gap-2 self-start rounded-full border border-white/12 px-4 py-2 text-white/70 hover:bg-white/5 hover:text-white sm:self-auto"

@@ -75,7 +75,7 @@ const Header = () => {
         }`}
       >
         <div className="page-container">
-          <div className="flex h-[74px] items-center justify-between gap-4">
+          <div className="grid h-[74px] grid-cols-[auto_1fr_auto] items-center gap-3 lg:gap-5 xl:gap-6">
             <Link to="/" className="flex shrink-0 items-center">
               <img
                 src="/Govindji_Logo.webp"
@@ -84,26 +84,26 @@ const Header = () => {
               />
             </Link>
 
-            <div className="hidden flex-1 justify-center lg:flex">
-              <form onSubmit={handleSearch} className="relative w-full max-w-[380px] xl:max-w-[440px]">
+            <div className="hidden min-w-0 justify-center lg:flex">
+              <form onSubmit={handleSearch} className="relative w-full max-w-[460px] xl:max-w-[560px]">
                 <input
                   type="text"
                   placeholder="Search products"
                   value={searchTerm}
                   onChange={(event) => setSearchTerm(event.target.value)}
-                  className="input-field w-[250px] rounded-full border-border/80 bg-white pl-10 pr-4"
+                  className="input-field w-full min-w-0 rounded-full border-border/80 bg-white/95 pl-10 pr-4 shadow-[0_10px_24px_rgba(15,23,42,0.05)]"
                 />
                 <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               </form>
             </div>
 
-            <div className="hidden items-center gap-2.5 lg:flex">
+            <div className="hidden shrink-0 items-center justify-end gap-1.5 lg:flex xl:gap-2">
               <nav className="flex items-center gap-1">
                 {navLinks.map((link) => (
                   <Link
                     key={link.href}
                     to={link.href}
-                    className={`inline-flex items-center rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
+                    className={`inline-flex items-center rounded-full px-3.5 py-2 text-sm font-semibold transition-colors xl:px-4 ${
                       isActiveLink(link.href)
                         ? 'bg-[#23442a] text-white'
                         : 'text-slate-600 hover:bg-[#23442a]/6 hover:text-[#16221a]'
@@ -118,11 +118,11 @@ const Header = () => {
                 <div className="relative">
                   <button
                     onClick={() => setIsUserMenuOpen((current) => !current)}
-                    className="inline-flex h-11 items-center gap-2 rounded-full border border-border/80 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:border-[#23442a]/15 hover:text-[#16221a]"
+                    className="inline-flex h-11 items-center gap-2 rounded-full border border-border/80 bg-white px-3.5 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:border-[#23442a]/15 hover:text-[#16221a] xl:px-4"
                     type="button"
                   >
                     <User className="h-4 w-4 text-[#23442a]" />
-                    <span className="max-w-[140px] truncate">{displayName}</span>
+                    <span className="max-w-[124px] truncate xl:max-w-[148px]">{displayName}</span>
                     <ChevronDown className="h-4 w-4 text-slate-400" />
                   </button>
 
@@ -170,7 +170,7 @@ const Header = () => {
               ) : (
                 <button
                   onClick={() => setIsAuthModalOpen(true)}
-                  className="inline-flex h-11 items-center rounded-full border border-border/80 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:border-[#23442a]/15 hover:text-[#16221a]"
+                  className="inline-flex h-11 items-center rounded-full border border-border/80 bg-white px-3.5 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:border-[#23442a]/15 hover:text-[#16221a] xl:px-4"
                   type="button"
                 >
                   <User className="mr-2 h-4 w-4 text-[#23442a]" />
@@ -180,7 +180,7 @@ const Header = () => {
 
               <button
                 onClick={toggleCartPopup}
-                className="premium-cart-btn relative inline-flex h-11 items-center gap-2 rounded-full bg-[#23442a] px-4 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#1d3722]"
+                className="premium-cart-btn relative inline-flex h-11 items-center gap-2 rounded-full bg-[#23442a] px-3.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#1d3722] xl:px-4"
                 type="button"
               >
                 <ShoppingCart className="h-4 w-4" data-cart-icon />
@@ -193,7 +193,7 @@ const Header = () => {
               </button>
             </div>
 
-            <div className="flex items-center gap-2 lg:hidden">
+            <div className="flex items-center gap-2 justify-self-end lg:hidden">
               <button
                 onClick={toggleCartPopup}
                 className="premium-cart-btn relative inline-flex h-10 w-10 items-center justify-center rounded-full border border-border/80 bg-white text-slate-700 shadow-sm"
@@ -227,7 +227,7 @@ const Header = () => {
               exit={{ opacity: 0, y: -8 }}
               className="border-t border-border/70 bg-[rgba(255,253,248,0.98)] lg:hidden"
             >
-              <div className="page-container space-y-4 py-4">
+              <div className="page-container space-y-4 py-3.5">
                 <form onSubmit={handleSearch} className="relative">
                   <input
                     type="text"

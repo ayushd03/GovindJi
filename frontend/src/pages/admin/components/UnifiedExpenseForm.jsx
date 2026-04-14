@@ -12,18 +12,10 @@ import { Card, CardContent } from '../../../components/ui/card';
 import { Button } from '../../../components/ui/button';
 import { useToast } from '../../../hooks/useToast';
 import { API_BASE_URL } from '../../../config/apiBaseUrl';
-
-// Simplified expense categories - this replaces the complex top-level categories
-const EXPENSE_CATEGORIES = [
-  'Store Utilities',
-  'Office Supplies', 
-  'Marketing',
-  'Maintenance',
-  'Transportation',
-  'Miscellaneous',
-  'Vendor Order', // This is the special category for vendor orders (creates credit for vendor)
-  'Vendor Payment' // This is for paying vendors (creates debit for vendor)
-];
+import {
+  EXPENSE_CATEGORIES,
+  VENDOR_TRANSACTION_CATEGORIES,
+} from '../../../constants/adminConstants';
 
 const UnifiedExpenseForm = ({
   transactionData,
@@ -167,35 +159,58 @@ const UnifiedExpenseForm = ({
       {/* Category Selection First - Most Important */}
       <div>
         <label className="block text-sm font-medium text-foreground mb-2">
-          Expense Category *
+          Transaction Type *
         </label>
-        <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
-          {EXPENSE_CATEGORIES.map((cat) => (
-            <button
-              key={cat}
-              type="button"
-              onClick={() => handleCategoryChange(cat)}
-              className={`p-2 rounded-lg border text-xs font-medium transition-all hover:shadow-sm ${
-                transactionData.expense_category === cat
-                  ? 'border-primary bg-primary/10 text-primary shadow-sm'
-                  : 'border-border hover:border-primary/50 hover:bg-primary/5 text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              {cat === 'Vendor Order' ? (
-                <div className="flex flex-col items-center space-y-0.5">
-                  <CubeIcon className="w-4 h-4" />
-                  <span>Vendor Order</span>
-                </div>
-              ) : cat === 'Vendor Payment' ? (
-                <div className="flex flex-col items-center space-y-0.5">
-                  <BuildingOfficeIcon className="w-4 h-4" />
-                  <span>Vendor Payment</span>
-                </div>
-              ) : (
-                cat
-              )}
-            </button>
-          ))}
+        <div className="space-y-3">
+          <div>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Expenses</p>
+            <div className="grid grid-cols-3 gap-2 md:grid-cols-4 lg:grid-cols-5">
+              {EXPENSE_CATEGORIES.map((cat) => (
+                <button
+                  key={cat}
+                  type="button"
+                  onClick={() => handleCategoryChange(cat)}
+                  className={`p-2 rounded-lg border text-xs font-medium transition-all hover:shadow-sm ${
+                    transactionData.expense_category === cat
+                      ? 'border-primary bg-primary/10 text-primary shadow-sm'
+                      : 'border-border hover:border-primary/50 hover:bg-primary/5 text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Vendor Transactions</p>
+            <div className="grid grid-cols-2 gap-2 md:max-w-md">
+              {VENDOR_TRANSACTION_CATEGORIES.map((cat) => (
+                <button
+                  key={cat}
+                  type="button"
+                  onClick={() => handleCategoryChange(cat)}
+                  className={`p-2 rounded-lg border text-xs font-medium transition-all hover:shadow-sm ${
+                    transactionData.expense_category === cat
+                      ? 'border-primary bg-primary/10 text-primary shadow-sm'
+                      : 'border-border hover:border-primary/50 hover:bg-primary/5 text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  {cat === 'Vendor Order' ? (
+                    <div className="flex flex-col items-center space-y-0.5">
+                      <CubeIcon className="w-4 h-4" />
+                      <span>Vendor Order</span>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center space-y-0.5">
+                      <BuildingOfficeIcon className="w-4 h-4" />
+                      <span>Vendor Payment</span>
+                    </div>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
         {validationErrors.expense_category && (
           <p className="text-red-500 text-xs mt-1">{validationErrors.expense_category}</p>

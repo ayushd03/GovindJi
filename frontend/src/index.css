@@ -63,6 +63,10 @@
     --spacing-md: 1.5rem;
     --spacing-lg: 2rem;
     --spacing-xl: 3rem;
+
+    /* Shared storefront layout */
+    --page-container-max-width: 1600px;
+    --page-container-gutter: clamp(0.875rem, 1.35vw, 1.5rem);
   }
  
   .dark {
@@ -201,8 +205,9 @@
   }
 
   .page-container {
-    @apply mx-auto w-full px-4 sm:px-6 lg:px-8 xl:px-10;
-    max-width: 1360px;
+    @apply mx-auto w-full;
+    max-width: var(--page-container-max-width);
+    padding-inline: var(--page-container-gutter);
   }
 
   .page-header-block {
@@ -219,6 +224,11 @@
 
   .page-description {
     @apply mt-2 max-w-2xl text-sm leading-7 text-muted-foreground sm:text-[15px];
+  }
+
+  .selection-inverse ::selection {
+    background: rgba(255, 255, 255, 0.28);
+    color: #fffdf7;
   }
 
   .surface-card {
@@ -414,11 +424,31 @@
   }
 
   .admin-shell .input-field {
-    @apply h-8 rounded-md px-2.5 py-1 text-[12.5px];
+    @apply h-9 rounded-md px-3 py-0 text-[13px];
   }
 
   .admin-shell textarea.input-field {
     @apply min-h-[60px];
+  }
+
+  .admin-shell .input-icon-left {
+    @apply left-2.5 h-3.5 w-3.5;
+  }
+
+  .admin-shell .input-icon-right {
+    @apply right-2.5 h-3.5 w-3.5;
+  }
+
+  .admin-shell .input-with-left-icon {
+    @apply pl-9;
+  }
+
+  .admin-shell .input-with-right-icon {
+    @apply pr-9;
+  }
+
+  .admin-shell .input-with-both-icons {
+    @apply pl-9 pr-9;
   }
 
   .admin-shell .admin-page-header,

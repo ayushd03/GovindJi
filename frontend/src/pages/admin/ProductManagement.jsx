@@ -1,11 +1,19 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { PermissionGuard } from '../../components/PermissionGuard';
+import {
+  AdminDialog,
+  AdminDialogBody,
+  AdminDialogContent,
+  AdminDialogDescription,
+  AdminDialogFooter,
+  AdminDialogHeader,
+  AdminDialogIconButton,
+  AdminDialogTitle,
+} from '../../components/AdminDialog';
 import { ADMIN_PERMISSIONS } from '../../enums/roles';
 import EnhancedImageGalleryManager from '../../components/EnhancedImageGalleryManager';
 import ProductImagePreview from '../../components/ProductImagePreview';
-import UnitSelectionDialog from '../../components/UnitSelectionDialog';
 import AddProductModal from './components/AddProductModal';
-import ProductVariantManager from './components/ProductVariantManager';
 import {
   PlusIcon,
   PencilIcon,
@@ -14,7 +22,6 @@ import {
   MagnifyingGlassIcon,
   ExclamationTriangleIcon,
   CubeIcon,
-  Squares2X2Icon,
   ChevronUpIcon,
   ChevronDownIcon,
   ChevronUpDownIcon,
@@ -22,7 +29,37 @@ import {
   ChevronRightIcon,
 } from '@heroicons/react/24/outline';
 import { API_BASE_URL } from '../../config/apiBaseUrl';
-const ITEMS_PER_PAGE = 15;
+import { getProductPricing } from '../../utils/productPricing';
+import { ITEMS_PER_PAGE } from '../../constants/adminConstants';
+
+const SORT_FIELD_LABELS = {
+  name: 'Name',
+  price: 'Price',
+  stock: 'Stock',
+  status: 'Visibility',
+};
+
+const getVariantAttentionCount = (product, pricing) => {
+  if (!pricing.hasVariants) {
+    return 0;
+  }
+
+  const fallbackThreshold = Number(product.min_stock_level) || 0;
+
+  return pricing.variants.filter((variant) => {
+    const variantStock = Number(variant.stock_quantity) || 0;
+    const variantThreshold = Number(variant.min_stock_level ?? fallbackThreshold) || 0;
+    return variantStock <= variantThreshold;
+  }).length;
+};
+
+const isProductLowStock = (product, pricing = getProductPricing(product)) => {
+  if (!pricing.hasVariants) {
+    return (Number(product.stock_quantity) || 0) <= (Number(product.min_stock_level) || 0);
+  }
+
+  return getVariantAttentionCount(product, pricing) > 0;
+};
 
 const ProductManagement = () => {
   const [products, setProducts] = useState([]);
@@ -32,37 +69,13 @@ const ProductManagement = () => {
   const [showImageGallery, setShowImageGallery] = useState(false);
   const [selectedProductForImages, setSelectedProductForImages] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [showUnitSelectionDialog, setShowUnitSelectionDialog] = useState(false);
-  const [showVariantManager, setShowVariantManager] = useState(false);
-  const [selectedProductForVariants, setSelectedProductForVariants] = useState(null);
   const [sortField, setSortField] = useState('name');
   const [sortDir, setSortDir] = useState('asc');
   const [currentPage, setCurrentPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState('all');
-  const [formData, setFormData] = useState({
-    name: '',
-    description: '',
-    price: '',
-    image_url: '',
-    category_id: '',
-    stock_quantity: '',
-    min_stock_level: '',
-    sku: '',
-    weight: '',
-    unit: 'kg',
-    item_hsn: '',
-    is_service: false,
-    base_unit: 'KILOGRAMS',
-    secondary_unit: 'GRAMS',
-    unit_conversion_value: 1000,
-    sale_price_without_tax: false,
-    discount_on_sale_price: '',
-    discount_type: 'percentage',
-    wholesale_prices: [],
-    opening_quantity_at_price: '',
-    opening_quantity_as_of_date: '',
-    stock_location: ''
-  });
+  const [statusUpdatingId, setStatusUpdatingId] = useState(null);
+  const [productPendingDelete, setProductPendingDelete] = useState(null);
+  const [isDeletingProduct, setIsDeletingProduct] = useState(false);
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -81,10 +94,10 @@ const ProductManagement = () => {
       setLoading(true);
       const token = localStorage.getItem('authToken');
       const response = await fetch(`${API_BASE_URL}/api/admin/products`, {
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
       });
       const data = await response.json();
-      setProducts(Array.isArray(data) ? data : []);
+      setProducts(Array.isArray(data) ? data : (data.products || []));
     } catch (error) {
       console.error('Error fetching products:', error);
     } finally {
@@ -97,74 +110,65 @@ const ProductManagement = () => {
     setShowAddForm(true);
   };
 
-  const handleProductAdded = () => {
-    fetchProducts();
-  };
+  const handleDelete = async () => {
+    if (!productPendingDelete) {
+      return;
+    }
 
-  const handleCloseModal = () => {
-    setShowAddForm(false);
-    setEditingProduct(null);
-    resetForm();
-  };
-
-  const handleDelete = async (productId) => {
-    if (!window.confirm('Are you sure you want to delete this product?')) return;
-    const token = localStorage.getItem('authToken');
     try {
-      const response = await fetch(`${API_BASE_URL}/api/admin/products/${productId}`, {
+      setIsDeletingProduct(true);
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`${API_BASE_URL}/api/admin/products/${productPendingDelete.id}`, {
         method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
       });
-      if (response.ok) await fetchProducts();
+
+      if (response.ok) {
+        setProductPendingDelete(null);
+        await fetchProducts();
+      }
     } catch (error) {
       console.error('Error deleting product:', error);
+    } finally {
+      setIsDeletingProduct(false);
     }
   };
 
+  const handleOpenDeleteDialog = (product) => {
+    setProductPendingDelete(product);
+  };
+
+  const handleCloseDeleteDialog = () => {
+    if (isDeletingProduct) {
+      return;
+    }
+
+    setProductPendingDelete(null);
+  };
+
   const handleStatusChange = async (productId, isActive) => {
-    const token = localStorage.getItem('authToken');
     try {
+      setStatusUpdatingId(productId);
+      const token = localStorage.getItem('authToken');
       const response = await fetch(`${API_BASE_URL}/api/admin/products/${productId}/status`, {
         method: 'PATCH',
         headers: {
-          'Authorization': `Bearer ${token}`,
+          Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ is_active: isActive }),
       });
+
       if (response.ok) {
-        setProducts(prev => prev.map(p => p.id === productId ? { ...p, is_active: isActive } : p));
+        setProducts((currentProducts) => currentProducts.map((product) => (
+          product.id === productId ? { ...product, is_active: isActive } : product
+        )));
       }
     } catch (error) {
       console.error('Error updating product status:', error);
+    } finally {
+      setStatusUpdatingId(null);
     }
-  };
-
-  const resetForm = () => {
-    setFormData({
-      name: '',
-      description: '',
-      price: '',
-      image_url: '',
-      category_id: '',
-      stock_quantity: '',
-      min_stock_level: '',
-      sku: '',
-      weight: '',
-      unit: 'kg',
-      item_hsn: '',
-      is_service: false,
-      base_unit: 'KILOGRAMS',
-      secondary_unit: 'GRAMS',
-      unit_conversion_value: 1000,
-      sale_price_without_tax: false,
-      discount_on_sale_price: '',
-      discount_type: 'percentage',
-      wholesale_prices: [],
-      opening_quantity_at_price: '',
-      opening_quantity_as_of_date: '',
-      stock_location: ''
-    });
   };
 
   const handleOpenImageGallery = (product) => {
@@ -177,60 +181,109 @@ const ProductManagement = () => {
     setSelectedProductForImages(null);
   };
 
-  const handleOpenVariantManager = (product) => {
-    setSelectedProductForVariants(product);
-    setShowVariantManager(true);
-  };
-
-  const handleCloseVariantManager = () => {
-    setShowVariantManager(false);
-    setSelectedProductForVariants(null);
-  };
-
-  const handleUnitSave = (unitData) => {
-    setFormData({
-      ...formData,
-      base_unit: unitData.base_unit,
-      secondary_unit: unitData.secondary_unit,
-      unit_conversion_value: unitData.unit_conversion_value
-    });
-  };
-
   const handleSort = (field) => {
     if (sortField === field) {
-      setSortDir(d => d === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortField(field);
-      setSortDir('asc');
+      setSortDir((currentSortDir) => (currentSortDir === 'asc' ? 'desc' : 'asc'));
+      return;
     }
+
+    setSortField(field);
+    setSortDir('asc');
     setCurrentPage(1);
   };
 
-  const filteredProducts = useMemo(() => products.filter(product => {
+  const productStats = useMemo(() => products.reduce((summary, product) => {
+    const pricing = getProductPricing(product);
+
+    if (product.is_active) {
+      summary.active += 1;
+    } else {
+      summary.inactive += 1;
+    }
+
+    if (pricing.hasVariants) {
+      summary.withVariants += 1;
+    }
+
+    if (isProductLowStock(product, pricing)) {
+      summary.needsAttention += 1;
+    }
+
+    return summary;
+  }, {
+    total: products.length,
+    active: 0,
+    inactive: 0,
+    withVariants: 0,
+    needsAttention: 0,
+  }), [products]);
+
+  const statusOptions = useMemo(() => ([
+    {
+      key: 'all',
+      label: 'All',
+      count: productStats.total,
+    },
+    {
+      key: 'active',
+      label: 'Visible',
+      count: productStats.active,
+    },
+    {
+      key: 'inactive',
+      label: 'Hidden',
+      count: productStats.inactive,
+    },
+  ]), [productStats]);
+
+  const filteredProducts = useMemo(() => products.filter((product) => {
     if (statusFilter === 'active' && !product.is_active) return false;
     if (statusFilter === 'inactive' && product.is_active) return false;
-    const q = searchTerm.toLowerCase();
-    return !q ||
-      product.name.toLowerCase().includes(q) ||
-      product.sku?.toLowerCase().includes(q) ||
-      product.item_hsn?.toLowerCase().includes(q);
+
+    const query = searchTerm.trim().toLowerCase();
+    return !query
+      || product.name.toLowerCase().includes(query)
+      || product.sku?.toLowerCase().includes(query)
+      || product.item_hsn?.toLowerCase().includes(query);
   }), [products, searchTerm, statusFilter]);
 
-  const sortedProducts = useMemo(() => {
-    return [...filteredProducts].sort((a, b) => {
-      let aVal, bVal;
+  const sortedProducts = useMemo(() => (
+    [...filteredProducts].sort((left, right) => {
+      let leftValue;
+      let rightValue;
+      const leftPricing = (sortField === 'price' || sortField === 'stock')
+        ? getProductPricing(left)
+        : null;
+      const rightPricing = (sortField === 'price' || sortField === 'stock')
+        ? getProductPricing(right)
+        : null;
+
       switch (sortField) {
-        case 'name': aVal = (a.name || '').toLowerCase(); bVal = (b.name || '').toLowerCase(); break;
-        case 'price': aVal = Number(a.price) || 0; bVal = Number(b.price) || 0; break;
-        case 'stock': aVal = Number(a.stock_quantity) || 0; bVal = Number(b.stock_quantity) || 0; break;
-        case 'status': aVal = a.is_active ? 1 : 0; bVal = b.is_active ? 1 : 0; break;
-        default: return 0;
+        case 'name':
+          leftValue = (left.name || '').toLowerCase();
+          rightValue = (right.name || '').toLowerCase();
+          break;
+        case 'price':
+          leftValue = leftPricing?.hasVariants ? leftPricing.minPrice : (leftPricing?.selectedPrice || 0);
+          rightValue = rightPricing?.hasVariants ? rightPricing.minPrice : (rightPricing?.selectedPrice || 0);
+          break;
+        case 'stock':
+          leftValue = leftPricing?.hasVariants ? leftPricing.totalStock : (Number(left.stock_quantity) || 0);
+          rightValue = rightPricing?.hasVariants ? rightPricing.totalStock : (Number(right.stock_quantity) || 0);
+          break;
+        case 'status':
+          leftValue = left.is_active ? 1 : 0;
+          rightValue = right.is_active ? 1 : 0;
+          break;
+        default:
+          return 0;
       }
-      if (aVal < bVal) return sortDir === 'asc' ? -1 : 1;
-      if (aVal > bVal) return sortDir === 'asc' ? 1 : -1;
+
+      if (leftValue < rightValue) return sortDir === 'asc' ? -1 : 1;
+      if (leftValue > rightValue) return sortDir === 'asc' ? 1 : -1;
       return 0;
-    });
-  }, [filteredProducts, sortField, sortDir]);
+    })
+  ), [filteredProducts, sortDir, sortField]);
 
   const totalPages = Math.ceil(sortedProducts.length / ITEMS_PER_PAGE);
   const paginatedProducts = sortedProducts.slice(
@@ -239,34 +292,50 @@ const ProductManagement = () => {
   );
 
   const SortIcon = ({ field }) => {
-    if (sortField !== field) return <ChevronUpDownIcon className="h-3.5 w-3.5 ml-1 text-muted-foreground/40" />;
+    if (sortField !== field) {
+      return <ChevronUpDownIcon className="ml-1 h-3.5 w-3.5 text-muted-foreground/40" />;
+    }
+
     return sortDir === 'asc'
-      ? <ChevronUpIcon className="h-3.5 w-3.5 ml-1 text-primary" />
-      : <ChevronDownIcon className="h-3.5 w-3.5 ml-1 text-primary" />;
+      ? <ChevronUpIcon className="ml-1 h-3.5 w-3.5 text-primary" />
+      : <ChevronDownIcon className="ml-1 h-3.5 w-3.5 text-primary" />;
   };
 
   const Pagination = () => {
-    if (totalPages <= 1) return null;
-    const pageWindow = () => {
-      if (totalPages <= 5) return Array.from({ length: totalPages }, (_, i) => i + 1);
-      if (currentPage <= 3) return [1, 2, 3, 4, 5];
-      if (currentPage >= totalPages - 2) return [totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
+    if (totalPages <= 1) {
+      return null;
+    }
+
+    const getPageWindow = () => {
+      if (totalPages <= 5) {
+        return Array.from({ length: totalPages }, (_, index) => index + 1);
+      }
+
+      if (currentPage <= 3) {
+        return [1, 2, 3, 4, 5];
+      }
+
+      if (currentPage >= totalPages - 2) {
+        return [totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
+      }
+
       return [currentPage - 2, currentPage - 1, currentPage, currentPage + 1, currentPage + 2];
     };
+
     return (
       <div className="flex items-center justify-between border-t border-border px-4 py-3">
         <span className="text-sm text-muted-foreground">
-          {(currentPage - 1) * ITEMS_PER_PAGE + 1}–{Math.min(currentPage * ITEMS_PER_PAGE, sortedProducts.length)} of {sortedProducts.length} products
+          {(currentPage - 1) * ITEMS_PER_PAGE + 1}-{Math.min(currentPage * ITEMS_PER_PAGE, sortedProducts.length)} of {sortedProducts.length} products
         </span>
         <div className="flex items-center gap-1">
           <button
-            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+            onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
             disabled={currentPage === 1}
-            className="admin-icon-button disabled:opacity-40 disabled:cursor-not-allowed"
+            className="admin-icon-button disabled:cursor-not-allowed disabled:opacity-40"
           >
             <ChevronLeftIcon className="h-4 w-4" />
           </button>
-          {pageWindow().map(page => (
+          {getPageWindow().map((page) => (
             <button
               key={page}
               onClick={() => setCurrentPage(page)}
@@ -280,9 +349,9 @@ const ProductManagement = () => {
             </button>
           ))}
           <button
-            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+            onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
             disabled={currentPage === totalPages}
-            className="admin-icon-button disabled:opacity-40 disabled:cursor-not-allowed"
+            className="admin-icon-button disabled:cursor-not-allowed disabled:opacity-40"
           >
             <ChevronRightIcon className="h-4 w-4" />
           </button>
@@ -291,352 +360,492 @@ const ProductManagement = () => {
     );
   };
 
+  const renderVisibilityControl = (product) => {
+    const isVisible = product.is_active;
+    const isUpdating = statusUpdatingId === product.id;
+
+    return (
+      <button
+        type="button"
+        onClick={() => handleStatusChange(product.id, !isVisible)}
+        disabled={isUpdating}
+        aria-pressed={isVisible}
+        title={isVisible ? 'Hide from storefront' : 'Show on storefront'}
+        className={`inline-flex h-9 min-w-[108px] items-center justify-between rounded-full border px-2 py-1 text-[12px] font-medium transition-all ${
+          isVisible
+            ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:border-emerald-300 hover:bg-emerald-100'
+            : 'border-slate-200 bg-slate-50 text-slate-600 hover:border-slate-300 hover:bg-slate-100'
+        } ${isUpdating ? 'cursor-wait opacity-70' : 'shadow-sm'}`}
+      >
+        <span className="pl-1 text-left">{isUpdating ? 'Updating' : (isVisible ? 'Visible' : 'Hidden')}</span>
+        <span
+          className={`flex h-5 w-9 items-center rounded-full p-0.5 transition-colors ${
+            isVisible ? 'bg-emerald-200/80' : 'bg-slate-200'
+          }`}
+          aria-hidden="true"
+        >
+          <span
+            className={`h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${
+              isVisible ? 'translate-x-4' : 'translate-x-0'
+            } ${isUpdating ? 'animate-pulse' : ''}`}
+          />
+        </span>
+      </button>
+    );
+  };
+
   return (
     <PermissionGuard permission={ADMIN_PERMISSIONS.VIEW_PRODUCTS}>
       <div className="admin-page">
+        <div className="admin-page-header border-slate-200/80 bg-white shadow-[0_10px_24px_rgba(15,23,42,0.04)]">
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Catalog</p>
+                <h1 className="admin-page-title mt-1 text-slate-950">Products</h1>
+                <p className="admin-page-description mt-1.5 max-w-2xl text-slate-600">
+                  Manage product details, pricing, stock, images, and storefront visibility from one catalog view.
+                </p>
+              </div>
 
-      {/* Header & Search */}
-      <div className="admin-page-header">
-        <div className="mb-4 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <h1 className="admin-page-title">Product Management</h1>
-            <p className="admin-page-description">Manage products, inventory visibility, images, and variants.</p>
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              {[
-                { key: 'all',      label: 'All',      count: products.length },
-                { key: 'active',   label: 'Active',   count: products.filter(p => p.is_active).length },
-                { key: 'inactive', label: 'Inactive', count: products.filter(p => !p.is_active).length },
-              ].map(({ key, label, count }) => (
-                <button
-                  key={key}
-                  onClick={() => setStatusFilter(key)}
-                  className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
-                    statusFilter === key
-                      ? 'border-primary bg-primary/10 text-primary'
-                      : 'border-border bg-muted/30 text-muted-foreground hover:bg-muted/60 hover:text-foreground'
-                  }`}
-                >
-                  {label}
-                  <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${
-                    statusFilter === key ? 'bg-primary/20' : 'bg-muted'
-                  }`}>{count}</span>
-                </button>
-              ))}
+              <button
+                onClick={() => {
+                  setEditingProduct(null);
+                  setShowAddForm(true);
+                }}
+                className="btn-primary inline-flex h-10 items-center justify-center gap-2 self-start rounded-xl px-4"
+              >
+                <PlusIcon className="h-4 w-4" />
+                Add product
+              </button>
+            </div>
+
+            <div className="border-t border-slate-200/80 pt-4">
+              <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-center">
+                <div className="relative">
+                  <MagnifyingGlassIcon className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <input
+                    id="product-search"
+                    type="text"
+                    placeholder="Search by product name, SKU, or HSN"
+                    value={searchTerm}
+                    onChange={(event) => setSearchTerm(event.target.value)}
+                    className="h-10 w-full rounded-xl border border-slate-200/80 bg-white pl-11 pr-3.5 text-[14px] text-slate-900 shadow-sm placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 xl:max-w-xl"
+                  />
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  {statusOptions.map((option) => (
+                    <button
+                      key={option.key}
+                      type="button"
+                      onClick={() => setStatusFilter(option.key)}
+                      className={`inline-flex h-10 items-center gap-2 rounded-lg border px-3 text-sm font-medium transition-colors ${
+                        statusFilter === option.key
+                          ? 'border-slate-900 bg-slate-900 text-white'
+                          : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-100'
+                      }`}
+                    >
+                      <span>{option.label}</span>
+                      <span className={`rounded-md px-1.5 py-0.5 text-xs ${
+                        statusFilter === option.key ? 'bg-white/15 text-white' : 'bg-slate-100 text-slate-600'
+                      }`}>
+                        {option.count}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="mt-3 flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-slate-600">
+                  {loading ? (
+                    <span>Loading catalog...</span>
+                  ) : (
+                    <>
+                      <span className="font-medium text-slate-950">{filteredProducts.length}</span>
+                      <span>shown</span>
+                      <span className="text-slate-300">•</span>
+                      <span>{productStats.active} visible</span>
+                      <span className="text-slate-300">•</span>
+                      <span>{productStats.inactive} hidden</span>
+                      <span className="text-slate-300">•</span>
+                      <span>{productStats.withVariants} with variants</span>
+                      {productStats.needsAttention > 0 && (
+                        <>
+                          <span className="text-slate-300">•</span>
+                          <span className="inline-flex items-center gap-1.5 text-[13px] font-medium text-amber-700">
+                            <ExclamationTriangleIcon className="h-3.5 w-3.5" />
+                            {productStats.needsAttention} {productStats.needsAttention === 1 ? 'needs' : 'need'} stock review
+                          </span>
+                        </>
+                      )}
+                    </>
+                  )}
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2 text-[13px] text-slate-500">
+                  <span>Sorted by {SORT_FIELD_LABELS[sortField]} ({sortDir === 'asc' ? 'asc' : 'desc'})</span>
+                  <span className="text-slate-300">•</span>
+                  <span>{ITEMS_PER_PAGE} per page</span>
+                </div>
+              </div>
             </div>
           </div>
-          <button
-            onClick={() => {
-              setShowAddForm(true);
-              setEditingProduct(null);
-              resetForm();
-            }}
-            className="btn-primary inline-flex items-center justify-center gap-2 self-start rounded-lg"
-          >
-            <PlusIcon className="h-4 w-4" />
-            Add Product
-          </button>
         </div>
-        <div className="relative">
-          <MagnifyingGlassIcon className="input-icon-left" />
-          <input
-            type="text"
-            placeholder="Search products by name, SKU or HSN..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="input-field input-with-left-icon block w-full"
-          />
-        </div>
-      </div>
 
-      {/* Products Table */}
-      <div className="admin-section overflow-hidden">
-        {loading ? (
-          <div className="flex items-center justify-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-            <span className="ml-3 text-muted-foreground">Loading products...</span>
-          </div>
-        ) : filteredProducts.length === 0 ? (
-          <div className="px-6 py-12 text-center">
-            <CubeIcon className="w-12 h-12 text-muted-foreground/50 mx-auto mb-3" />
-            <p className="text-muted-foreground text-lg">No products found</p>
-            <p className="text-sm">
-              {searchTerm ? 'Try adjusting your search' : statusFilter === 'inactive' ? 'No inactive products — all products are active.' : 'Add your first product to get started!'}
-            </p>
-          </div>
-        ) : (
-          <>
-            {/* Desktop Table View */}
-            <div className="admin-table-wrap hidden xl:block">
-              <table className="admin-table">
-                <thead>
-                  <tr>
-                    <th className="w-[11%]">Media</th>
-                    <th className="w-[27%]">
-                      <button onClick={() => handleSort('name')} className="inline-flex items-center hover:text-foreground transition-colors">
-                        Product <SortIcon field="name" />
-                      </button>
-                    </th>
-                    <th className="w-[10%]">SKU / HSN</th>
-                    <th className="w-[10%]">
-                      <button onClick={() => handleSort('price')} className="inline-flex items-center hover:text-foreground transition-colors">
-                        Price <SortIcon field="price" />
-                      </button>
-                    </th>
-                    <th className="w-[12%]">
-                      <button onClick={() => handleSort('stock')} className="inline-flex items-center hover:text-foreground transition-colors">
-                        Stock <SortIcon field="stock" />
-                      </button>
-                    </th>
-                    <th className="w-[12%]">
-                      <button onClick={() => handleSort('status')} className="inline-flex items-center hover:text-foreground transition-colors">
-                        Status <SortIcon field="status" />
-                      </button>
-                    </th>
-                    <th className="w-[8%]">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-card divide-y">
-                  {paginatedProducts.map((product) => (
-                    <tr key={product.id} className="hover:bg-muted/50 transition-colors duration-200">
-                      {/* Media column: thumbnail + Images/Variants buttons */}
-                      <td>
-                        <div className="flex items-center gap-1.5">
-                          <div className="h-10 w-10 flex-shrink-0 overflow-hidden rounded-lg bg-muted">
-                            <ProductImagePreview productId={product.id} fallbackImageUrl={product.image_url} />
-                          </div>
-                          <div className="flex flex-col gap-1">
+        <div className="admin-section overflow-hidden border-slate-200/80 bg-white/95 shadow-[0_18px_38px_rgba(15,23,42,0.05)]">
+          {loading ? (
+            <div className="flex items-center justify-center py-16">
+              <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary" />
+              <span className="ml-3 text-muted-foreground">Loading products...</span>
+            </div>
+          ) : filteredProducts.length === 0 ? (
+            <div className="px-6 py-16">
+              <div className="mx-auto flex max-w-xl flex-col items-center text-center">
+                <div className="flex h-16 w-16 items-center justify-center rounded-[1.5rem] bg-muted/60 text-muted-foreground">
+                  <CubeIcon className="h-8 w-8" />
+                </div>
+                <h2 className="mt-5 text-lg font-semibold text-foreground">No products found</h2>
+                <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                  {searchTerm
+                    ? 'Try a broader search term or clear the current filter to see more products.'
+                    : statusFilter === 'inactive'
+                      ? 'There are no hidden products right now. Everything in the catalog is currently live.'
+                      : 'Start by adding your first product to build out the storefront catalog.'}
+                </p>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="admin-table-wrap hidden xl:block">
+                <table className="admin-table">
+                  <thead>
+                    <tr>
+                      <th className="w-[38%]">
+                        <button onClick={() => handleSort('name')} className="inline-flex items-center transition-colors hover:text-foreground">
+                          Product <SortIcon field="name" />
+                        </button>
+                      </th>
+                      <th className="w-[12%]">SKU / HSN</th>
+                      <th className="w-[14%]">
+                        <button onClick={() => handleSort('price')} className="inline-flex items-center transition-colors hover:text-foreground">
+                          Pricing <SortIcon field="price" />
+                        </button>
+                      </th>
+                      <th className="w-[14%]">
+                        <button onClick={() => handleSort('stock')} className="inline-flex items-center transition-colors hover:text-foreground">
+                          Inventory <SortIcon field="stock" />
+                        </button>
+                      </th>
+                      <th className="w-[10%]">
+                        <button onClick={() => handleSort('status')} className="inline-flex items-center transition-colors hover:text-foreground">
+                          Visibility <SortIcon field="status" />
+                        </button>
+                      </th>
+                      <th className="w-[12%] text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200/70 bg-card">
+                    {paginatedProducts.map((product) => {
+                      const pricing = getProductPricing(product);
+                      const isLowStock = isProductLowStock(product, pricing);
+                      const variantAttentionCount = getVariantAttentionCount(product, pricing);
+
+                      return (
+                        <tr key={product.id} className="transition-colors duration-200 hover:bg-slate-50/80">
+                          <td>
+                            <div className="flex items-start gap-3">
+                              <div className="h-12 w-12 flex-shrink-0 overflow-hidden rounded-xl border border-slate-200/80 bg-muted">
+                                <ProductImagePreview productId={product.id} fallbackImageUrl={product.image_url} />
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <button
+                                  type="button"
+                                  onClick={() => handleEdit(product)}
+                                  className="group inline-flex max-w-full items-center gap-1 text-left text-sm font-semibold text-foreground transition-colors hover:text-primary"
+                                >
+                                  <span className="truncate">{product.name}</span>
+                                  <PencilIcon className="h-3 w-3 flex-shrink-0 text-muted-foreground transition-colors group-hover:text-primary" />
+                                </button>
+                                {product.description && (
+                                  <p className="mt-0.5 max-w-[320px] truncate text-[12px] text-muted-foreground">
+                                    {product.description}
+                                  </p>
+                                )}
+                                <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+                                  <span>
+                                    {pricing.hasVariants
+                                      ? `${pricing.variants.length} variant${pricing.variants.length === 1 ? '' : 's'}`
+                                      : 'Simple product'}
+                                  </span>
+                                  {isLowStock && (
+                                    <span className="font-medium text-amber-700">Needs restock</span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="whitespace-nowrap">
+                            <div className="text-[13px] text-foreground">{product.sku || '—'}</div>
+                            {product.item_hsn && (
+                              <div className="text-[11px] text-muted-foreground">HSN {product.item_hsn}</div>
+                            )}
+                          </td>
+                          <td className="whitespace-nowrap">
+                            <div className="text-sm font-semibold text-foreground">
+                              {pricing.hasPriceRange
+                                ? `₹${pricing.minPrice.toFixed(2)} - ₹${pricing.maxPrice.toFixed(2)}`
+                                : `₹${pricing.selectedPrice.toFixed(2)}`}
+                            </div>
+                            <div className="text-[11px] text-muted-foreground">
+                              {pricing.hasVariants
+                                ? 'Variant pricing'
+                                : pricing.hasMrp
+                                  ? `MRP ₹${pricing.selectedMrp.toFixed(2)}`
+                                  : 'No MRP set'}
+                            </div>
+                          </td>
+                          <td className="whitespace-nowrap">
+                            {pricing.hasVariants ? (
+                              <div className="space-y-0.5">
+                                <div className="text-sm font-semibold text-foreground">{pricing.totalStock} in stock</div>
+                                <div className="text-[11px] text-muted-foreground">
+                                  {pricing.inStockVariants.length}/{pricing.variants.length} variants available
+                                </div>
+                                {isLowStock && (
+                                  <div className="text-[11px] font-medium text-amber-700">
+                                    {variantAttentionCount} variant{variantAttentionCount === 1 ? '' : 's'} {variantAttentionCount === 1 ? 'needs' : 'need'} restocking
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <>
+                                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${
+                                  isLowStock ? 'bg-destructive/10 text-destructive' : 'bg-success/10 text-success'
+                                }`}>
+                                  {product.stock_quantity || 0}
+                                </span>
+                                <div className="mt-0.5 text-[11px] text-muted-foreground">min {product.min_stock_level || 0}</div>
+                              </>
+                            )}
+                          </td>
+                          <td className="whitespace-nowrap">
+                            <div className="flex items-center justify-end">
+                              {renderVisibilityControl(product)}
+                            </div>
+                          </td>
+                          <td>
+                            <div className="flex items-center justify-end gap-1">
+                              <button
+                                onClick={() => handleOpenImageGallery(product)}
+                                className="admin-icon-button"
+                                aria-label={`Manage images for ${product.name}`}
+                                title="Manage images"
+                              >
+                                <PhotoIcon className="h-4 w-4" />
+                              </button>
+                              <button
+                                onClick={() => handleEdit(product)}
+                                className="admin-icon-button"
+                                aria-label={`Edit ${product.name}`}
+                                title="Edit product"
+                              >
+                                <PencilIcon className="h-4 w-4" />
+                              </button>
+                              <button
+                                onClick={() => handleOpenDeleteDialog(product)}
+                                className="admin-icon-button border-rose-200/80 text-rose-600 hover:bg-rose-50 hover:text-rose-700"
+                                aria-label={`Delete ${product.name}`}
+                                title="Delete product"
+                              >
+                                <TrashIcon className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="divide-y divide-slate-200/70 xl:hidden">
+                {paginatedProducts.map((product) => {
+                  const pricing = getProductPricing(product);
+                  const isLowStock = isProductLowStock(product, pricing);
+                  const variantAttentionCount = getVariantAttentionCount(product, pricing);
+
+                  return (
+                    <div key={product.id} className="p-4 transition-colors duration-200 hover:bg-slate-50/75">
+                      <div className="flex items-start gap-3">
+                        <div className="h-14 w-14 flex-shrink-0 overflow-hidden rounded-xl border border-slate-200/80 bg-muted">
+                          <ProductImagePreview productId={product.id} fallbackImageUrl={product.image_url} />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-start justify-between gap-2">
                             <button
                               type="button"
-                              onClick={() => handleOpenImageGallery(product)}
-                              className="inline-flex h-6 items-center rounded-md border border-border/70 bg-muted/30 px-1.5 text-[10px] font-medium text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
-                              title="Manage Images"
+                              onClick={() => handleEdit(product)}
+                              className="group inline-flex max-w-full items-center gap-1 text-left text-sm font-semibold leading-tight text-foreground transition-colors hover:text-primary"
                             >
-                              <PhotoIcon className="h-3 w-3 mr-0.5" />
+                              <span className="truncate">{product.name}</span>
+                              <PencilIcon className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground transition-colors group-hover:text-primary" />
+                            </button>
+                            <div className="flex-shrink-0">
+                              {renderVisibilityControl(product)}
+                            </div>
+                          </div>
+                          {product.description && (
+                            <p className="mt-1 line-clamp-1 text-xs leading-5 text-muted-foreground">{product.description}</p>
+                          )}
+                          <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-[13px]">
+                            <div><span className="text-muted-foreground">SKU:</span><span className="ml-1 text-foreground">{product.sku || '—'}</span></div>
+                            <div>
+                              <span className="text-muted-foreground">Price:</span>
+                              <span className="ml-1 font-semibold text-foreground">
+                                {pricing.hasPriceRange
+                                  ? `₹${pricing.minPrice.toFixed(0)} - ₹${pricing.maxPrice.toFixed(0)}`
+                                  : `₹${pricing.selectedPrice.toFixed(0)}`}
+                              </span>
+                            </div>
+                            <div className="col-span-2">
+                              <span className="text-muted-foreground">{pricing.hasVariants ? 'Inventory:' : 'Stock:'}</span>
+                              <span className={`ml-1 inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${
+                                isLowStock ? 'bg-destructive/10 text-destructive' : 'bg-success/10 text-success'
+                              }`}>
+                                {pricing.hasVariants
+                                  ? `${pricing.totalStock} in stock`
+                                  : (product.stock_quantity || 0)}
+                                {isLowStock && <ExclamationTriangleIcon className="ml-1 h-3 w-3" />}
+                              </span>
+                            </div>
+                            <div className="col-span-2 text-[12px] text-muted-foreground">
+                              {pricing.hasVariants
+                                ? (
+                                  isLowStock
+                                    ? `${pricing.inStockVariants.length}/${pricing.variants.length} variants available, ${variantAttentionCount} variant${variantAttentionCount === 1 ? '' : 's'} ${variantAttentionCount === 1 ? 'needs' : 'need'} restocking`
+                                    : `${pricing.inStockVariants.length}/${pricing.variants.length} variants available`
+                                )
+                                : pricing.hasMrp
+                                  ? `MRP ₹${pricing.selectedMrp.toFixed(0)}`
+                                  : 'No MRP set'}
+                            </div>
+                          </div>
+                          <div className="mt-3 grid grid-cols-3 gap-2">
+                            <button
+                              onClick={() => handleOpenImageGallery(product)}
+                              className="inline-flex h-8 items-center justify-center rounded-lg border border-slate-200 bg-white px-2 text-[12px] font-medium text-slate-700 transition-colors hover:bg-slate-100"
+                            >
+                              <PhotoIcon className="mr-1 h-3.5 w-3.5" />
                               Images
                             </button>
                             <button
-                              type="button"
-                              onClick={() => handleOpenVariantManager(product)}
-                              className="inline-flex h-6 items-center rounded-md border border-border/70 bg-muted/30 px-1.5 text-[10px] font-medium text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
-                              title="Manage Variants"
+                              onClick={() => handleEdit(product)}
+                              className="inline-flex h-8 items-center justify-center rounded-lg border border-slate-200 bg-white px-2 text-[12px] font-medium text-slate-700 transition-colors hover:bg-slate-100"
                             >
-                              <Squares2X2Icon className="h-3 w-3 mr-0.5" />
-                              Variants
+                              <PencilIcon className="mr-1 h-3.5 w-3.5" />
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => handleOpenDeleteDialog(product)}
+                              className="inline-flex h-8 items-center justify-center rounded-lg border border-rose-200/80 bg-rose-50 px-2 text-[12px] font-medium text-rose-700 transition-colors hover:bg-rose-100"
+                            >
+                              <TrashIcon className="mr-1 h-3.5 w-3.5" />
+                              Delete
                             </button>
                           </div>
                         </div>
-                      </td>
-                      {/* Product name + description */}
-                      <td>
-                        <button
-                          type="button"
-                          onClick={() => handleEdit(product)}
-                          className="group inline-flex max-w-full items-center gap-1 text-left text-sm font-semibold text-foreground transition-colors hover:text-primary"
-                        >
-                          <span className="truncate">{product.name}</span>
-                          <PencilIcon className="h-3 w-3 flex-shrink-0 text-muted-foreground transition-colors group-hover:text-primary" />
-                        </button>
-                        {product.description && (
-                          <p className="mt-0.5 truncate text-[11px] text-muted-foreground max-w-[220px]">
-                            {product.description}
-                          </p>
-                        )}
-                      </td>
-                      {/* SKU / HSN */}
-                      <td className="whitespace-nowrap">
-                        <div className="text-[13px] text-foreground">{product.sku || '—'}</div>
-                        {product.item_hsn && (
-                          <div className="text-[11px] text-muted-foreground">HSN {product.item_hsn}</div>
-                        )}
-                      </td>
-                      {/* Price */}
-                      <td className="whitespace-nowrap">
-                        <div className="text-sm font-semibold text-foreground">₹{product.price}</div>
-                        <div className="text-[11px] text-muted-foreground">per {product.unit || 'kg'}</div>
-                      </td>
-                      {/* Stock */}
-                      <td className="whitespace-nowrap">
-                        {product.variants && product.variants.length > 0 ? (
-                          <div className="space-y-0.5">
-                            {product.variants.map(v => (
-                              <div key={v.id} className="flex items-center gap-1.5">
-                                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${
-                                  v.stock_quantity <= 0
-                                    ? 'bg-destructive/10 text-destructive'
-                                    : 'bg-success/10 text-success'
-                                }`}>
-                                  {v.stock_quantity ?? 0}
-                                </span>
-                                <span className="text-[11px] text-muted-foreground truncate max-w-[80px]">{v.variant_name}</span>
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <>
-                            <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${
-                              product.stock_quantity <= product.min_stock_level
-                                ? 'bg-destructive/10 text-destructive'
-                                : 'bg-success/10 text-success'
-                            }`}>
-                              {product.stock_quantity || 0} {product.unit || 'kg'}
-                            </span>
-                            <div className="mt-0.5 text-[11px] text-muted-foreground">min {product.min_stock_level || 0}</div>
-                          </>
-                        )}
-                      </td>
-                      {/* Status dropdown */}
-                      <td className="whitespace-nowrap">
-                        <select
-                          value={product.is_active ? 'active' : 'inactive'}
-                          onChange={(e) => handleStatusChange(product.id, e.target.value === 'active')}
-                          className={`inline-flex h-7 cursor-pointer items-center rounded-full border-0 px-2.5 py-1 text-[11px] font-medium focus:ring-2 focus:ring-primary ${
-                            product.is_active
-                              ? 'bg-success/10 text-success'
-                              : 'bg-muted text-muted-foreground'
-                          }`}
-                        >
-                          <option value="active">Active</option>
-                          <option value="inactive">Inactive</option>
-                        </select>
-                      </td>
-                      {/* Actions */}
-                      <td>
-                        <div className="flex items-center justify-end gap-1.5">
-                          {product.stock_quantity <= product.min_stock_level && (
-                            <ExclamationTriangleIcon
-                              className="h-4 w-4 text-destructive flex-shrink-0"
-                              title="Low stock"
-                            />
-                          )}
-                          <button
-                            onClick={() => handleDelete(product.id)}
-                            className="admin-icon-button border-rose-200/80 text-rose-600 hover:bg-rose-50 hover:text-rose-700"
-                            aria-label={`Delete ${product.name}`}
-                            title="Delete product"
-                          >
-                            <TrashIcon className="h-4 w-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
 
-            {/* Mobile Card View */}
-            <div className="xl:hidden divide-y">
-              {paginatedProducts.map((product) => (
-                <div key={product.id} className="p-4 hover:bg-muted/40 transition-colors duration-200 sm:p-5">
-                  <div className="flex items-start gap-3">
-                    <div className="h-14 w-14 flex-shrink-0 overflow-hidden rounded-xl bg-muted">
-                      <ProductImagePreview productId={product.id} fallbackImageUrl={product.image_url} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-2">
-                        <button
-                          type="button"
-                          onClick={() => handleEdit(product)}
-                          className="group inline-flex max-w-full items-center gap-1 text-left text-sm font-semibold leading-tight text-foreground transition-colors hover:text-primary"
-                        >
-                          <span className="truncate">{product.name}</span>
-                          <PencilIcon className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground transition-colors group-hover:text-primary" />
-                        </button>
-                        <select
-                          value={product.is_active ? 'active' : 'inactive'}
-                          onChange={(e) => handleStatusChange(product.id, e.target.value === 'active')}
-                          className={`flex-shrink-0 h-7 cursor-pointer rounded-full border-0 px-2.5 py-1 text-[11px] font-medium focus:ring-2 focus:ring-primary ${
-                            product.is_active
-                              ? 'bg-success/10 text-success'
-                              : 'bg-muted text-muted-foreground'
-                          }`}
-                        >
-                          <option value="active">Active</option>
-                          <option value="inactive">Inactive</option>
-                        </select>
-                      </div>
-                      {product.description && (
-                        <p className="mt-1 text-xs leading-5 text-muted-foreground line-clamp-1">{product.description}</p>
-                      )}
-                      <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-[13px]">
-                        <div><span className="text-muted-foreground">SKU:</span><span className="ml-1 text-foreground">{product.sku || '—'}</span></div>
-                        <div><span className="text-muted-foreground">Price:</span><span className="ml-1 font-semibold text-foreground">₹{product.price}</span></div>
-                        <div className="col-span-2">
-                          <span className="text-muted-foreground">Stock:</span>
-                          <span className={`ml-1 inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${
-                            product.stock_quantity <= product.min_stock_level ? 'bg-destructive/10 text-destructive' : 'bg-success/10 text-success'
-                          }`}>
-                            {product.stock_quantity || 0} {product.unit || 'kg'}
-                            {product.stock_quantity <= product.min_stock_level && <ExclamationTriangleIcon className="w-3 h-3 ml-1" />}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="mt-3 grid grid-cols-3 gap-2">
-                        <button
-                          onClick={() => handleOpenImageGallery(product)}
-                          className="inline-flex h-8 items-center justify-center rounded-lg border border-border/70 bg-card px-2 text-[12px] font-medium text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground"
-                        >
-                          <PhotoIcon className="mr-1 h-3.5 w-3.5" />
-                          Images
-                        </button>
-                        <button
-                          onClick={() => handleOpenVariantManager(product)}
-                          className="inline-flex h-8 items-center justify-center rounded-lg border border-border/70 bg-card px-2 text-[12px] font-medium text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground"
-                        >
-                          <Squares2X2Icon className="mr-1 h-3.5 w-3.5" />
-                          Variants
-                        </button>
-                        <button
-                          onClick={() => handleDelete(product.id)}
-                          className="inline-flex h-8 items-center justify-center rounded-lg border border-rose-200/80 bg-rose-50 px-2 text-[12px] font-medium text-rose-700 transition-colors hover:bg-rose-100"
-                        >
-                          <TrashIcon className="mr-1 h-3.5 w-3.5" />
-                          Delete
-                        </button>
-                      </div>
-                    </div>
+              <Pagination />
+            </>
+          )}
+        </div>
+
+        <AddProductModal
+          isOpen={showAddForm}
+          onClose={() => {
+            setShowAddForm(false);
+            setEditingProduct(null);
+          }}
+          onProductAdded={fetchProducts}
+          editingProduct={editingProduct}
+          mode={editingProduct ? 'edit' : 'add'}
+          apiBaseUrl={API_BASE_URL}
+        />
+
+        <EnhancedImageGalleryManager
+          productId={selectedProductForImages?.id}
+          isOpen={showImageGallery}
+          onClose={handleCloseImageGallery}
+          onImagesUpdate={fetchProducts}
+        />
+
+        <AdminDialog open={Boolean(productPendingDelete)} onOpenChange={(open) => { if (!open) handleCloseDeleteDialog(); }}>
+          <AdminDialogContent size="sm" className="p-0">
+            <AdminDialogHeader className="border-b border-border/70 px-5 py-4">
+              <div className="flex w-full items-start justify-between gap-4">
+                <div className="flex min-w-0 items-start gap-3">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-border/70 bg-muted/30 text-muted-foreground">
+                    <TrashIcon className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <AdminDialogTitle>Delete product</AdminDialogTitle>
+                    <AdminDialogDescription>
+                      This action permanently removes the product from your catalog.
+                    </AdminDialogDescription>
                   </div>
                 </div>
-              ))}
-            </div>
+                <AdminDialogIconButton onClick={handleCloseDeleteDialog} />
+              </div>
+            </AdminDialogHeader>
 
-            {/* Pagination */}
-            <Pagination />
-          </>
-        )}
-      </div>
+            <AdminDialogBody className="space-y-4 px-5 py-5">
+              <div className="rounded-xl border border-border/70 bg-muted/20 px-4 py-3.5">
+                <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                  Product
+                </p>
+                <p className="mt-1.5 text-sm font-semibold text-foreground">
+                  {productPendingDelete?.name}
+                </p>
+                <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
+                  <span>SKU: {productPendingDelete?.sku || 'Not set'}</span>
+                  {productPendingDelete?.item_hsn && (
+                    <span>HSN: {productPendingDelete.item_hsn}</span>
+                  )}
+                </div>
+              </div>
 
-      <AddProductModal
-        isOpen={showAddForm}
-        onClose={handleCloseModal}
-        onProductAdded={handleProductAdded}
-        editingProduct={editingProduct}
-        mode={editingProduct ? 'edit' : 'add'}
-        apiBaseUrl={API_BASE_URL}
-      />
+              <p className="text-sm leading-6 text-muted-foreground">
+                Are you sure you want to continue? This action cannot be undone.
+              </p>
+            </AdminDialogBody>
 
-      <EnhancedImageGalleryManager
-        productId={selectedProductForImages?.id}
-        isOpen={showImageGallery}
-        onClose={handleCloseImageGallery}
-        onImagesUpdate={fetchProducts}
-      />
-
-      <UnitSelectionDialog
-        isOpen={showUnitSelectionDialog}
-        onClose={() => setShowUnitSelectionDialog(false)}
-        onSave={handleUnitSave}
-        baseUnit={formData.base_unit}
-        secondaryUnit={formData.secondary_unit}
-        unitConversionValue={formData.unit_conversion_value}
-      />
-
-      <ProductVariantManager
-        isOpen={showVariantManager}
-        onClose={handleCloseVariantManager}
-        product={selectedProductForVariants}
-        onSave={fetchProducts}
-      />
+            <AdminDialogFooter className="border-t border-border/70 px-5 py-4 sm:justify-end">
+              <button
+                type="button"
+                onClick={handleCloseDeleteDialog}
+                disabled={isDeletingProduct}
+                className="btn-outline"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={isDeletingProduct}
+                className="btn-destructive"
+              >
+                {isDeletingProduct ? 'Deleting...' : 'Delete product'}
+              </button>
+            </AdminDialogFooter>
+          </AdminDialogContent>
+        </AdminDialog>
       </div>
     </PermissionGuard>
   );

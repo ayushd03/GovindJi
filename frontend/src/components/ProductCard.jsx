@@ -8,7 +8,11 @@ import { Badge } from './ui/badge';
 import { useCart } from '../context/CartContext';
 import { useProductImage } from '../hooks/useProductImage';
 import { handleImageError } from '../utils/imageUtils';
-import { buildCartItem, getProductPricing } from '../utils/productPricing';
+import {
+  buildCartItem,
+  formatDiscountPercent,
+  getProductPricing,
+} from '../utils/productPricing';
 import { cn } from '../lib/utils';
 import SizeSelectionDialog from './SizeSelectionDialog';
 
@@ -20,20 +24,24 @@ const ProductCard = ({ product, className, viewMode = "grid" }) => {
   const productCartInfo = getProductCartInfo(product.id);
   const currentQuantity = productCartInfo.totalQuantity;
   const pricing = getProductPricing(product);
-  const displayPrice = pricing.hasPriceRange ? pricing.minPrice : pricing.selectedPrice;
+  const variantCount = pricing.variants.length;
+  const displayPrice = pricing.displayPrice;
   const isInStock = pricing.isPurchasable;
-  const actionLabel = !isInStock ? 'Sold out' : pricing.hasVariants ? 'Select pack' : 'Add to cart';
+  const actionLabel = !isInStock
+    ? 'Sold out'
+    : pricing.hasVariants && variantCount > 1
+      ? 'Select pack'
+      : 'Add to cart';
 
   const handleAddToCart = (e) => {
     e.preventDefault();
     e.stopPropagation();
 
-    // Check if product has variants configured
-    if (pricing.hasVariants) {
-      // Show size selection dialog for products with variants
+    if (pricing.hasVariants && variantCount > 1) {
       setShowSizeDialog(true);
+    } else if (pricing.hasVariants && pricing.selectedVariant) {
+      addToCart(buildCartItem(product, pricing.selectedVariant.id), 1);
     } else {
-      // Add directly to cart for products without variants
       addToCart(buildCartItem(product), 1);
     }
   };
@@ -51,7 +59,7 @@ const ProductCard = ({ product, className, viewMode = "grid" }) => {
     return null;
   };
 
-  const discount = product.discount || 0;
+  const discount = pricing.displayDiscountPercent;
   const cartLabel = getCartLabel();
   const description = product.description?.trim();
   const truncatedDescription = description
@@ -60,7 +68,7 @@ const ProductCard = ({ product, className, viewMode = "grid" }) => {
       : description
     : 'Carefully packed dry fruits for everyday snacking and gifting.';
   const detailLine = pricing.hasVariants
-    ? `${pricing.variants.length} pack option${pricing.variants.length === 1 ? '' : 's'}`
+    ? `${variantCount} pack option${variantCount === 1 ? '' : 's'}`
     : product.weight
       ? `${product.weight} ${product.unit || 'kg'}`
       : 'Standard pack';
@@ -109,7 +117,7 @@ const ProductCard = ({ product, className, viewMode = "grid" }) => {
                 <div className="absolute left-3 top-3 flex max-w-[calc(100%-1.5rem)] flex-wrap gap-2">
                   {discount > 0 && (
                     <Badge className="rounded-full border-0 bg-slate-900/88 px-2.5 py-1 text-[10px] font-semibold text-white shadow-sm">
-                      {discount}% off
+                      {formatDiscountPercent(discount)}% off
                     </Badge>
                   )}
                 </div>
@@ -142,9 +150,9 @@ const ProductCard = ({ product, className, viewMode = "grid" }) => {
                         <span className="font-heading text-[1.28rem] font-semibold tracking-tight text-slate-900">
                           ₹{displayPrice.toFixed(2)}
                         </span>
-                        {discount > 0 && (
+                        {pricing.displayHasMrp && (
                           <span className="text-sm font-medium text-slate-400 line-through">
-                            ₹{(displayPrice * (1 + discount / 100)).toFixed(2)}
+                            ₹{pricing.displayMrp.toFixed(2)}
                           </span>
                         )}
                       </div>

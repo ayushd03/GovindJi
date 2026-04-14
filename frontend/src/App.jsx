@@ -17,6 +17,9 @@ import Checkout from './pages/Checkout';
 import PaymentVerify from './pages/PaymentVerify';
 import OrderSuccess from './pages/OrderSuccess';
 import Orders from './pages/Orders';
+import PrivacyPolicy from './pages/PrivacyPolicy';
+import TermsConditions from './pages/TermsConditions';
+import ShippingReturns from './pages/ShippingReturns';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import ProductManagement from './pages/admin/ProductManagement';
 import OrderManagement from './pages/admin/OrderManagement';
@@ -163,7 +166,7 @@ const AppContent = () => {
         <Route path="/*" element={
           <>
             <Header />
-            <main className="main-content pt-20">
+            <main className="main-content pt-[74px]">
               <Routes>
                 <Route path="/" element={<Home />} />
                 <Route path="/products" element={<Products />} />
@@ -182,14 +185,17 @@ const AppContent = () => {
                 />
                 <Route path="/payment/verify" element={<PaymentVerify />} />
                 <Route path="/order-success" element={<OrderSuccess />} />
-                <Route 
-                  path="/orders" 
+                <Route
+                  path="/orders"
                   element={
                     <ProtectedRoute>
                       <Orders />
                     </ProtectedRoute>
-                  } 
+                  }
                 />
+                <Route path="/privacy" element={<PrivacyPolicy />} />
+                <Route path="/terms" element={<TermsConditions />} />
+                <Route path="/shipping" element={<ShippingReturns />} />
               </Routes>
             </main>
             <Footer />

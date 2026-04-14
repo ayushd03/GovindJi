@@ -8,8 +8,6 @@ import {
   ShoppingCartIcon,
   ExclamationTriangleIcon,
   CurrencyDollarIcon,
-  ArrowUpIcon,
-  ArrowDownIcon,
   ClockIcon,
   CheckCircleIcon,
   TruckIcon,
@@ -74,33 +72,25 @@ const AdminDashboard = () => {
       title: 'Total Products',
       value: dashboardData?.totalProducts || 0,
       icon: CubeIcon,
-      color: 'primary',
-      change: '+12%',
-      changeType: 'increase'
+      color: 'primary'
     },
     {
       title: 'Total Orders',
       value: dashboardData?.totalOrders || 0,
       icon: ShoppingCartIcon,
-      color: 'success',
-      change: '+8%',
-      changeType: 'increase'
+      color: 'success'
     },
     {
       title: 'Low Stock Items',
       value: dashboardData?.lowStockItems || 0,
       icon: ExclamationTriangleIcon,
-      color: 'warning',
-      change: '-3%',
-      changeType: 'decrease'
+      color: 'warning'
     },
     {
       title: "Today's Revenue",
       value: `₹${dashboardData?.todaysRevenue?.toFixed(2) || '0.00'}`,
       icon: CurrencyDollarIcon,
-      color: 'secondary',
-      change: '+15%',
-      changeType: 'increase'
+      color: 'secondary'
     }
   ];
 
@@ -161,19 +151,7 @@ const AdminDashboard = () => {
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">{stat.title}</p>
                   <p className="text-2xl font-bold text-foreground mt-2">{stat.value}</p>
-                  <div className="flex items-center mt-3">
-                    {stat.changeType === 'increase' ? (
-                      <ArrowUpIcon className="w-4 h-4 text-success mr-1" />
-                    ) : (
-                      <ArrowDownIcon className="w-4 h-4 text-destructive mr-1" />
-                    )}
-                    <span className={`text-sm font-medium ${
-                      stat.changeType === 'increase' ? 'text-success' : 'text-destructive'
-                    }`}>
-                      {stat.change}
-                    </span>
-                    <span className="text-sm text-muted-foreground ml-1">vs last month</span>
-                  </div>
+                  <p className="mt-3 text-sm text-muted-foreground">Live snapshot from current orders and inventory.</p>
                 </div>
                 <div className={`p-3 rounded-lg ${getStatsIconColor(stat.color)}`}>
                   <IconComponent className="w-6 h-6" />

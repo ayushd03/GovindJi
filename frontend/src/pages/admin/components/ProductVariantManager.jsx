@@ -1,476 +1,517 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
+  ChevronDownIcon,
+  ChevronRightIcon,
+  ChevronUpIcon,
+  CubeIcon,
   PlusIcon,
   TrashIcon,
-  CheckCircleIcon,
-  CubeIcon
 } from '@heroicons/react/24/outline';
-import { productsAPI } from '../../../services/api';
-import {
-  AdminDialog,
-  AdminDialogBody,
-  AdminDialogContent,
-  AdminDialogDescription,
-  AdminDialogFooter,
-  AdminDialogHeader,
-  AdminDialogIconButton,
-  AdminDialogTitle,
-} from '../../../components/AdminDialog';
+import { formatDiscountPercent } from '../../../utils/productPricing';
 
-const ProductVariantManager = ({ isOpen, onClose, product, onSave }) => {
-  const [variants, setVariants] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState(null);
+const SIZE_UNITS = [
+  { value: 'GRAMS', label: 'Grams (g)' },
+  { value: 'KILOGRAMS', label: 'Kilograms (kg)' },
+  { value: 'POUNDS', label: 'Pounds (lb)' },
+  { value: 'OUNCES', label: 'Ounces (oz)' },
+  { value: 'PIECES', label: 'Pieces' },
+  { value: 'LITERS', label: 'Liters (L)' },
+  { value: 'MILLILITERS', label: 'Milliliters (ml)' },
+  { value: 'PACKETS', label: 'Packets' },
+  { value: 'BOXES', label: 'Boxes' },
+  { value: 'BAGS', label: 'Bags' },
+  { value: 'DOZENS', label: 'Dozens' },
+  { value: 'SETS', label: 'Sets' },
+  { value: 'PAIRS', label: 'Pairs' },
+];
 
-  const sizeUnits = [
-    { value: 'GRAMS', label: 'Grams (g)' },
-    { value: 'KILOGRAMS', label: 'Kilograms (kg)' },
-    { value: 'PIECES', label: 'Pieces' },
-    { value: 'LITERS', label: 'Liters (L)' },
-    { value: 'MILLILITERS', label: 'Milliliters (ml)' }
-  ];
+export const createEmptyVariant = (isDefault = false, displayOrder = 0) => ({
+  variant_name: '',
+  size_value: '',
+  size_unit: 'GRAMS',
+  price: '',
+  mrp: '',
+  stock_quantity: '',
+  weight_grams: '',
+  is_default: isDefault,
+  is_active: true,
+  display_order: displayOrder,
+});
 
-  const fetchVariants = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await productsAPI.getVariants(product.id);
-      setVariants(response.data.length > 0 ? response.data : getDefaultVariants());
-    } catch (err) {
-      console.error('Error fetching variants:', err);
-      setVariants(getDefaultVariants());
-    } finally {
-      setLoading(false);
-    }
-  }, [product?.id]);
+const normalizeVariants = (variants = []) =>
+  variants.map((variant, index) => ({
+    ...variant,
+    mrp: variant?.mrp ?? '',
+    weight_grams: variant?.weight_grams ?? '',
+    stock_quantity: variant?.stock_quantity ?? '',
+    is_active: variant?.is_active !== false,
+    is_default: variant?.is_default === true,
+    display_order: variant?.display_order ?? index,
+  }));
+
+const calculateWeight = (sizeValue, sizeUnit) => {
+  const value = Number.parseFloat(sizeValue);
+  if (!value || value <= 0) return '';
+  switch (sizeUnit) {
+    case 'GRAMS': return Math.round(value);
+    case 'KILOGRAMS': return Math.round(value * 1000);
+    case 'POUNDS': return Math.round(value * 453.592);
+    case 'OUNCES': return Math.round(value * 28.3495);
+    default: return '';
+  }
+};
+
+const getDiscountPercent = (mrp, price) => {
+  const m = Number.parseFloat(mrp);
+  const p = Number.parseFloat(price);
+  if (!Number.isFinite(m) || !Number.isFinite(p) || m <= p) return 0;
+  return ((m - p) / m) * 100;
+};
+
+const getUnitSuffix = (sizeUnit) => {
+  switch (sizeUnit) {
+    case 'KILOGRAMS': return 'kg';
+    case 'GRAMS': return 'g';
+    case 'LITERS': return 'L';
+    case 'MILLILITERS': return 'ml';
+    case 'PIECES': return 'pcs';
+    case 'POUNDS': return 'lb';
+    case 'OUNCES': return 'oz';
+    case 'PACKETS': return 'pkt';
+    case 'BOXES': return 'box';
+    case 'BAGS': return 'bag';
+    case 'DOZENS': return 'doz';
+    case 'SETS': return 'set';
+    case 'PAIRS': return 'pair';
+    default: return '';
+  }
+};
+
+const formatCurrencyValue = (value, fallback = '') => {
+  const n = Number.parseFloat(value);
+  return Number.isFinite(n) && n > 0 ? `₹${n.toFixed(2)}` : fallback;
+};
+
+const formatStockValue = (value) => {
+  const stock = Number.parseInt(value, 10);
+  return Number.isFinite(stock) && stock >= 0 ? `${stock} stk` : 'Stock pending';
+};
+
+const labelClass = 'text-[11px] font-medium uppercase tracking-wider text-muted-foreground';
+const inputClass = 'input-field h-9 px-2.5 text-sm';
+
+const VariantField = ({
+  label,
+  hint,
+  children,
+  required = false,
+  className = '',
+}) => (
+  <div className={className}>
+    <div className="mb-1">
+      <label className={labelClass}>
+        {label}
+        {required ? <span className="ml-0.5 text-destructive">*</span> : null}
+      </label>
+    </div>
+    {children}
+    {hint ? <p className="mt-0.5 text-[11px] leading-4 text-muted-foreground">{hint}</p> : null}
+  </div>
+);
+
+const ProductVariantManager = ({ variants = [], onChange, compact = false }) => {
+  const normalizedVariants = normalizeVariants(variants);
+  const [expandedIndex, setExpandedIndex] = useState(0);
 
   useEffect(() => {
-    if (isOpen && product?.id) {
-      fetchVariants();
+    if (normalizedVariants.length === 0) {
+      setExpandedIndex(-1);
+      return;
     }
-  }, [fetchVariants, isOpen, product?.id]);
-
-  const getDefaultVariants = () => [
-    {
-      variant_name: '',
-      size_value: '',
-      size_unit: 'GRAMS',
-      price: '',
-      stock_quantity: '',
-      weight_grams: '',  // Weight for shipping
-      is_default: true, // First variant should be default
-      is_active: true,
-      display_order: 0
+    if (expandedIndex > normalizedVariants.length - 1) {
+      setExpandedIndex(normalizedVariants.length - 1);
     }
-  ];
+  }, [normalizedVariants.length, expandedIndex]);
 
-  const addVariant = () => {
-    const newVariant = {
-      variant_name: '',
-      size_value: '',
-      size_unit: 'GRAMS',
-      price: '',
-      stock_quantity: '',
-      weight_grams: '',  // Weight for shipping
-      is_default: variants.length === 0,
-      is_active: true,
-      display_order: variants.length
-    };
-    setVariants([...variants, newVariant]);
-  };
-
-  // Auto-calculate weight_grams based on size_unit and size_value
-  const calculateWeight = (sizeValue, sizeUnit) => {
-    const value = parseFloat(sizeValue);
-    if (!value || value <= 0) return '';
-
-    switch (sizeUnit) {
-      case 'GRAMS':
-        return Math.round(value);
-      case 'KILOGRAMS':
-        return Math.round(value * 1000);
-      default:
-        // For non-weight units, return empty (user must enter manually)
-        return '';
-    }
-  };
-
-  const removeVariant = (index) => {
-    const newVariants = variants.filter((_, i) => i !== index);
-    // If we removed the default, make the first one default
-    if (newVariants.length > 0 && !newVariants.some(v => v.is_default)) {
-      newVariants[0].is_default = true;
-    }
-    setVariants(newVariants);
+  const commitVariants = (nextVariants) => {
+    onChange?.(nextVariants.map((v, i) => ({ ...v, display_order: i })));
   };
 
   const updateVariant = (index, field, value) => {
-    const newVariants = [...variants];
-    newVariants[index][field] = value;
+    const next = [...normalizedVariants];
+    next[index] = { ...next[index], [field]: value };
 
-    // If marking as default, unmark others
     if (field === 'is_default' && value === true) {
-      newVariants.forEach((v, i) => {
-        if (i !== index) v.is_default = false;
+      next.forEach((v, i) => {
+        if (i !== index) next[i] = { ...v, is_default: false };
       });
     }
 
-    // Auto-calculate weight when size_value or size_unit changes
     if (field === 'size_value' || field === 'size_unit') {
-      const sizeValue = field === 'size_value' ? value : newVariants[index].size_value;
-      const sizeUnit = field === 'size_unit' ? value : newVariants[index].size_unit;
-      const calculatedWeight = calculateWeight(sizeValue, sizeUnit);
-
-      // Only auto-update if it's a weight unit (GRAMS/KILOGRAMS)
-      if (calculatedWeight !== '') {
-        newVariants[index].weight_grams = calculatedWeight;
-      } else if (field === 'size_unit') {
-        // Clear weight when switching to non-weight unit
-        newVariants[index].weight_grams = '';
-      }
+      const sv = field === 'size_value' ? value : next[index].size_value;
+      const su = field === 'size_unit' ? value : next[index].size_unit;
+      const w = calculateWeight(sv, su);
+      if (w !== '') next[index].weight_grams = w;
+      else if (field === 'size_unit') next[index].weight_grams = '';
     }
 
-    setVariants(newVariants);
+    commitVariants(next);
+  };
+
+  const addVariant = () => {
+    setExpandedIndex(normalizedVariants.length);
+    commitVariants([
+      ...normalizedVariants,
+      createEmptyVariant(normalizedVariants.length === 0, normalizedVariants.length),
+    ]);
+  };
+
+  const removeVariant = (index) => {
+    const next = normalizedVariants.filter((_, i) => i !== index);
+    if (next.length > 0 && !next.some((v) => v.is_default)) {
+      next[0] = { ...next[0], is_default: true };
+    }
+    setExpandedIndex((prev) => {
+      if (prev >= next.length) return Math.max(0, next.length - 1);
+      if (prev > index) return prev - 1;
+      return prev;
+    });
+    commitVariants(next);
   };
 
   const moveVariant = (index, direction) => {
-    const newVariants = [...variants];
-    const newIndex = direction === 'up' ? index - 1 : index + 1;
-
-    if (newIndex < 0 || newIndex >= newVariants.length) return;
-
-    [newVariants[index], newVariants[newIndex]] = [newVariants[newIndex], newVariants[index]];
-
-    // Update display_order
-    newVariants.forEach((v, i) => {
-      v.display_order = i;
-    });
-
-    setVariants(newVariants);
-  };
-
-  const validateVariants = () => {
-    if (variants.length === 0) {
-      setError('Please add at least one variant');
-      return false;
-    }
-
-    for (let i = 0; i < variants.length; i++) {
-      const variant = variants[i];
-      if (!variant.variant_name || !variant.variant_name.trim()) {
-        setError(`Variant ${i + 1}: Name is required`);
-        return false;
-      }
-      if (!variant.size_value || parseFloat(variant.size_value) <= 0) {
-        setError(`Variant ${i + 1}: Size value must be greater than 0`);
-        return false;
-      }
-      if (!variant.price || parseFloat(variant.price) <= 0) {
-        setError(`Variant ${i + 1}: Price must be greater than 0`);
-        return false;
-      }
-      if (variant.stock_quantity === '' || variant.stock_quantity === undefined || parseInt(variant.stock_quantity) < 0) {
-        setError(`Variant ${i + 1}: Stock quantity must be 0 or more`);
-        return false;
-      }
-
-      // Validate weight_grams for shipping
-      if (!variant.weight_grams || parseFloat(variant.weight_grams) <= 0) {
-        const nonWeightUnits = ['PIECES', 'LITERS', 'MILLILITERS'];
-        if (nonWeightUnits.includes(variant.size_unit)) {
-          setError(`Variant ${i + 1}: Shipping weight (grams) is required for ${variant.size_unit}`);
-        } else {
-          setError(`Variant ${i + 1}: Shipping weight is required`);
-        }
-        return false;
-      }
-    }
-
-    setError(null);
-    return true;
-  };
-
-  const handleSave = async () => {
-    if (!validateVariants()) return;
-
-    setSaving(true);
-    setError(null);
-
-    try {
-      await productsAPI.saveVariants(product.id, variants);
-      onSave?.();
-      onClose();
-    } catch (err) {
-      console.error('Error saving variants:', err);
-      setError(err.response?.data?.error || 'Failed to save variants');
-    } finally {
-      setSaving(false);
-    }
+    const next = [...normalizedVariants];
+    const swap = direction === 'up' ? index - 1 : index + 1;
+    if (swap < 0 || swap >= next.length) return;
+    [next[index], next[swap]] = [next[swap], next[index]];
+    if (expandedIndex === index) setExpandedIndex(swap);
+    else if (expandedIndex === swap) setExpandedIndex(index);
+    commitVariants(next);
   };
 
   const generateVariantName = (index) => {
-    const variant = variants[index];
-    if (variant.size_value && variant.size_unit) {
-      const unit = variant.size_unit === 'KILOGRAMS' ? 'kg' :
-                    variant.size_unit === 'GRAMS' ? 'g' :
-                    variant.size_unit === 'LITERS' ? 'L' :
-                    variant.size_unit === 'MILLILITERS' ? 'ml' :
-                    variant.size_unit === 'PIECES' ? 'pcs' : '';
-      updateVariant(index, 'variant_name', `${variant.size_value}${unit}`);
-    }
+    const v = normalizedVariants[index];
+    if (!v?.size_value || !v?.size_unit) return;
+    const suffix = getUnitSuffix(v.size_unit);
+    if (suffix) updateVariant(index, 'variant_name', `${v.size_value}${suffix}`);
   };
 
-  if (!isOpen) return null;
+  if (normalizedVariants.length === 0) {
+    return (
+      <div className="rounded-xl border border-dashed border-border/70 px-5 py-6 text-center">
+        <CubeIcon className="mx-auto h-8 w-8 text-muted-foreground/40" />
+        <p className="mt-2 text-sm font-semibold text-foreground">No size options yet</p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Add sizes like 250g, 500g, or 1kg for customer selection.
+        </p>
+        <button
+          type="button"
+          onClick={addVariant}
+          className="btn-primary mt-4 inline-flex items-center rounded-xl px-4 py-2 text-sm font-semibold"
+        >
+          <PlusIcon className="mr-1.5 h-4 w-4" />
+          Add First Option
+        </button>
+      </div>
+    );
+  }
 
   return (
-    <AdminDialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
-      <AdminDialogContent size="lg">
-        <AdminDialogHeader sticky>
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex items-start gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10">
-                <CubeIcon className="h-5 w-5 text-primary" />
-              </div>
-              <div className="space-y-1">
-                <AdminDialogTitle>Manage Product Variants</AdminDialogTitle>
-                <AdminDialogDescription>
-                  Configure pack sizes, pricing, and shipping weight for {product?.name || 'this product'}.
-                </AdminDialogDescription>
-              </div>
-            </div>
-            <AdminDialogIconButton onClick={onClose} />
-          </div>
-        </AdminDialogHeader>
+    <div className={compact ? 'space-y-1.5' : 'space-y-2'}>
+      {normalizedVariants.map((variant, index) => {
+        const isExpanded = expandedIndex === index;
+        const suffix = getUnitSuffix(variant.size_unit);
+        const sizeLabel = variant.size_value && suffix ? `${variant.size_value}${suffix}` : 'Size pending';
+        const priceLabel = formatCurrencyValue(variant.price);
+        const stockLabel = formatStockValue(variant.stock_quantity);
+        const isWeightUnit = ['GRAMS', 'KILOGRAMS', 'POUNDS', 'OUNCES'].includes(variant.size_unit);
+        const discount = getDiscountPercent(variant.mrp, variant.price);
+        const compactSummary = [
+          sizeLabel,
+          priceLabel || 'Price pending',
+          stockLabel,
+          discount > 0 ? `${formatDiscountPercent(discount)}% off` : null,
+          variant.is_default ? 'Default' : null,
+          variant.is_active === false ? 'Hidden' : null,
+        ].filter(Boolean).join(' • ');
+        const compactInputClass = compact ? 'input-field h-8 px-2 text-[13px]' : inputClass;
 
-        <AdminDialogBody className="admin-dialog-stack">
-            {loading ? (
-              <div className="flex items-center justify-center py-12">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                <span className="ml-3 text-muted-foreground">Loading variants...</span>
-              </div>
-            ) : (
-              <>
-                {error && (
-                  <div className="mb-4 rounded-2xl border border-destructive/20 bg-destructive/10 p-4 text-sm text-destructive">
-                    {error}
+        return (
+          <div
+            key={variant.id || `${index}-${variant.display_order}`}
+            className={`rounded-xl border transition-colors ${
+              isExpanded ? 'border-primary/20 shadow-sm' : 'border-border/60 hover:border-border'
+            }`}
+          >
+            {/* Collapsed header -- always visible */}
+            <div className={`flex items-start gap-2 ${compact ? 'px-2.5 py-2' : 'px-3 py-2'}`}>
+              <button
+                type="button"
+                onClick={() => setExpandedIndex(isExpanded ? -1 : index)}
+                className={`flex min-w-0 flex-1 gap-2 text-left ${compact ? 'items-start' : 'items-center'}`}
+              >
+                <ChevronRightIcon
+                  className={`h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform ${
+                    isExpanded ? 'rotate-90' : ''
+                  }`}
+                />
+                <div className="min-w-0 flex-1">
+                  {compact ? (
+                    <>
+                      <div className="flex items-center gap-2">
+                        <span className="inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-muted/40 px-1 text-[10px] font-semibold text-muted-foreground">
+                          {index + 1}
+                        </span>
+                        <div className="truncate text-[13px] font-semibold leading-5 text-foreground">
+                          {variant.variant_name?.trim() || `Option ${index + 1}`}
+                        </div>
+                      </div>
+                      <div className="mt-0.5 truncate pr-1 text-[11px] leading-4 text-muted-foreground">
+                        {compactSummary}
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="truncate text-sm font-semibold text-foreground">
+                        {variant.variant_name?.trim() || `Option ${index + 1}`}
+                      </div>
+                      <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                        {priceLabel && (
+                          <span className="text-xs font-medium text-foreground">{priceLabel}</span>
+                        )}
+                        {discount > 0 && (
+                          <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700">
+                            {formatDiscountPercent(discount)}% off
+                          </span>
+                        )}
+                        {variant.is_default && (
+                          <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
+                            Default
+                          </span>
+                        )}
+                        {variant.is_active === false && (
+                          <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">
+                            Hidden
+                          </span>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </div>
+              </button>
+
+              <div className={`flex shrink-0 items-center ${compact ? 'gap-1' : 'gap-4'}`}>
+                {/* Toggles */}
+                {isExpanded && !compact && (
+                  <div className="hidden sm:flex items-center gap-4 border-r border-border/60 pr-4 mr-1">
+                    <label className="flex items-center gap-1.5 cursor-pointer group">
+                      <input
+                        type="checkbox"
+                        checked={variant.is_default}
+                        onChange={(e) => updateVariant(index, 'is_default', e.target.checked)}
+                        className="rounded-full border-border text-primary focus:ring-primary w-3.5 h-3.5 bg-background cursor-pointer"
+                      />
+                      <span className="text-[11px] font-medium text-muted-foreground group-hover:text-foreground transition-colors">Default</span>
+                    </label>
+                    <label className="flex items-center gap-1.5 cursor-pointer group">
+                      <input
+                        type="checkbox"
+                        checked={variant.is_active}
+                        onChange={(e) => updateVariant(index, 'is_active', e.target.checked)}
+                        className="rounded border-border text-primary focus:ring-primary w-3.5 h-3.5 bg-background cursor-pointer"
+                      />
+                      <span className="text-[11px] font-medium text-muted-foreground group-hover:text-foreground transition-colors">Visible</span>
+                    </label>
                   </div>
                 )}
 
-                <div className="admin-dialog-section-muted text-sm text-muted-foreground">
-                  <p className="mb-1 font-medium text-foreground">Configure customer-facing size variants</p>
-                  <p>Add different sizes (e.g., 250g, 500g, 1kg) with individual prices. Customers will see these options when adding to cart.</p>
-                  <p className="mt-2 text-xs"><strong>Shipping weight:</strong> For `GRAMS` and `KILOGRAMS`, weight is auto-calculated. For other units, enter the actual weight used for shipping.</p>
+                <div className="flex shrink-0 items-center gap-0.5">
+                  {!compact && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); moveVariant(index, 'up'); }}
+                        disabled={index === 0}
+                        className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-muted/40 hover:text-foreground disabled:opacity-30"
+                        aria-label="Move up"
+                      >
+                        <ChevronUpIcon className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); moveVariant(index, 'down'); }}
+                        disabled={index === normalizedVariants.length - 1}
+                        className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-muted/40 hover:text-foreground disabled:opacity-30"
+                        aria-label="Move down"
+                      >
+                        <ChevronDownIcon className="h-3.5 w-3.5" />
+                      </button>
+                    </>
+                  )}
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); removeVariant(index); }}
+                    className={`inline-flex items-center justify-center rounded-lg text-destructive/70 transition hover:bg-destructive/10 hover:text-destructive ${compact ? 'h-6 w-6' : 'h-7 w-7'}`}
+                    aria-label="Remove"
+                  >
+                    <TrashIcon className="h-3.5 w-3.5" />
+                  </button>
                 </div>
+              </div>
+            </div>
 
-                <div className="space-y-3">
-                  {variants.map((variant, index) => {
-                    const isWeightUnit = ['GRAMS', 'KILOGRAMS'].includes(variant.size_unit);
-                    return (
-                    <div
-                      key={index}
-                      className="admin-dialog-section"
+            {/* Expanded edit fields */}
+            {isExpanded && (
+              <div className={`border-t border-border/60 ${compact ? 'space-y-2.5 px-2.5 py-2.5' : 'space-y-3 px-3 py-3'}`}>
+                <div className={`grid gap-3 ${compact ? 'grid-cols-2' : 'sm:grid-cols-3'}`}>
+                  <VariantField label="Option name" required className={compact ? 'col-span-2' : ''}>
+                    <input
+                      type="text"
+                      value={variant.variant_name}
+                      onChange={(e) => updateVariant(index, 'variant_name', e.target.value)}
+                      placeholder="e.g. 500g"
+                      className={compactInputClass}
+                    />
+                  </VariantField>
+                  <VariantField label="Size" required>
+                    <input
+                      type="number"
+                      step="0.001"
+                      value={variant.size_value}
+                      onChange={(e) => updateVariant(index, 'size_value', e.target.value)}
+                      onBlur={() => generateVariantName(index)}
+                      placeholder="500"
+                      className={compactInputClass}
+                    />
+                  </VariantField>
+                  <VariantField label="Unit" required>
+                    <select
+                      value={variant.size_unit}
+                      onChange={(e) => updateVariant(index, 'size_unit', e.target.value)}
+                      onBlur={() => generateVariantName(index)}
+                      className={compactInputClass}
                     >
-                      <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
-                        {/* Variant Name */}
-                        <div className="md:col-span-2">
-                          <label className="admin-dialog-label">
-                            Variant Name *
-                          </label>
-                          <input
-                            type="text"
-                            value={variant.variant_name}
-                            onChange={(e) => updateVariant(index, 'variant_name', e.target.value)}
-                            placeholder="e.g., 500g Packet"
-                            className="input-field text-sm"
-                          />
-                        </div>
-
-                        {/* Size Value */}
-                        <div className="md:col-span-1">
-                          <label className="admin-dialog-label">
-                            Size *
-                          </label>
-                          <input
-                            type="number"
-                            step="0.001"
-                            value={variant.size_value}
-                            onChange={(e) => updateVariant(index, 'size_value', e.target.value)}
-                            onBlur={() => generateVariantName(index)}
-                            placeholder="500"
-                            className="input-field text-sm"
-                          />
-                        </div>
-
-                        {/* Size Unit */}
-                        <div className="md:col-span-2">
-                          <label className="admin-dialog-label">
-                            Unit *
-                          </label>
-                          <select
-                            value={variant.size_unit}
-                            onChange={(e) => updateVariant(index, 'size_unit', e.target.value)}
-                            onBlur={() => generateVariantName(index)}
-                            className="input-field text-sm"
-                          >
-                            {sizeUnits.map(unit => (
-                              <option key={unit.value} value={unit.value}>
-                                {unit.label}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-
-                        {/* Price */}
-                        <div className="md:col-span-2">
-                          <label className="admin-dialog-label">
-                            Price (₹) *
-                          </label>
-                          <input
-                            type="number"
-                            step="0.01"
-                            value={variant.price}
-                            onChange={(e) => updateVariant(index, 'price', e.target.value)}
-                            placeholder="499.00"
-                            className="input-field text-sm"
-                          />
-                        </div>
-
-                        {/* Stock Quantity */}
-                        <div className="md:col-span-2">
-                          <label className="admin-dialog-label">
-                            Stock *
-                          </label>
-                          <input
-                            type="number"
-                            step="1"
-                            min="0"
-                            value={variant.stock_quantity}
-                            onChange={(e) => updateVariant(index, 'stock_quantity', e.target.value)}
-                            placeholder="0"
-                            className="input-field text-sm"
-                          />
-                        </div>
-
-                        {/* Weight for shipping */}
-                        <div className="md:col-span-1">
-                          <label className="admin-dialog-label">
-                            Wt (g) *
-                            {isWeightUnit && <span className="ml-1 text-emerald-600">Auto</span>}
-                          </label>
-                          <input
-                            type="number"
-                            step="1"
-                            value={variant.weight_grams}
-                            onChange={(e) => updateVariant(index, 'weight_grams', e.target.value)}
-                            placeholder={isWeightUnit ? "Auto" : "grams"}
-                            disabled={isWeightUnit}
-                            className={`input-field text-sm ${
-                              isWeightUnit ? 'cursor-not-allowed bg-emerald-50 text-emerald-700' : ''
-                            }`}
-                            title={isWeightUnit ? "Auto-calculated from size" : "Enter actual weight for shipping"}
-                          />
-                        </div>
-
-                        {/* Checkboxes */}
-                        <div className="md:col-span-1 flex flex-col gap-2 rounded-xl bg-muted/30 p-3">
-                          <label className="flex items-center text-xs font-medium text-foreground">
-                            <input
-                              type="checkbox"
-                              checked={variant.is_default}
-                              onChange={(e) => updateVariant(index, 'is_default', e.target.checked)}
-                              className="rounded border-gray-300 text-primary mr-2"
-                            />
-                            Default
-                          </label>
-                          <label className="flex items-center text-xs font-medium text-foreground">
-                            <input
-                              type="checkbox"
-                              checked={variant.is_active}
-                              onChange={(e) => updateVariant(index, 'is_active', e.target.checked)}
-                              className="rounded border-gray-300 text-primary mr-2"
-                            />
-                            Active
-                          </label>
-                        </div>
-
-                        {/* Actions */}
-                        <div className="md:col-span-1 flex flex-col gap-2">
-                          <button
-                            type="button"
-                            onClick={() => moveVariant(index, 'up')}
-                            disabled={index === 0}
-                            className="rounded-lg border border-border/70 bg-muted/30 px-2 py-1 text-sm font-semibold text-foreground transition hover:bg-muted disabled:opacity-30"
-                            title="Move up"
-                          >
-                            ↑
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => moveVariant(index, 'down')}
-                            disabled={index === variants.length - 1}
-                            className="rounded-lg border border-border/70 bg-muted/30 px-2 py-1 text-sm font-semibold text-foreground transition hover:bg-muted disabled:opacity-30"
-                            title="Move down"
-                          >
-                            ↓
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => removeVariant(index)}
-                            className="rounded-lg border border-destructive/20 bg-destructive/10 px-2 py-1 text-destructive transition hover:bg-destructive/15"
-                            title="Remove"
-                          >
-                            <TrashIcon className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                    );
-                  })}
+                      {SIZE_UNITS.map((u) => (
+                        <option key={u.value} value={u.value}>{u.label}</option>
+                      ))}
+                    </select>
+                  </VariantField>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={addVariant}
-                  className="mt-4 inline-flex items-center rounded-xl border border-border/70 bg-card px-4 py-2 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted/30"
-                >
-                  <PlusIcon className="w-4 h-4 mr-2" />
-                  Add Another Variant
-                </button>
-              </>
-            )}
-        </AdminDialogBody>
+                <div className={`grid gap-3 ${compact ? 'grid-cols-2' : 'sm:grid-cols-4'}`}>
+                  <VariantField label="Selling price" required>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={variant.price}
+                      onChange={(e) => updateVariant(index, 'price', e.target.value)}
+                      placeholder="499.00"
+                      className={compactInputClass}
+                    />
+                  </VariantField>
+                  <VariantField label="MRP" hint="Compare-at price">
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={variant.mrp}
+                      onChange={(e) => updateVariant(index, 'mrp', e.target.value)}
+                      placeholder="549.00"
+                      className={compactInputClass}
+                    />
+                  </VariantField>
+                  <VariantField label="Stock" required>
+                    <input
+                      type="number"
+                      min="0"
+                      value={variant.stock_quantity}
+                      onChange={(e) => updateVariant(index, 'stock_quantity', e.target.value)}
+                      placeholder="0"
+                      className={compactInputClass}
+                    />
+                  </VariantField>
+                  <VariantField
+                    label={
+                      <>
+                        Weight (g)
+                        {isWeightUnit && <span className="ml-1 text-emerald-600">Auto</span>}
+                      </>
+                    }
+                    hint={isWeightUnit ? 'From size & unit' : 'Required for shipping'}
+                    required={!isWeightUnit}
+                  >
+                    <input
+                      type="number"
+                      min="0"
+                      value={variant.weight_grams}
+                      onChange={(e) => updateVariant(index, 'weight_grams', e.target.value)}
+                      placeholder={isWeightUnit ? 'Auto' : 'Enter grams'}
+                      disabled={isWeightUnit}
+                      className={`${compactInputClass} ${isWeightUnit ? 'cursor-not-allowed border-emerald-200 bg-emerald-50 text-emerald-700' : ''}`}
+                    />
+                  </VariantField>
+                </div>
 
-          <AdminDialogFooter sticky className="justify-end gap-3">
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={saving}
-              className="rounded-xl border border-border/70 bg-card px-4 py-2 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted/30"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={saving || loading}
-              className="btn-primary inline-flex items-center px-4 py-2 text-sm font-medium rounded-xl"
-            >
-              {saving ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                  Saving...
-                </>
-              ) : (
-                <>
-                  <CheckCircleIcon className="w-4 h-4 mr-2" />
-                  Save Variants
-                </>
-              )}
-            </button>
-          </AdminDialogFooter>
-      </AdminDialogContent>
-    </AdminDialog>
+                {/* Compact mode keeps toggles here to avoid crowding the row header. */}
+                <div className={`${compact ? 'flex' : 'flex sm:hidden'} flex-wrap gap-x-6 gap-y-2 border-t border-border/40 pt-2`}>
+                    <label className="flex items-center gap-2 text-sm cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={variant.is_default}
+                        onChange={(e) => updateVariant(index, 'is_default', e.target.checked)}
+                        className="rounded-full border-border text-primary focus:ring-primary w-4 h-4"
+                      />
+                      <span className="font-medium text-foreground text-[13px]">Default option</span>
+                    </label>
+                    <label className="flex items-center gap-2 text-sm cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={variant.is_active}
+                        onChange={(e) => updateVariant(index, 'is_active', e.target.checked)}
+                        className="rounded border-border text-primary focus:ring-primary w-4 h-4"
+                      />
+                      <span className="font-medium text-foreground text-[13px]">Visible in storefront</span>
+                    </label>
+                  </div>
+
+                {compact && (
+                  <div className="flex items-center gap-2 border-t border-border/40 pt-2">
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => moveVariant(index, 'up')}
+                        disabled={index === 0}
+                        className="inline-flex h-7 items-center gap-1 rounded-lg border border-border/60 px-2 text-[11px] font-medium text-muted-foreground transition hover:bg-muted/30 hover:text-foreground disabled:opacity-30"
+                      >
+                        <ChevronUpIcon className="h-3.5 w-3.5" />
+                        Up
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => moveVariant(index, 'down')}
+                        disabled={index === normalizedVariants.length - 1}
+                        className="inline-flex h-7 items-center gap-1 rounded-lg border border-border/60 px-2 text-[11px] font-medium text-muted-foreground transition hover:bg-muted/30 hover:text-foreground disabled:opacity-30"
+                      >
+                        <ChevronDownIcon className="h-3.5 w-3.5" />
+                        Down
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
+
+      <button
+        type="button"
+        onClick={addVariant}
+        className={`flex w-full items-center justify-center gap-1.5 border border-dashed border-border/70 font-semibold text-muted-foreground transition hover:border-primary/30 hover:text-primary ${compact ? 'rounded-lg py-2 text-[13px]' : 'rounded-xl py-2.5 text-sm'}`}
+      >
+        <PlusIcon className="h-4 w-4" />
+        Add New Option
+      </button>
+    </div>
   );
 };
 

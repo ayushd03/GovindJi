@@ -2,6 +2,10 @@
   overscroll-behavior: contain;
 }
 
+.products-layout {
+  --products-sidebar-max-height: calc(100vh - 5.5rem);
+}
+
 .products-filter-panel {
   display: flex;
   flex-direction: column;
@@ -52,37 +56,13 @@
   color: rgb(148 163 184);
 }
 
-.products-sidebar-summary {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.6rem;
-  border: 1px solid rgba(226, 232, 240, 0.9);
-  border-radius: 0.9rem;
-  background: linear-gradient(180deg, rgba(248, 250, 252, 0.96), rgba(255, 255, 255, 0.96));
-  padding: 0.7rem 0.75rem;
-}
-
-.products-sidebar-summary-label {
-  display: block;
-  font-size: 0.68rem;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: rgb(100 116 139);
-}
-
-.products-sidebar-summary-value {
-  margin-top: 0.2rem;
-  font-size: 1rem;
-  font-weight: 700;
-  color: rgb(15 23 42);
-}
-
 .products-display-section {
   display: grid;
-  gap: 0.75rem;
-  border-top: 1px solid rgba(226, 232, 240, 0.9);
-  padding-top: 0.85rem;
+  gap: 0.85rem;
+  border: 1px solid rgba(226, 232, 240, 0.92);
+  border-radius: 1.1rem;
+  background: linear-gradient(180deg, rgba(246, 249, 247, 0.96), rgba(255, 255, 255, 0.98));
+  padding: 0.9rem;
 }
 
 @media (min-width: 1024px) {
@@ -91,7 +71,7 @@
   }
 
   .products-filter-panel {
-    max-height: calc(100vh - 8.5rem);
+    max-height: var(--products-sidebar-max-height);
     overflow-y: auto;
     scrollbar-width: thin;
     scrollbar-color: rgba(35, 68, 42, 0.22) transparent;

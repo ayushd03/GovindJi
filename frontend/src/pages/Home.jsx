@@ -92,29 +92,29 @@ const Home = () => {
 
   return (
     <div className="page-shell-soft">
-      <section className="relative flex min-h-[86vh] items-center overflow-hidden pt-24">
+      <section className="selection-inverse relative overflow-hidden">
         <div
           className="absolute inset-0 bg-cover bg-center"
           style={{ backgroundImage: `url(${process.env.PUBLIC_URL}/hero_bgg.webp)` }}
         />
         <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(17,24,39,0.66),rgba(17,24,39,0.5))]" />
 
-        <div className="page-container relative z-10 py-16">
+        <div className="page-container relative z-10 flex min-h-[calc(100svh-74px)] items-center py-10 sm:py-12 lg:py-16">
           <div className="mx-auto max-w-4xl text-center text-white">
             <p className="text-[11px] font-semibold uppercase tracking-[0.34em] text-white/70">
               GovindJi Dry Fruits
             </p>
-            <h1 className="mt-6 font-heading text-[3.2rem] font-semibold leading-[0.96] tracking-[-0.05em] text-white sm:text-[4.5rem] lg:text-[5.2rem]">
+            <h1 className="mt-5 font-heading text-[2.9rem] font-semibold leading-[0.96] tracking-[-0.05em] text-white sm:text-[4.2rem] lg:text-[5.2rem]">
               Premium dry fruits,
               <br />
-              simply presented
+              carefully selected
             </h1>
-            <p className="mx-auto mt-6 max-w-2xl text-base leading-8 text-white/84 sm:text-lg">
-              Handpicked dry fruits and nuts with a cleaner storefront, clearer delivery visibility,
-              and a simpler path from browsing to checkout.
+            <p className="mx-auto mt-5 max-w-2xl text-base leading-8 text-white/84 sm:text-lg">
+              Handpicked dry fruits and nuts chosen for freshness, rich taste, and dependable quality,
+              brought together in a cleaner, more premium shopping experience.
             </p>
 
-            <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+            <div className="mt-7 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <Link to="/products">
                 <Button className="h-12 rounded-full bg-white px-7 text-sm font-semibold text-slate-900 hover:bg-white/92">
                   Shop Now
@@ -131,7 +131,7 @@ const Home = () => {
               </Link>
             </div>
 
-            <div className="mt-8 flex items-center justify-center gap-3 text-sm text-white/82">
+            <div className="mt-7 flex items-center justify-center gap-3 text-sm text-white/82">
               <div className="flex items-center gap-1 text-[#f2d08a]">
                 {[1, 2, 3, 4, 5].map((star) => (
                   <Star key={star} className="h-4 w-4 fill-current" />
