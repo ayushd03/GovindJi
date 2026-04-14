@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 # Build frontend (same-origin API) and rsync app to EC2. Usage: ./deploy-to-ec2.sh [PUBLIC_IP]
+# Optional: DEPLOY_PUSH_ENV=1 also uploads backend/.env (Supabase, storage, secrets) and rewrites
+# localhost URLs to http://<PUBLIC_IP>; set NODE_ENV=production.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -42,6 +44,22 @@ rsync "${RSYNC_OPTS[@]}" \
   --exclude logs \
   --exclude '*.log' \
   "$REPO_ROOT/backend/" "ec2-user@$PUB:/opt/govindji/backend/"
+
+# Push local backend/.env to the instance (rsync excludes .env). Rewrites localhost URLs to this host.
+if [[ "${DEPLOY_PUSH_ENV:-}" == "1" ]]; then
+  if [[ ! -f "$REPO_ROOT/backend/.env" ]]; then
+    echo "DEPLOY_PUSH_ENV=1 but $REPO_ROOT/backend/.env not found." >&2
+    exit 1
+  fi
+  echo "Syncing .env to ec2-user@$PUB (localhost -> http://$PUB, NODE_ENV=production)..."
+  sed \
+    -e "s|http://localhost:3000|http://$PUB|g" \
+    -e "s|http://localhost:3001|http://$PUB|g" \
+    -e "s|^NODE_ENV=development|NODE_ENV=production|" \
+    "$REPO_ROOT/backend/.env" \
+    | ssh -i "$KEY_FILE" -o StrictHostKeyChecking=accept-new "ec2-user@$PUB" \
+        "cat > /opt/govindji/backend/.env && chmod 600 /opt/govindji/backend/.env"
+fi
 
 ssh -i "$KEY_FILE" -o StrictHostKeyChecking=accept-new "ec2-user@$PUB" bash -s <<REMOTE
 set -e
