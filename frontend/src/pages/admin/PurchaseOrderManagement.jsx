@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { PermissionGuard } from '../../components/PermissionGuard';
 import { ADMIN_PERMISSIONS } from '../../enums/roles';
 import {
@@ -59,6 +59,14 @@ const PurchaseOrderManagement = () => {
   const [receiveData, setReceiveData] = useState({
     received_items: [],
     notes: ''
+  });
+  const hasLoadedInitiallyRef = useRef(false);
+  const filterSnapshotRef = useRef({
+    searchTerm: '',
+    selectedStatus: '',
+    selectedParty: '',
+    startDate: '',
+    endDate: ''
   });
 
   const showSuccess = useCallback((message) => {
@@ -162,21 +170,38 @@ const PurchaseOrderManagement = () => {
   }, []);
 
   useEffect(() => {
+    if (hasLoadedInitiallyRef.current) return;
+    hasLoadedInitiallyRef.current = true;
     fetchPurchaseOrders(1);
     fetchParties();
   }, [fetchParties, fetchPurchaseOrders]);
 
   useEffect(() => {
+    const filtersChanged = (
+      filterSnapshotRef.current.searchTerm !== searchTerm
+      || filterSnapshotRef.current.selectedStatus !== selectedStatus
+      || filterSnapshotRef.current.selectedParty !== selectedParty
+      || filterSnapshotRef.current.startDate !== startDate
+      || filterSnapshotRef.current.endDate !== endDate
+    );
+
+    if (!filtersChanged) return;
+
+    filterSnapshotRef.current = {
+      searchTerm,
+      selectedStatus,
+      selectedParty,
+      startDate,
+      endDate
+    };
+
     const timer = setTimeout(() => {
-      if (currentPage !== 1) {
-        setCurrentPage(1);
-        return;
-      }
+      if (currentPage !== 1) setCurrentPage(1);
       fetchPurchaseOrders(1);
     }, 500);
 
     return () => clearTimeout(timer);
-  }, [endDate, fetchPurchaseOrders, searchTerm, selectedParty, selectedStatus, startDate]);
+  }, [currentPage, endDate, fetchPurchaseOrders, searchTerm, selectedParty, selectedStatus, startDate]);
 
   const handlePageChange = (page) => {
     if (page >= 1 && page <= totalPages) {

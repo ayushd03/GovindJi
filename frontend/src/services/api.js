@@ -143,7 +143,7 @@ export const authAPI = {
 };
 
 export const productsAPI = {
-  getAll: () => api.get('/api/products'),
+  getAll: (params) => api.get('/api/products', { params }),
   getById: (id) => api.get(`/api/products/${id}`),
   getByCategory: (category) => api.get(`/api/products/category/${category}`),
   getReviews: (productId) => api.get(`/api/products/${productId}/reviews`),

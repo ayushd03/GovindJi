@@ -1,27 +1,30 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useSearchParams, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   FunnelIcon,
   ViewColumnsIcon,
   ListBulletIcon,
+  MagnifyingGlassIcon,
 } from '@heroicons/react/24/outline';
 import ProductCard from '../components/ProductCard';
 import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
+import { useDebounced } from '../hooks/useDebounced';
 import { productsAPI, categoriesAPI } from '../services/api';
 import { getComparableProductPrice } from '../utils/productPricing';
 import './Products.css';
 
 const Products = () => {
   const [products, setProducts] = useState([]);
-  const [filteredProducts, setFilteredProducts] = useState([]);
   const [categories, setCategories] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
+  const [isProductsLoading, setIsProductsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();
+  const latestProductsRequestIdRef = useRef(0);
 
   // Fuzzy search function
   const fuzzySearch = (searchTerm, text) => {
@@ -82,6 +85,7 @@ const Products = () => {
   const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'list'
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(12);
+  const debouncedSearchTerm = useDebounced(filters.search, 300);
   
   const sortOptions = [
     { id: 'name', name: 'Name (A-Z)' },
@@ -91,26 +95,49 @@ const Products = () => {
   ];
 
   useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
+    const fetchCategories = async () => {
       try {
-        const [productsResponse, categoriesResponse] = await Promise.all([
-          productsAPI.getAll(),
-          categoriesAPI.getAll()
-        ]);
-        
-        setProducts(productsResponse.data);
-        setCategories(categoriesResponse.data);
+        const categoriesResponse = await categoriesAPI.getAll();
+        setCategories(Array.isArray(categoriesResponse.data) ? categoriesResponse.data : []);
       } catch (err) {
-        setError('Failed to load data');
-        console.error('Error fetching data:', err);
-      } finally {
-        setLoading(false);
+        console.error('Error fetching categories:', err);
       }
     };
 
-    fetchData();
+    fetchCategories();
   }, []);
+
+  useEffect(() => {
+    const fetchProducts = async () => {
+      const requestId = latestProductsRequestIdRef.current + 1;
+      latestProductsRequestIdRef.current = requestId;
+      setIsProductsLoading(true);
+      try {
+        const productsResponse = await productsAPI.getAll(
+          debouncedSearchTerm ? { search: debouncedSearchTerm } : undefined
+        );
+        if (latestProductsRequestIdRef.current !== requestId) {
+          return;
+        }
+        const nextProducts = Array.isArray(productsResponse.data) ? productsResponse.data : [];
+        setProducts(nextProducts);
+        setError(null);
+      } catch (err) {
+        if (latestProductsRequestIdRef.current !== requestId) {
+          return;
+        }
+        setError('Failed to load products');
+        console.error('Error fetching products:', err);
+      } finally {
+        if (latestProductsRequestIdRef.current === requestId) {
+          setIsProductsLoading(false);
+          setIsInitialLoading(false);
+        }
+      }
+    };
+
+    fetchProducts();
+  }, [debouncedSearchTerm]);
 
   // Scroll to top when component mounts
   useEffect(() => {
@@ -119,14 +146,15 @@ const Products = () => {
 
   // Handle URL search params initialization
   useEffect(() => {
-    const searchFromUrl = searchParams.get('search');
-    if (searchFromUrl && searchFromUrl !== filters.search) {
+    const params = new URLSearchParams(location.search);
+    const searchFromUrl = params.get('search') || '';
+    if (searchFromUrl !== filters.search) {
       setFilters(prev => ({
         ...prev,
         search: searchFromUrl
       }));
     }
-  }, [searchParams, filters.search]);
+  }, [filters.search, location.search]);
 
   // Handle category auto-selection from navigation state
   useEffect(() => {
@@ -139,66 +167,16 @@ const Products = () => {
   }, [location.state, categories]);
   
   useEffect(() => {
-    let result = [...products];
-    
-    // Apply search filter
-    if (filters.search) {
-      result = result.filter(product => {
-        const searchableText = `${product.name} ${product.description || ''}`;
-        return fuzzySearch(filters.search, searchableText);
-      });
-    }
-    
-    // Apply category filter (multiple selections)
-    if (filters.categories.length > 0) {
-      result = result.filter(product => 
-        filters.categories.includes(product.category_id)
-      );
-    }
-    
-    // Apply price range filter
-    if (filters.priceRange.min) {
-      result = result.filter(product => (
-        getComparableProductPrice(product) >= parseFloat(filters.priceRange.min)
-      ));
-    }
-    if (filters.priceRange.max) {
-      result = result.filter(product => (
-        getComparableProductPrice(product) <= parseFloat(filters.priceRange.max)
-      ));
-    }
-    
-    // Apply weight range filter
-    if (filters.weightRange.min) {
-      result = result.filter(product => 
-        product.weight && product.weight >= parseFloat(filters.weightRange.min)
-      );
-    }
-    if (filters.weightRange.max) {
-      result = result.filter(product => 
-        product.weight && product.weight <= parseFloat(filters.weightRange.max)
-      );
-    }
-    
-    // Apply sorting
-    result.sort((a, b) => {
-      switch (filters.sortBy) {
-        case 'name':
-          return a.name.localeCompare(b.name);
-        case 'name-desc':
-          return b.name.localeCompare(a.name);
-        case 'price':
-          return getComparableProductPrice(a) - getComparableProductPrice(b);
-        case 'price-desc':
-          return getComparableProductPrice(b) - getComparableProductPrice(a);
-        default:
-          return 0;
-      }
-    });
-    
-    setFilteredProducts(result);
-    setCurrentPage(1); // Reset to first page when filters change
-  }, [products, filters]);
+    setCurrentPage(1);
+  }, [
+    filters.search,
+    filters.categories,
+    filters.priceRange.min,
+    filters.priceRange.max,
+    filters.weightRange.min,
+    filters.weightRange.max,
+    filters.sortBy
+  ]);
   
   const handleFilterChange = (key, value) => {
     setFilters(prev => ({ ...prev, [key]: value }));
@@ -243,6 +221,61 @@ const Products = () => {
     return count;
   };
 
+  const filteredProducts = useMemo(() => {
+    let result = [...products];
+
+    if (filters.categories.length > 0) {
+      result = result.filter((product) => filters.categories.includes(product.category_id));
+    }
+
+    if (filters.priceRange.min) {
+      result = result.filter((product) => (
+        getComparableProductPrice(product) >= parseFloat(filters.priceRange.min)
+      ));
+    }
+    if (filters.priceRange.max) {
+      result = result.filter((product) => (
+        getComparableProductPrice(product) <= parseFloat(filters.priceRange.max)
+      ));
+    }
+
+    if (filters.weightRange.min) {
+      result = result.filter((product) => (
+        product.weight && product.weight >= parseFloat(filters.weightRange.min)
+      ));
+    }
+    if (filters.weightRange.max) {
+      result = result.filter((product) => (
+        product.weight && product.weight <= parseFloat(filters.weightRange.max)
+      ));
+    }
+
+    result.sort((a, b) => {
+      switch (filters.sortBy) {
+        case 'name':
+          return a.name.localeCompare(b.name);
+        case 'name-desc':
+          return b.name.localeCompare(a.name);
+        case 'price':
+          return getComparableProductPrice(a) - getComparableProductPrice(b);
+        case 'price-desc':
+          return getComparableProductPrice(b) - getComparableProductPrice(a);
+        default:
+          return 0;
+      }
+    });
+
+    return result;
+  }, [
+    products,
+    filters.categories,
+    filters.priceRange.min,
+    filters.priceRange.max,
+    filters.weightRange.min,
+    filters.weightRange.max,
+    filters.sortBy
+  ]);
+
   // Pagination calculations
   const totalPages = Math.ceil(filteredProducts.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
@@ -255,20 +288,6 @@ const Products = () => {
   };
   const activeFiltersCount = getActiveFiltersCount();
   const selectedSortOption = sortOptions.find((option) => option.id === filters.sortBy) || sortOptions[0];
-
-  if (loading) {
-    return (
-      <div className="page-shell-soft py-6">
-        <div className="page-container flex items-center justify-center py-20">
-          <motion.div
-            animate={{ rotate: 360 }}
-            transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-            className="h-10 w-10 rounded-full border-[3px] border-[#23442a]/20 border-t-[#23442a]"
-          />
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="products-layout page-shell-soft py-6 lg:h-[calc(100vh-5rem)] lg:overflow-hidden">
@@ -311,6 +330,22 @@ const Products = () => {
                   )}
 
                   <div className="products-display-section">
+                    <div>
+                      <label className="mb-1.5 block text-sm font-semibold tracking-tight text-slate-900">
+                        Search
+                      </label>
+                      <div className="relative">
+                        <MagnifyingGlassIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                        <input
+                          type="text"
+                          value={filters.search}
+                          onChange={(e) => handleFilterChange('search', e.target.value)}
+                          placeholder="Search products"
+                          className="h-10 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-sm text-slate-700 shadow-sm transition-all duration-200 focus:border-[#23442a]/35 focus:outline-none focus:ring-2 focus:ring-[#23442a]/15"
+                        />
+                      </div>
+                    </div>
+
                     <div>
                       <label className="mb-1.5 block text-sm font-semibold tracking-tight text-slate-900">
                         Layout

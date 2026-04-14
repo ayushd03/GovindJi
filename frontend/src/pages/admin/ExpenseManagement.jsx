@@ -199,7 +199,7 @@ const ExpenseManagement = () => {
   }, [makeApiCall]);
 
   // Fetch expenses with filters
-  const fetchExpenses = useCallback(async (page = currentPage) => {
+  const fetchExpenses = useCallback(async (page = 1) => {
     try {
       const searchParams = new URLSearchParams({
         page: page.toString(),
@@ -237,7 +237,7 @@ const ExpenseManagement = () => {
       showErrorToast('Failed to load expenses');
       console.error('Failed to fetch expenses:', error);
     }
-  }, [currentPage, dateRange.end_date, dateRange.start_date, makeApiCall, searchTerm, selectedCategory, selectedPaymentMethod, showErrorToast]);
+  }, [dateRange.end_date, dateRange.start_date, makeApiCall, searchTerm, selectedCategory, selectedPaymentMethod, showErrorToast]);
 
   useEffect(() => {
     const initializeComponent = async () => {

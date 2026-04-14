@@ -2496,12 +2496,32 @@ app.post('/api/admin/init-categories', authenticateAdmin, async (req, res) => {
 
 // Product Routes
 app.get('/api/products', asyncHandler(async (req, res) => {
-    const { data: products, error: productsError } = await supabase
+    const normalizedSearch = typeof req.query.search === 'string' ? req.query.search.trim() : '';
+
+    let productsQuery = supabase
         .from('products')
         .select('*')
         .eq('is_active', true);
 
+    if (normalizedSearch) {
+        productsQuery = productsQuery.or(
+            `name.ilike.%${normalizedSearch}%,description.ilike.%${normalizedSearch}%,sku.ilike.%${normalizedSearch}%,item_hsn.ilike.%${normalizedSearch}%`
+        );
+    }
+
+    const { data: products, error: productsError } = await productsQuery;
+
     if (productsError) throw productsError;
+    if (!products || products.length === 0) {
+        logger.info('Products retrieved successfully', {
+            productCount: 0,
+            variantCount: 0,
+            search: normalizedSearch
+        });
+        return res.json([]);
+    }
+
+    const productIds = products.map((product) => product.id);
 
     // Fetch variants and wholesale prices in parallel for efficiency
     const [variantsResult, wholesalePricesResult] = await Promise.all([
@@ -2509,11 +2529,13 @@ app.get('/api/products', asyncHandler(async (req, res) => {
             .from('product_variants')
             .select('*')
             .eq('is_active', true)
+            .in('product_id', productIds)
             .order('product_id')
             .order('display_order', { ascending: true }),
         supabase
             .from('wholesale_prices')
             .select('*')
+            .in('product_id', productIds)
             .order('quantity', { ascending: true })
     ]);
 
@@ -2549,7 +2571,8 @@ app.get('/api/products', asyncHandler(async (req, res) => {
 
     logger.info('Products retrieved successfully', {
         productCount: productsWithData?.length,
-        variantCount: variants?.length || 0
+        variantCount: variants?.length || 0,
+        search: normalizedSearch
     });
 
     res.json(productsWithData);
@@ -5828,7 +5851,7 @@ app.get('/api/admin/products/:productId/purchase-orders', roleMiddleware.require
         const sortedOrders = (purchaseOrders || [])
             .map((purchaseOrder) => ({
                 ...purchaseOrder,
-                items: (purchaseOrder.items || []).filter((item) => item.product_id === productId)
+                items: (purchaseOrder.items || []).filter((item) => String(item.product_id) === String(productId))
             }))
             .sort((left, right) => (orderIndex.get(left.id) || 0) - (orderIndex.get(right.id) || 0));
 

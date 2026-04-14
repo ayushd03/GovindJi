@@ -83,6 +83,13 @@ const PartyManagement = () => {
   const [vendorDetailsLoading, setVendorDetailsLoading] = useState(false);
   const listScrollYRef = useRef(0);
   const paymentFormRef = useRef(null);
+  const hasLoadedInitiallyRef = useRef(false);
+  const filterSnapshotRef = useRef({
+    searchTerm: '',
+    selectedCategory: '',
+    selectedGstType: '',
+    selectedState: ''
+  });
   
   // Removed formData state - now handled by AddVendorModal component
 
@@ -240,15 +247,30 @@ const PartyManagement = () => {
   }, [itemsPerPage, searchTerm, selectedCategory, selectedGstType, selectedState, showError]);
 
   useEffect(() => {
+    if (hasLoadedInitiallyRef.current) return;
+    hasLoadedInitiallyRef.current = true;
     fetchParties(1);
   }, [fetchParties]);
 
   useEffect(() => {
+    const filtersChanged = (
+      filterSnapshotRef.current.searchTerm !== searchTerm
+      || filterSnapshotRef.current.selectedCategory !== selectedCategory
+      || filterSnapshotRef.current.selectedGstType !== selectedGstType
+      || filterSnapshotRef.current.selectedState !== selectedState
+    );
+
+    if (!filtersChanged) return;
+
+    filterSnapshotRef.current = {
+      searchTerm,
+      selectedCategory,
+      selectedGstType,
+      selectedState
+    };
+
     const timer = setTimeout(() => {
-      if (currentPage !== 1) {
-        setCurrentPage(1);
-        return;
-      }
+      if (currentPage !== 1) setCurrentPage(1);
 
       if (viewMode === 'active') {
         fetchParties(1);
@@ -258,7 +280,7 @@ const PartyManagement = () => {
     }, 500);
 
     return () => clearTimeout(timer);
-  }, [fetchArchivedParties, fetchParties, searchTerm, selectedCategory, selectedGstType, selectedState, viewMode]);
+  }, [currentPage, fetchArchivedParties, fetchParties, searchTerm, selectedCategory, selectedGstType, selectedState, viewMode]);
 
   const currentTotal = viewMode === 'active' ? totalParties : totalArchivedParties;
   const currentPartiesList = viewMode === 'active' ? parties : archivedParties;
@@ -721,7 +743,9 @@ const PartyManagement = () => {
                 {!isLoading ? ` (${currentTotal})` : ''}
               </CardTitle>
               {!isLoading && (
-                <div className="text-sm text-muted-foreground">Showing {startIndex + 1}-{endIndex} of {currentTotal}</div>
+                <div className="text-sm text-muted-foreground">
+                  {currentTotal > 0 ? `Showing ${startIndex + 1}-${endIndex} of ${currentTotal}` : 'No records'}
+                </div>
               )}
             </div>
           </CardHeader>

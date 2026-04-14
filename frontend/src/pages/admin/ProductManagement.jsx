@@ -96,8 +96,14 @@ const ProductManagement = () => {
       const response = await fetch(`${API_BASE_URL}/api/admin/products`, {
         headers: { Authorization: `Bearer ${token}` },
       });
+      if (!response.ok) {
+        throw new Error('Failed to fetch products');
+      }
       const data = await response.json();
-      setProducts(Array.isArray(data) ? data : (data.products || []));
+      if (!Array.isArray(data.products)) {
+        throw new Error('Invalid products response format');
+      }
+      setProducts(data.products);
     } catch (error) {
       console.error('Error fetching products:', error);
     } finally {

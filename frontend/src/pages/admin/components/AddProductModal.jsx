@@ -272,7 +272,10 @@ const AddProductModal = ({
         });
         if (!res.ok) throw new Error('Failed to load categories');
         const data = await res.json();
-        setCategories(data.data || data || []);
+        if (!Array.isArray(data)) {
+          throw new Error('Invalid categories response format');
+        }
+        setCategories(data);
       } catch (err) {
         console.error('Error fetching categories:', err);
       }

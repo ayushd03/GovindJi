@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { PermissionGuard } from '../../components/PermissionGuard';
 import { ADMIN_PERMISSIONS } from '../../enums/roles';
 import {
@@ -76,6 +76,8 @@ const EmployeeManagement = () => {
     emergency_phone: '',
     notes: ''
   });
+  const hasLoadedInitiallyRef = useRef(false);
+  const filterSnapshotRef = useRef({ searchTerm: '', selectedRole: '' });
 
   const showSuccess = useCallback((message) => {
     toast({ title: "Success", description: message, variant: "success", duration: 3000 });
@@ -126,19 +128,27 @@ const EmployeeManagement = () => {
   }, [itemsPerPage, searchTerm, selectedRole, showError]);
 
   useEffect(() => {
+    if (hasLoadedInitiallyRef.current) return;
+    hasLoadedInitiallyRef.current = true;
     fetchEmployees(1);
   }, [fetchEmployees]);
 
   useEffect(() => {
+    const filtersChanged = (
+      filterSnapshotRef.current.searchTerm !== searchTerm
+      || filterSnapshotRef.current.selectedRole !== selectedRole
+    );
+
+    if (!filtersChanged) return;
+
+    filterSnapshotRef.current = { searchTerm, selectedRole };
+
     const timer = setTimeout(() => {
-      if (currentPage !== 1) {
-        setCurrentPage(1);
-        return;
-      }
+      if (currentPage !== 1) setCurrentPage(1);
       fetchEmployees(1);
     }, 500);
     return () => clearTimeout(timer);
-  }, [fetchEmployees, searchTerm, selectedRole]);
+  }, [currentPage, fetchEmployees, searchTerm, selectedRole]);
 
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = Math.min(startIndex + itemsPerPage, totalEmployees);
