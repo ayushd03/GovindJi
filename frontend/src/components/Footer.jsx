@@ -28,11 +28,11 @@ const Footer = () => {
               GovindJi Dry Fruits
             </p>
             <h3 className="max-w-sm font-heading text-2xl font-semibold leading-tight text-white">
-              A cleaner way to order premium dry fruits online.
+              Dry fruits online, without the guesswork.
             </h3>
             <p className="max-w-md text-sm leading-7 text-white/68">
-              Thoughtful product pages, clearer delivery information, and a more dependable
-              checkout flow built for repeat ordering.
+              Check exact pack sizes, delivery timelines, and final pricing before checkout,
+              then reorder your regular basket in minutes.
             </p>
           </div>
 

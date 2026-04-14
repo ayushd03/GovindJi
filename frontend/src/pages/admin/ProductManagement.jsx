@@ -371,21 +371,21 @@ const ProductManagement = () => {
         disabled={isUpdating}
         aria-pressed={isVisible}
         title={isVisible ? 'Hide from storefront' : 'Show on storefront'}
-        className={`inline-flex h-9 min-w-[108px] items-center justify-between rounded-full border px-2 py-1 text-[12px] font-medium transition-all ${
+        className={`inline-flex h-9 min-w-[108px] items-center justify-between rounded-full border px-2 py-1 text-[12px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
           isVisible
-            ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:border-emerald-300 hover:bg-emerald-100'
-            : 'border-slate-200 bg-slate-50 text-slate-600 hover:border-slate-300 hover:bg-slate-100'
-        } ${isUpdating ? 'cursor-wait opacity-70' : 'shadow-sm'}`}
+            ? 'border-primary/25 bg-primary/10 text-primary hover:border-primary/35 hover:bg-primary/[0.14]'
+            : 'border-border bg-muted/80 text-muted-foreground hover:bg-muted hover:text-foreground'
+        } ${isUpdating ? 'cursor-wait opacity-70' : ''}`}
       >
         <span className="pl-1 text-left">{isUpdating ? 'Updating' : (isVisible ? 'Visible' : 'Hidden')}</span>
         <span
-          className={`flex h-5 w-9 items-center rounded-full p-0.5 transition-colors ${
-            isVisible ? 'bg-emerald-200/80' : 'bg-slate-200'
+          className={`flex h-5 w-9 shrink-0 items-center rounded-full p-0.5 transition-colors ${
+            isVisible ? 'bg-primary/35' : 'bg-muted-foreground/20'
           }`}
           aria-hidden="true"
         >
           <span
-            className={`h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${
+            className={`h-4 w-4 rounded-full bg-card shadow-sm ring-1 ring-border/40 transition-transform ${
               isVisible ? 'translate-x-4' : 'translate-x-0'
             } ${isUpdating ? 'animate-pulse' : ''}`}
           />
@@ -434,22 +434,30 @@ const ProductManagement = () => {
                   />
                 </div>
 
-                <div className="flex flex-wrap items-center gap-2">
+                <div
+                  className="inline-flex max-w-full flex-wrap gap-0.5 rounded-xl border border-border/80 bg-muted/50 p-1 shadow-[inset_0_1px_2px_rgba(15,23,42,0.04)]"
+                  role="group"
+                  aria-label="Filter products by storefront visibility"
+                >
                   {statusOptions.map((option) => (
                     <button
                       key={option.key}
                       type="button"
                       onClick={() => setStatusFilter(option.key)}
-                      className={`inline-flex h-10 items-center gap-2 rounded-lg border px-3 text-sm font-medium transition-colors ${
+                      className={`inline-flex h-10 items-center gap-2 rounded-lg px-3 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
                         statusFilter === option.key
-                          ? 'border-slate-900 bg-slate-900 text-white'
-                          : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-100'
+                          ? 'bg-card text-foreground shadow-sm ring-1 ring-border/70'
+                          : 'text-muted-foreground hover:bg-card/60 hover:text-foreground'
                       }`}
                     >
                       <span>{option.label}</span>
-                      <span className={`rounded-md px-1.5 py-0.5 text-xs ${
-                        statusFilter === option.key ? 'bg-white/15 text-white' : 'bg-slate-100 text-slate-600'
-                      }`}>
+                      <span
+                        className={`rounded-md px-1.5 py-0.5 text-[11px] font-semibold tabular-nums ${
+                          statusFilter === option.key
+                            ? 'bg-primary/12 text-primary'
+                            : 'bg-background/70 text-muted-foreground'
+                        }`}
+                      >
                         {option.count}
                       </span>
                     </button>

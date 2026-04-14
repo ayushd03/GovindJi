@@ -11,13 +11,13 @@ import { getImageUrl } from '../utils/imageUtils';
 const brandPoints = [
   {
     icon: Award,
-    title: 'Premium quality',
-    description: 'Handpicked dry fruits and nuts selected for freshness and taste.',
+    title: 'Careful selection',
+    description: 'We choose nuts and dry fruits for consistent size, aroma, and taste.',
   },
   {
     icon: Leaf,
-    title: 'Freshly packed',
-    description: 'A reliable range for daily use, festive gifting, and repeat orders.',
+    title: 'Packed right',
+    description: 'Each order is packed in sealed, food-safe pouches for better shelf life.',
   },
   {
     icon: Truck,
@@ -26,8 +26,8 @@ const brandPoints = [
   },
   {
     icon: ShieldCheck,
-    title: 'Simple checkout',
-    description: 'Cleaner order flow with better summaries and order tracking.',
+    title: 'Checkout clarity',
+    description: 'Your item total, shipping fee, and payment method are shown in one flow.',
   },
 ];
 
@@ -105,19 +105,19 @@ const Home = () => {
               GovindJi Dry Fruits
             </p>
             <h1 className="mt-5 font-heading text-[2.9rem] font-semibold leading-[0.96] tracking-[-0.05em] text-white sm:text-[4.2rem] lg:text-[5.2rem]">
-              Premium dry fruits,
+              Dry fruits,
               <br />
-              carefully selected
+              chosen with care
             </h1>
             <p className="mx-auto mt-5 max-w-2xl text-base leading-8 text-white/84 sm:text-lg">
-              Handpicked dry fruits and nuts chosen for freshness, rich taste, and dependable quality,
-              brought together in a cleaner, more premium shopping experience.
+              From daily-use nuts to festive gifting packs, see exact size, price, and delivery
+              details before you place the order.
             </p>
 
             <div className="mt-7 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <Link to="/products">
                 <Button className="h-12 rounded-full bg-white px-7 text-sm font-semibold text-slate-900 hover:bg-white/92">
-                  Shop Now
+                  Shop Products
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               </Link>
@@ -137,7 +137,7 @@ const Home = () => {
                   <Star key={star} className="h-4 w-4 fill-current" />
                 ))}
               </div>
-              <span>Trusted by repeat household buyers and gifting customers</span>
+              <span>Ordered regularly for home use and festive gifting.</span>
             </div>
           </div>
         </div>
