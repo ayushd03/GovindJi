@@ -189,7 +189,7 @@ const ImageUploadManager = ({
           onClick={() => setActiveTab('file')}
         >
           <PhotoIcon className="w-4 h-4 shrink-0" aria-hidden />
-          <span>Upload Files</span>
+          <span>Files</span>
         </button>
         <button
           type="button"
@@ -200,7 +200,7 @@ const ImageUploadManager = ({
           onClick={() => setActiveTab('url')}
         >
           <PhotoIcon className="w-4 h-4 shrink-0" aria-hidden />
-          <span>From URL</span>
+          <span>URL</span>
         </button>
         {showAdvancedSettings && (
           <button
@@ -213,7 +213,7 @@ const ImageUploadManager = ({
             title="Image processing settings"
           >
             <CogIcon className="w-4 h-4 shrink-0" aria-hidden />
-            <span className="tab-btn-settings-label">Settings</span>
+            <span className="tab-btn-settings-label">Processing</span>
           </button>
         )}
       </div>
@@ -227,14 +227,14 @@ const ImageUploadManager = ({
           id="upload-panel-settings"
         >
           <div className="settings-header">
-            <h4>Processing</h4>
-            <p className="settings-header-caption">Compression and output apply before upload.</p>
+            <h4>Image Processing Settings</h4>
+            <p className="settings-header-caption">Choose automatic optimization or manually tune compression, output format, and metadata behavior.</p>
           </div>
 
           <div className="settings-content">
             {/* Mode Selection */}
             <div className="setting-group">
-              <h5>Mode</h5>
+              <h5>Processing mode</h5>
               <div className="mode-selector">
                 <label className="mode-option">
                   <input
@@ -269,7 +269,7 @@ const ImageUploadManager = ({
             {/* Auto Mode Settings */}
             {settings.mode === 'auto' && (
               <div className="setting-group">
-                <h5>Target size</h5>
+                <h5>Target file size</h5>
                 <div className="setting-item">
                   <label className="setting-value-row">
                     <span className="setting-value-label">Output budget</span>
@@ -370,7 +370,7 @@ const ImageUploadManager = ({
 
                 {/* Format Settings */}
                 <div className="setting-group">
-                  <h5>Output format</h5>
+                  <h5>Output</h5>
                   <div className="setting-item">
                     <label>Format</label>
                     <select
@@ -388,7 +388,7 @@ const ImageUploadManager = ({
 
                 {/* Optimization Settings */}
                 <div className="setting-group">
-                  <h5>Optimization</h5>
+                  <h5>Optimization rules</h5>
                   <label className="setting-label">
                     <input
                       type="checkbox"

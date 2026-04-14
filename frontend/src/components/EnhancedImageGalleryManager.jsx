@@ -369,15 +369,15 @@ const EnhancedImageGalleryManager = ({
             </section>
 
             {/* Upload */}
-            <aside className="flex w-full shrink-0 flex-col border-t border-border/40 bg-card lg:w-[min(100%,22rem)] lg:border-l lg:border-t-0 xl:w-[26rem]">
-              <div className="shrink-0 border-b border-border/40 px-4 py-3 sm:px-5">
-                <h3 className="text-sm font-semibold text-foreground">Add images</h3>
-                <p className="mt-0.5 text-[12px] text-muted-foreground">
-                  Upload multiple files or paste a URL. Optional compression runs before upload.
+            <aside className="flex w-full shrink-0 flex-col border-t border-border/40 bg-card/95 lg:w-[min(100%,29rem)] lg:border-l lg:border-t-0 xl:w-[31rem]">
+              <div className="shrink-0 border-b border-border/40 bg-card px-4 py-4 sm:px-6">
+                <h3 className="text-[15px] font-semibold tracking-tight text-foreground">Add images</h3>
+                <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
+                  Upload files or use an external URL. Processing settings control quality, format, and optimization.
                 </p>
               </div>
-              <div className="custom-scrollbar min-h-0 max-h-[min(42vh,20rem)] flex-1 overflow-y-auto p-4 sm:p-5 lg:max-h-none">
-                <div className="rounded-xl border border-border/40 bg-muted/15 p-3 sm:p-4">
+              <div className="custom-scrollbar min-h-0 max-h-[min(45vh,24rem)] flex-1 overflow-y-auto p-4 sm:p-5 lg:max-h-none lg:p-6">
+                <div className="flex min-h-0 flex-1 flex-col rounded-2xl border border-border/50 bg-gradient-to-b from-card to-muted/10 p-4 shadow-sm sm:p-5">
                   <ImageUploadManager
                     onFilesSelected={handleFilesSelected}
                     onUrlSubmit={handleUrlSubmit}
@@ -405,7 +405,7 @@ const EnhancedImageGalleryManager = ({
 
                 {uploading && (
                   <div
-                    className="mt-4 flex items-center gap-3 rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 text-[13px] text-muted-foreground"
+                    className="mt-4 flex items-center gap-3 rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 text-[13px] font-medium text-muted-foreground"
                     role="status"
                   >
                     <div
