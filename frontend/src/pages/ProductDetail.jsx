@@ -3,9 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeftIcon,
   ClockIcon,
-  CubeIcon,
   MapPinIcon,
-  ShieldCheckIcon,
   SparklesIcon,
   TruckIcon,
 } from '@heroicons/react/24/outline';
@@ -268,13 +266,8 @@ const ProductDetail = () => {
   const overviewHighlights = [
     {
       icon: SparklesIcon,
-      label: 'Pack format',
+      label: 'Pack',
       value: selectedVariant?.variant_name || 'Standard pack',
-    },
-    {
-      icon: CubeIcon,
-      label: hasVariants ? 'Available packs' : 'Inventory',
-      value: hasVariants ? `${availableVariantCount} ready to order` : `${availableStock} units available`,
     },
     {
       icon: TruckIcon,
@@ -290,31 +283,15 @@ const ProductDetail = () => {
     product.weight
       ? { label: 'Weight', value: `${product.weight} ${product.unit || 'kg'}` }
       : null,
-    { label: 'Selection', value: selectedVariant?.variant_name || 'Standard pack' },
+    product.sku
+      ? { label: 'SKU', value: product.sku }
+      : null,
     hasVariants
       ? { label: 'Pack options', value: `${availableVariantCount} available` }
-      : { label: 'Stock', value: `${availableStock} units ready` },
+      : product.unit
+        ? { label: 'Unit', value: product.unit }
+        : null,
   ].filter(Boolean);
-
-  const assuranceItems = [
-    {
-      icon: ShieldCheckIcon,
-      label: 'Checkout confidence',
-      value: 'Live inventory checks keep cart quantities aligned with current stock.',
-    },
-    {
-      icon: TruckIcon,
-      label: 'Shipping visibility',
-      value: 'Delivery fee, dispatch date, and ETA update based on pincode and selected quantity.',
-    },
-    {
-      icon: SparklesIcon,
-      label: 'Selection clarity',
-      value: hasVariants
-        ? 'Each pack size surfaces its own price, MRP, discount, and remaining stock.'
-        : 'Single-pack pricing is shown up front with no hidden configuration steps.',
-    },
-  ];
 
   return (
     <div className="page-shell-soft product-detail-shell">
@@ -401,23 +378,15 @@ const ProductDetail = () => {
                       </div>
                       <p className="product-detail-price-note">
                         {hasVariants && selectedVariant
-                          ? `Currently showing ${selectedVariant.variant_name}`
+                          ? selectedVariant.variant_name
                           : product.unit
-                            ? `Priced per ${product.unit}`
-                            : 'Priced per pack'}
-                        {pricing.hasMrp ? ' with visible MRP comparison.' : '.'}
+                            ? `Per ${product.unit}`
+                            : 'Per pack'}
                       </p>
                     </div>
 
                     <div className="product-detail-stock-card">
                       <span className={stockPillClassName}>{stockSummary}</span>
-                      <p className="product-detail-stock-copy">
-                        {isOutOfStock
-                          ? 'This selection cannot be purchased right now.'
-                          : isLowStock
-                            ? 'Inventory is running low for this configuration.'
-                            : 'In-stock quantity is reserved as you add it to cart.'}
-                      </p>
                     </div>
                   </div>
 
@@ -426,9 +395,6 @@ const ProductDetail = () => {
                       <div className="product-detail-section-header product-detail-section-header--compact">
                         <div>
                           <h2 className="product-detail-section-title">Choose pack size</h2>
-                          <p className="product-detail-section-copy">
-                            Each pack shows the live selling price, MRP, and current stock.
-                          </p>
                         </div>
                       </div>
 
@@ -544,9 +510,6 @@ const ProductDetail = () => {
                     <div className="product-detail-section-header product-detail-section-header--compact">
                       <div>
                         <h2 className="product-detail-section-title">Delivery estimate</h2>
-                        <p className="product-detail-section-copy">
-                          Live shipping fee and ETA for this product selection.
-                        </p>
                       </div>
                     </div>
 
@@ -565,9 +528,6 @@ const ProductDetail = () => {
                           className="product-detail-delivery-input"
                         />
                       </div>
-                      <p className="product-detail-delivery-helper">
-                        Based on {quantity} selected unit{quantity > 1 ? 's' : ''} and the active pack.
-                      </p>
                     </div>
 
                     <div className="product-detail-delivery-state">
@@ -675,9 +635,6 @@ const ProductDetail = () => {
                   <div className="product-detail-section-header">
                     <div>
                       <h2 className="product-detail-section-title">Catalog details</h2>
-                      <p className="product-detail-section-copy">
-                        Core product information surfaced in a dense, scan-friendly layout.
-                      </p>
                     </div>
                   </div>
 
@@ -691,35 +648,6 @@ const ProductDetail = () => {
                   </div>
                 </div>
               )}
-
-              <div className="product-detail-assurance-panel">
-                <div className="product-detail-section-header">
-                  <div>
-                    <h2 className="product-detail-section-title">Page improvements</h2>
-                    <p className="product-detail-section-copy">
-                      Decision-critical details are grouped so users can compare, configure, and buy without hunting through the page.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="product-detail-assurance-grid">
-                  {assuranceItems.map((item) => {
-                    const Icon = item.icon;
-
-                    return (
-                      <div key={item.label} className="product-detail-assurance-card">
-                        <div className="product-detail-assurance-icon">
-                          <Icon className="h-5 w-5" />
-                        </div>
-                        <div>
-                          <p className="product-detail-assurance-label">{item.label}</p>
-                          <p className="product-detail-assurance-value">{item.value}</p>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
             </div>
           </section>
         </div>

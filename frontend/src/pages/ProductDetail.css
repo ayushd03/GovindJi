@@ -275,13 +275,6 @@
   color: #b42318;
 }
 
-.product-detail-stock-copy {
-  margin: 0;
-  color: rgba(15, 23, 42, 0.6);
-  font-size: 0.8rem;
-  line-height: 1.5;
-}
-
 .product-detail-panel-section {
   border-top: 1px solid rgba(15, 23, 42, 0.08);
   padding-top: 1rem;
@@ -304,13 +297,6 @@
   color: #16221a;
   font-size: 0.95rem;
   font-weight: 800;
-}
-
-.product-detail-section-copy {
-  margin: 0.3rem 0 0;
-  color: rgba(15, 23, 42, 0.6);
-  font-size: 0.82rem;
-  line-height: 1.55;
 }
 
 .product-detail-options-grid {
@@ -579,13 +565,6 @@
   box-shadow: 0 0 0 4px rgba(35, 68, 42, 0.08);
 }
 
-.product-detail-delivery-helper {
-  margin: 0;
-  color: rgba(15, 23, 42, 0.56);
-  font-size: 0.78rem;
-  line-height: 1.45;
-}
-
 .product-detail-delivery-state {
   margin-top: 0.85rem;
 }
@@ -762,8 +741,7 @@
   padding: 0 1.1rem 1.1rem;
 }
 
-.product-detail-meta-panel,
-.product-detail-assurance-panel {
+.product-detail-meta-panel {
   border: 1px solid rgba(15, 23, 42, 0.08);
   border-radius: 1.45rem;
   background: rgba(255, 255, 255, 0.92);
@@ -797,47 +775,6 @@
   font-size: 0.86rem;
   font-weight: 800;
   line-height: 1.4;
-}
-
-.product-detail-assurance-grid {
-  display: grid;
-  gap: 0.7rem;
-}
-
-.product-detail-assurance-card {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.85rem;
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  border-radius: 1rem;
-  background: linear-gradient(180deg, rgba(250, 248, 242, 0.72), rgba(255, 255, 255, 0.92));
-  padding: 0.9rem;
-}
-
-.product-detail-assurance-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 2.35rem;
-  height: 2.35rem;
-  border-radius: 0.9rem;
-  background: rgba(35, 68, 42, 0.08);
-  color: #23442a;
-  flex-shrink: 0;
-}
-
-.product-detail-assurance-label {
-  margin: 0;
-  color: #16221a;
-  font-size: 0.86rem;
-  font-weight: 800;
-}
-
-.product-detail-assurance-value {
-  margin: 0.3rem 0 0;
-  color: rgba(15, 23, 42, 0.6);
-  font-size: 0.8rem;
-  line-height: 1.55;
 }
 
 .product-detail-state-card {
@@ -926,8 +863,7 @@
 
 @media (min-width: 768px) {
   .product-detail-overview-grid,
-  .product-detail-meta-strip,
-  .product-detail-assurance-grid {
+  .product-detail-meta-strip {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -963,12 +899,8 @@
   }
 
   .product-detail-lower-grid {
-    grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
-    padding: 0 1.2rem 1.2rem;
-  }
-
-  .product-detail-assurance-grid {
     grid-template-columns: 1fr;
+    padding: 0 1.2rem 1.2rem;
   }
 
   .product-detail-skeleton {
@@ -993,8 +925,7 @@
   .product-detail-visual-panel,
   .product-detail-overview,
   .product-detail-purchase-card,
-  .product-detail-meta-panel,
-  .product-detail-assurance-panel {
+  .product-detail-meta-panel {
     padding: 0.85rem;
   }
 
