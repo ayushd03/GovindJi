@@ -213,7 +213,7 @@ const ImageUploadManager = ({
             title="Image processing settings"
           >
             <CogIcon className="w-4 h-4 shrink-0" aria-hidden />
-            <span className="tab-btn-settings-label">Processing</span>
+            <span className="tab-btn-settings-label">Settings</span>
           </button>
         )}
       </div>

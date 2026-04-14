@@ -668,9 +668,9 @@ const AddProductModal = ({
 
         <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col max-h-[80vh]">
           <div className="flex-1 overflow-y-auto px-4 py-5 sm:px-6 sm:py-6 custom-scrollbar bg-muted/10">
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 max-w-6xl mx-auto w-full items-start">
+            <div className="mx-auto grid w-full max-w-6xl grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1fr)_22rem]">
               {pendingServiceChange && (
-                <div className="lg:col-span-12 rounded-lg bg-amber-50 border border-amber-200/60 p-2.5 flex flex-wrap sm:flex-nowrap items-center justify-between gap-3">
+                <div className="col-span-full rounded-lg border border-amber-200/60 bg-amber-50 p-2.5 flex flex-wrap sm:flex-nowrap items-center justify-between gap-3">
                   <span className="text-[11px] font-medium text-amber-800 leading-tight">Switching will remove all variant options. Sure?</span>
                   <div className="flex gap-2 shrink-0">
                     <button type="button" onClick={() => setPendingServiceChange(false)} className="px-2 py-1 text-[11px] font-medium text-amber-900 border border-amber-300 rounded hover:bg-amber-100 transition-colors">Cancel</button>
@@ -680,7 +680,7 @@ const AddProductModal = ({
               )}
 
               {/* LEFT COLUMN */}
-              <div className="lg:col-span-8 flex flex-col rounded-xl border border-border/40 bg-card shadow-sm overflow-hidden">
+              <div className="min-w-0 flex flex-col overflow-hidden rounded-xl border border-border/40 bg-card shadow-sm">
 
                 {/* Basic Details */}
                 <div className="p-4 sm:p-5">
@@ -876,43 +876,43 @@ const AddProductModal = ({
 
               </div>
 
-              {/* RIGHT COLUMN */}
-              <div className="lg:col-span-4 flex min-h-[32rem] flex-col rounded-xl border border-border/40 bg-card shadow-sm overflow-hidden lg:max-h-[36rem]">
-                 <div className="border-b border-border/40 px-4 py-4 sm:px-5">
-                    <h3 className="text-[13px] font-semibold text-foreground">Pack Sizes & Shipping</h3>
-                    <p className="mt-1 text-[11px] text-muted-foreground">
+              {/* RIGHT COLUMN — fixed track width (see grid) so the main form gets the rest */}
+              <div className="flex min-w-0 flex-col overflow-hidden rounded-xl border border-border/40 bg-card shadow-sm">
+                 <div className="border-b border-border/40 px-3 py-3 sm:px-4">
+                    <h3 className="text-[13px] font-semibold text-foreground">Pack sizes & shipping</h3>
+                    <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
                       {formData.is_service
-                        ? 'Services keep this panel reserved so the layout stays stable.'
+                        ? 'Not used for services.'
                         : hasVariants
-                          ? 'Manage pack options, per-pack pricing, stock, and delivery weights.'
-                          : 'Set the default pack size and shipping weight, or enable multiple pack options.'}
+                          ? 'Pack options, prices, stock, and weights.'
+                          : 'Default pack size, shipping weight, or multiple options.'}
                     </p>
                  </div>
 
-                 <div className="sidebar-scroll flex-1 overflow-y-auto p-4 sm:p-5">
+                 <div className="sidebar-scroll max-h-[min(32rem,calc(80vh-13rem))] overflow-y-auto overscroll-contain p-3 sm:p-4">
                    {formData.is_service ? (
-                     <div className="flex h-full min-h-[24rem] flex-col items-center justify-center rounded-xl border border-dashed border-border/70 bg-muted/10 px-5 text-center">
-                       <Cog6ToothIcon className="h-9 w-9 text-muted-foreground/50" />
-                       <p className="mt-3 text-sm font-semibold text-foreground">Pack sizes are not needed for services</p>
-                       <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                         Switch back to product whenever you need customer-selectable pack sizes or shipping weights.
+                     <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border/70 bg-muted/10 px-3 py-8 text-center">
+                       <Cog6ToothIcon className="h-8 w-8 text-muted-foreground/50" />
+                       <p className="mt-2 text-[13px] font-semibold text-foreground">Not needed for services</p>
+                       <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+                         Switch to product for pack sizes and shipping weights.
                        </p>
                      </div>
                    ) : hasVariants ? (
-                     <div className="space-y-4">
-                       <div className="flex justify-between items-center bg-muted/20 p-2 rounded-lg border border-border/40">
-                         <div className="px-1">
-                            <h4 className="text-[12px] font-semibold text-foreground">Variants Enabled</h4>
-                            <p className="text-[10px] text-muted-foreground">{activeVariantCount} active · {totalVariantStock} total stock</p>
+                     <div className="space-y-3">
+                       <div className="flex flex-col gap-2 rounded-lg border border-border/40 bg-muted/20 p-2 sm:flex-row sm:items-center sm:justify-between">
+                         <div className="min-w-0 px-0.5">
+                            <h4 className="text-[12px] font-semibold text-foreground">Variants on</h4>
+                            <p className="text-[10px] text-muted-foreground">{activeVariantCount} active · {totalVariantStock} stock</p>
                          </div>
                          {pendingRemoveOptions ? (
-                            <div className="flex items-center gap-2">
-                               <span className="text-[11px] text-destructive font-medium pl-2 hidden sm:inline-block">Delete all options?</span>
-                               <button type="button" onClick={() => setPendingRemoveOptions(false)} className="px-2 py-1 rounded text-[11px] font-medium text-muted-foreground hover:bg-muted/30 transition-colors">Cancel</button>
-                               <button type="button" onClick={() => syncDefaultVariantToSingleOption()} className="px-2 py-1 rounded text-[11px] font-semibold text-white bg-destructive hover:bg-destructive/90 transition-colors">Confirm</button>
+                            <div className="flex flex-wrap items-center justify-end gap-1.5">
+                               <span className="text-[10px] text-destructive font-medium sm:pr-1">Remove all?</span>
+                               <button type="button" onClick={() => setPendingRemoveOptions(false)} className="rounded px-2 py-1 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-muted/30">Cancel</button>
+                               <button type="button" onClick={() => syncDefaultVariantToSingleOption()} className="rounded bg-destructive px-2 py-1 text-[11px] font-semibold text-white transition-colors hover:bg-destructive/90">Confirm</button>
                             </div>
                          ) : (
-                            <button type="button" onClick={() => disablePackSizes()} className="text-[11px] font-semibold text-destructive hover:bg-destructive/10 px-2 py-1 rounded transition-colors">
+                            <button type="button" onClick={() => disablePackSizes()} className="shrink-0 self-start rounded px-2 py-1 text-[11px] font-semibold text-destructive transition-colors hover:bg-destructive/10 sm:self-auto">
                               Remove options
                             </button>
                          )}
@@ -953,19 +953,19 @@ const AddProductModal = ({
 
                  {!formData.is_service && (
                    <>
-                     <hr className="border-border/40 m-0" />
-                     <div className="p-4 sm:p-5">
-                       <div className="flex items-center justify-between gap-3 bg-muted/10 p-2.5 rounded-lg border border-border/40">
-                          <div className="flex items-center gap-2.5">
-                             <div className="text-primary/70">
+                     <hr className="m-0 border-border/40" />
+                     <div className="p-3 sm:p-4">
+                       <div className="flex items-center justify-between gap-2 rounded-lg border border-border/40 bg-muted/10 p-2">
+                          <div className="flex min-w-0 items-center gap-2">
+                             <div className="shrink-0 text-primary/70">
                                <Cog6ToothIcon className="h-4 w-4" />
                              </div>
-                             <div>
-                               <h3 className="text-[12px] font-semibold text-foreground">Adv. Units</h3>
-                               <p className="text-[10px] text-muted-foreground">{formatUnitConfiguration(formData.base_unit, formData.secondary_unit, formData.unit_conversion_value)}</p>
+                             <div className="min-w-0">
+                               <h3 className="text-[12px] font-semibold text-foreground">Adv. units</h3>
+                               <p className="truncate text-[10px] text-muted-foreground">{formatUnitConfiguration(formData.base_unit, formData.secondary_unit, formData.unit_conversion_value)}</p>
                              </div>
                           </div>
-                          <button type="button" onClick={() => setShowUnitSelectionDialog(true)} className="text-[10px] font-semibold text-primary hover:text-primary/80 bg-primary/5 border border-primary/10 px-2 py-1 rounded">
+                          <button type="button" onClick={() => setShowUnitSelectionDialog(true)} className="shrink-0 rounded border border-primary/10 bg-primary/5 px-2 py-1 text-[10px] font-semibold text-primary hover:text-primary/80">
                             Config
                           </button>
                        </div>
