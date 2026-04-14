@@ -70,6 +70,8 @@ class StorageService {
       return 'gcp';
     } else if (this.storage.constructor.name === 'AWSS3Storage') {
       return 'aws';
+    } else if (this.storage.constructor.name === 'SupabaseStorage') {
+      return 'supabase';
     } else if (this.storage.constructor.name === 'LocalStorage') {
       return 'local';
     } else {
@@ -83,7 +85,7 @@ class StorageService {
    */
   async testConnection() {
     try {
-      // For GCP and AWS, try to create bucket if it doesn't exist
+      // For cloud providers that support it, ensure bucket exists
       if (this.storage.createBucketIfNotExists) {
         await this.storage.createBucketIfNotExists();
       }

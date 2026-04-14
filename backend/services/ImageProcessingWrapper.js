@@ -1,13 +1,7 @@
 const sharp = require('sharp');
-const path = require('path');
 const fs = require('fs').promises;
-const { v4: uuidv4 } = require('uuid');
 
 class ImageProcessingWrapper {
-  constructor() {
-    // No need for directories since we process in memory
-  }
-
   /**
    * Process an image using Sharp
    * @param {string|Buffer} input - Input file path or buffer
@@ -17,93 +11,95 @@ class ImageProcessingWrapper {
    */
   async processImage(input, settings = {}, outputFilename = null) {
     let tempFilePath = null;
-    
+
     try {
-      // Merge with default settings
       const processedSettings = this.validateSettings(settings);
-      
+
       let inputBuffer;
       let originalSize;
-      
-      // Handle input
+
       if (Buffer.isBuffer(input)) {
         inputBuffer = input;
         originalSize = input.length;
       } else {
         inputBuffer = await fs.readFile(input);
         originalSize = inputBuffer.length;
-        // If input was a file path, remember to clean it up if it's a temp file
-        if (input.includes('temp_')) {
+        if (typeof input === 'string' && input.includes('temp_')) {
           tempFilePath = input;
         }
       }
 
-      // Get original image metadata
-      const metadata = await sharp(inputBuffer).metadata();
-      
-      // Start processing pipeline
-      let pipeline = sharp(inputBuffer);
-      
-      // Auto-orient if enabled
+      if (processedSettings.mode === 'auto') {
+        const autoResult = await this.processToTargetSize(inputBuffer, processedSettings);
+        if (tempFilePath) {
+          try {
+            await fs.unlink(tempFilePath);
+          } catch (cleanupError) {
+            console.warn('Could not clean up temp file:', cleanupError.message);
+          }
+        }
+        if (!autoResult.success) {
+          return autoResult;
+        }
+        const ext = 'webp';
+        const name =
+          outputFilename ||
+          `processed_${Date.now()}.${ext}`;
+        return {
+          success: true,
+          output_filename: name,
+          processed_buffer: autoResult.processed_buffer,
+          original: autoResult.original,
+          processed: autoResult.processed,
+          settings_used: autoResult.settings_used || processedSettings,
+          compression_ratio: autoResult.compression_ratio,
+        };
+      }
+
+      const originalMeta = await sharp(inputBuffer).metadata();
+
+      let workBuffer = Buffer.from(inputBuffer);
       if (processedSettings.optimization.autoOrient) {
-        pipeline = pipeline.rotate();
+        workBuffer = await sharp(workBuffer).rotate().toBuffer();
       }
-      
-      // Resize if enabled
-      if (processedSettings.resize.enabled) {
-        const { width, height, maintainAspectRatio } = processedSettings.resize;
-        if (width || height) {
-          pipeline = pipeline.resize(width, height, {
-            fit: maintainAspectRatio ? 'inside' : 'fill',
-            withoutEnlargement: true
-          });
-        }
-      }
-      
-      // Compress if enabled (resize based on max dimensions)
-      if (processedSettings.compression.enabled) {
-        const { maxWidth, maxHeight } = processedSettings.compression;
-        if (metadata.width > maxWidth || metadata.height > maxHeight) {
-          pipeline = pipeline.resize(maxWidth, maxHeight, {
-            fit: 'inside',
-            withoutEnlargement: true
-          });
-        }
-      }
-      
-      // Determine output format and apply format-specific options
-      const outputFormat = this.determineOutputFormat(metadata.format, processedSettings.format);
-      
-      if (outputFormat === 'webp') {
-        pipeline = pipeline.webp({
-          quality: processedSettings.compression.quality,
-          progressive: processedSettings.optimization.progressive
-        });
-      } else if (outputFormat === 'jpeg') {
-        pipeline = pipeline.jpeg({
-          quality: processedSettings.compression.quality,
-          progressive: processedSettings.optimization.progressive
-        });
-      } else if (outputFormat === 'png') {
-        pipeline = pipeline.png({
-          progressive: processedSettings.optimization.progressive
+
+      const orientedMeta = await sharp(workBuffer).metadata();
+      let pipeline = sharp(workBuffer);
+
+      const resizeOnce = this._computeManualResize(processedSettings, orientedMeta);
+      if (resizeOnce) {
+        pipeline = pipeline.resize(resizeOnce.width, resizeOnce.height, {
+          fit: resizeOnce.fit,
+          withoutEnlargement: true,
         });
       }
-      
-      // Process the image
+
+      const outputFormat = this.determineOutputFormat(
+        orientedMeta.format,
+        processedSettings.format
+      );
+
+      const highFidelity = !processedSettings.compression.enabled;
+      const keepMeta = !processedSettings.optimization.removeMetadata;
+      if (keepMeta) {
+        pipeline = pipeline.withMetadata();
+      }
+
+      pipeline = this._applyOutputEncoder(
+        pipeline,
+        outputFormat,
+        processedSettings,
+        highFidelity
+      );
+
       const processedBuffer = await pipeline.toBuffer();
-      
-      // Get final metadata
-      const finalMetadata = await sharp(processedBuffer).metadata();
-      
-      // Generate filename for reference (but don't save to disk)
+      const finalMeta = await sharp(processedBuffer).metadata();
+
       if (!outputFilename) {
-        const timestamp = Date.now();
-        const extension = outputFormat === 'jpeg' ? 'jpg' : outputFormat;
-        outputFilename = `processed_${timestamp}.${extension}`;
+        const extension = outputFormat === 'jpeg' || outputFormat === 'jpg' ? 'jpg' : outputFormat;
+        outputFilename = `processed_${Date.now()}.${extension}`;
       }
-      
-      // Clean up temp file immediately after processing
+
       if (tempFilePath) {
         try {
           await fs.unlink(tempFilePath);
@@ -111,29 +107,27 @@ class ImageProcessingWrapper {
           console.warn('Could not clean up temp file:', cleanupError.message);
         }
       }
-      
+
       return {
         success: true,
         output_filename: outputFilename,
         processed_buffer: processedBuffer,
         original: {
-          format: metadata.format,
-          size: [metadata.width, metadata.height],
-          file_size: originalSize
+          format: originalMeta.format,
+          size: [originalMeta.width, originalMeta.height],
+          file_size: originalSize,
         },
         processed: {
-          format: finalMetadata.format,
-          size: [finalMetadata.width, finalMetadata.height],
-          file_size: processedBuffer.length
+          format: finalMeta.format,
+          size: [finalMeta.width, finalMeta.height],
+          file_size: processedBuffer.length,
         },
         settings_used: processedSettings,
-        compression_ratio: Math.round((1 - processedBuffer.length / originalSize) * 100)
+        compression_ratio: Math.round((1 - processedBuffer.length / originalSize) * 100),
       };
-      
     } catch (error) {
       console.error('Image processing error:', error);
-      
-      // Clean up temp file even on error
+
       if (tempFilePath) {
         try {
           await fs.unlink(tempFilePath);
@@ -141,24 +135,102 @@ class ImageProcessingWrapper {
           console.warn('Could not clean up temp file after error:', cleanupError.message);
         }
       }
-      
+
       return {
         success: false,
         error: error.message,
-        error_type: error.constructor.name
+        error_type: error.constructor.name,
       };
     }
   }
 
   /**
-   * Process multiple images
-   * @param {Array} inputs - Array of input files/buffers
-   * @param {Object} settings - Processing settings
-   * @returns {Promise<Array>} Array of processing results
+   * One resize pass: explicit resize wins; else max dimensions when compression is on.
+   * Uses dimensions after auto-orient.
+   * @private
    */
+  _computeManualResize(processedSettings, orientedMeta) {
+    const w0 = orientedMeta.width;
+    const h0 = orientedMeta.height;
+    if (!w0 || !h0) {
+      return null;
+    }
+
+    if (processedSettings.resize.enabled) {
+      const { width, height, maintainAspectRatio } = processedSettings.resize;
+      if (width || height) {
+        return {
+          width: width || undefined,
+          height: height || undefined,
+          fit: maintainAspectRatio ? 'inside' : 'fill',
+        };
+      }
+    }
+
+    if (!processedSettings.compression.enabled) {
+      return null;
+    }
+
+    const { maxWidth, maxHeight } = processedSettings.compression;
+    if (w0 <= maxWidth && h0 <= maxHeight) {
+      return null;
+    }
+
+    return {
+      width: maxWidth,
+      height: maxHeight,
+      fit: 'inside',
+    };
+  }
+
+  /**
+   * @private
+   */
+  _applyOutputEncoder(pipeline, outputFormat, processedSettings, highFidelity) {
+    const prog = processedSettings.optimization.progressive;
+    const qUser = processedSettings.compression.quality;
+    const q = highFidelity ? Math.max(qUser, 93) : qUser;
+
+    if (outputFormat === 'webp') {
+      return pipeline.webp({
+        quality: highFidelity ? Math.min(100, Math.max(q, 95)) : q,
+        effort: highFidelity ? 6 : 5,
+        smartSubsample: true,
+      });
+    }
+    if (outputFormat === 'jpeg' || outputFormat === 'jpg') {
+      return pipeline.jpeg({
+        quality: highFidelity ? Math.min(100, Math.max(q, 95)) : q,
+        progressive: prog,
+        mozjpeg: true,
+      });
+    }
+    if (outputFormat === 'png') {
+      return pipeline.png({
+        progressive: prog,
+        compressionLevel: highFidelity ? 6 : 9,
+        adaptiveFiltering: true,
+      });
+    }
+    if (outputFormat === 'gif') {
+      return pipeline.gif({ effort: 7 });
+    }
+
+    const fmt = String(outputFormat || 'jpeg').toLowerCase();
+    if (fmt === 'tiff' || fmt === 'tif') {
+      return pipeline.tiff({ quality: highFidelity ? 100 : q });
+    }
+
+    return pipeline.jpeg({
+      quality: highFidelity ? 95 : q,
+      progressive: prog,
+      mozjpeg: true,
+    });
+  }
+
   async processImages(inputs, settings = {}) {
     const results = [];
-    
+
     for (const input of inputs) {
       try {
         const result = await this.processImage(input, settings);
@@ -167,59 +239,73 @@ class ImageProcessingWrapper {
         results.push({
           success: false,
           error: error.message,
-          input: typeof input === 'string' ? input : 'buffer'
+          input: typeof input === 'string' ? input : 'buffer',
         });
       }
     }
-    
+
     return results;
   }
 
-  /**
-   * Get default settings
-   * @returns {Object} Default processing settings
-   */
   getDefaultSettings() {
     return {
+      mode: 'auto',
+      targetFileSize: 150 * 1024,
       compression: {
         enabled: true,
         quality: 85,
         maxWidth: 1920,
-        maxHeight: 1080
+        maxHeight: 1080,
       },
       format: {
         outputFormat: 'webp',
-        convertToWebp: true
+        convertToWebp: true,
       },
       optimization: {
         removeMetadata: true,
         progressive: true,
-        autoOrient: true
+        autoOrient: true,
       },
       resize: {
         enabled: false,
         width: null,
         height: null,
-        maintainAspectRatio: true
-      }
+        maintainAspectRatio: true,
+      },
     };
   }
 
-  /**
-   * Validate processing settings
-   * @param {Object} settings - Settings to validate
-   * @returns {Object} Validated and sanitized settings
-   */
   validateSettings(settings) {
     const defaults = this.getDefaultSettings();
-    const validated = { ...defaults };
+    const validated = {
+      ...defaults,
+      compression: { ...defaults.compression },
+      format: { ...defaults.format },
+      optimization: { ...defaults.optimization },
+      resize: { ...defaults.resize },
+    };
+
+    if (settings.mode === 'auto' || settings.mode === 'manual') {
+      validated.mode = settings.mode;
+    }
+
+    if (typeof settings.targetFileSize === 'number' && Number.isFinite(settings.targetFileSize)) {
+      const minT = 25 * 1024;
+      const maxT = 3 * 1024 * 1024;
+      validated.targetFileSize = Math.round(
+        Math.min(maxT, Math.max(minT, settings.targetFileSize))
+      );
+    }
 
     if (settings.compression) {
       if (typeof settings.compression.enabled === 'boolean') {
         validated.compression.enabled = settings.compression.enabled;
       }
-      if (typeof settings.compression.quality === 'number' && 
-          settings.compression.quality >= 1 && settings.compression.quality <= 100) {
+      if (
+        typeof settings.compression.quality === 'number' &&
+        settings.compression.quality >= 1 &&
+        settings.compression.quality <= 100
+      ) {
         validated.compression.quality = Math.round(settings.compression.quality);
       }
       if (typeof settings.compression.maxWidth === 'number' && settings.compression.maxWidth > 0) {
@@ -234,6 +320,9 @@ class ImageProcessingWrapper {
       const allowedFormats = ['webp', 'jpeg', 'jpg', 'png', 'gif', 'original'];
       if (allowedFormats.includes(settings.format.outputFormat)) {
         validated.format.outputFormat = settings.format.outputFormat;
+      }
+      if (typeof settings.format.convertToWebp === 'boolean') {
+        validated.format.convertToWebp = settings.format.convertToWebp;
       }
     }
 
@@ -267,97 +356,125 @@ class ImageProcessingWrapper {
     return validated;
   }
 
-
-  /**
-   * Determine output format based on settings
-   * @param {string} originalFormat - Original image format
-   * @param {Object} formatSettings - Format settings
-   * @returns {string} Output format
-   */
   determineOutputFormat(originalFormat, formatSettings) {
     const outputFormat = formatSettings.outputFormat?.toLowerCase() || 'webp';
-    
+
     if (outputFormat === 'original') {
       return originalFormat?.toLowerCase() || 'jpeg';
     }
-    
+
     const supportedFormats = ['webp', 'jpeg', 'jpg', 'png', 'gif'];
     return supportedFormats.includes(outputFormat) ? outputFormat : 'webp';
   }
 
   /**
-   * Process image to target file size
-   * @param {Buffer} input - Input image buffer
-   * @param {Object} settings - Processing settings with targetFileSize
-   * @returns {Promise<Object>} Processing result
+   * Auto mode: best WebP quality that fits under target byte size (with optional downscale passes).
+   * @param {Buffer} input
+   * @param {Object} settings
    */
   async processToTargetSize(input, settings = {}) {
     try {
-      const targetSize = settings.targetFileSize || 150 * 1024; // 150KB default
       const processedSettings = this.validateSettings(settings);
-      
-      // Always use WebP for size optimization
+      const targetSize = processedSettings.targetFileSize || 150 * 1024;
+      const overshoot = 1.03;
+
+      let buffer = Buffer.isBuffer(input) ? Buffer.from(input) : await fs.readFile(input);
+      const originalSize = buffer.length;
+      const metaUpload = await sharp(buffer).metadata();
+
+      if (processedSettings.optimization.autoOrient) {
+        buffer = await sharp(buffer).rotate().toBuffer();
+      }
+
+      let meta = await sharp(buffer).metadata();
+
+      const maxInitialEdge = 3200;
+      if (
+        meta.width &&
+        meta.height &&
+        (meta.width > maxInitialEdge || meta.height > maxInitialEdge)
+      ) {
+        buffer = await sharp(buffer)
+          .resize(maxInitialEdge, maxInitialEdge, { fit: 'inside', withoutEnlargement: true })
+          .toBuffer();
+        meta = await sharp(buffer).metadata();
+      }
+
+      const encodeWebp = (buf, quality) => {
+        let p = sharp(buf).webp({ quality, effort: 6, smartSubsample: true });
+        if (processedSettings.optimization.removeMetadata === false) {
+          p = p.withMetadata();
+        }
+        return p.toBuffer();
+      };
+
+      const bestQualityUnderTarget = async (buf) => {
+        const atLow = await encodeWebp(buf, 18);
+        if (atLow.length <= targetSize * overshoot) {
+          let lo = 18;
+          let hi = 100;
+          let ans = 18;
+          let ansBuf = atLow;
+          while (lo <= hi) {
+            const mid = (lo + hi) >> 1;
+            const trial = await encodeWebp(buf, mid);
+            if (trial.length <= targetSize * overshoot) {
+              ans = mid;
+              ansBuf = trial;
+              lo = mid + 1;
+            } else {
+              hi = mid - 1;
+            }
+          }
+          return { buf: ansBuf, quality: ans };
+        }
+        return { buf: atLow, quality: 18 };
+      };
+
+      let { buf: outputBuffer } = await bestQualityUnderTarget(buffer);
+      let guard = 0;
+      const minEdge = 160;
+
+      while (outputBuffer.length > targetSize * overshoot && guard < 14) {
+        guard += 1;
+        const m = await sharp(buffer).metadata();
+        const w = m.width || 800;
+        const h = m.height || 800;
+        const scale = Math.sqrt((targetSize * 0.92) / outputBuffer.length);
+        const newW = Math.max(minEdge, Math.floor(w * scale));
+        const newH = Math.max(minEdge, Math.floor(h * scale));
+        buffer = await sharp(buffer)
+          .resize(newW, newH, { fit: 'inside', withoutEnlargement: true })
+          .toBuffer();
+        ({ buf: outputBuffer } = await bestQualityUnderTarget(buffer));
+      }
+
+      const finalMeta = await sharp(outputBuffer).metadata();
+      const name = `processed_${Date.now()}.webp`;
+
       processedSettings.format.outputFormat = 'webp';
-      
-      let metadata = await sharp(input).metadata();
-      let pipeline = sharp(input);
-      
-      // Auto-orient
-      pipeline = pipeline.rotate();
-      
-      // Start with reasonable dimensions if too large
-      if (metadata.width > 2048 || metadata.height > 2048) {
-        pipeline = pipeline.resize(2048, 2048, { fit: 'inside', withoutEnlargement: true });
-      }
-      
-      let quality = 95;
-      let outputBuffer;
-      
-      // Iteratively reduce quality to reach target size
-      for (let attempt = 0; attempt < 10; attempt++) {
-        outputBuffer = await pipeline.webp({ quality }).toBuffer();
-        
-        if (outputBuffer.length <= targetSize) {
-          break;
-        }
-        
-        if (outputBuffer.length > targetSize * 1.5 && quality > 30) {
-          quality = Math.max(30, quality - 15);
-        } else if (outputBuffer.length > targetSize && quality > 20) {
-          quality = Math.max(20, quality - 5);
-        } else {
-          // Try reducing dimensions
-          const currentMeta = await sharp(outputBuffer).metadata();
-          const scaleFactor = Math.sqrt(targetSize / outputBuffer.length);
-          const newWidth = Math.max(300, Math.round(currentMeta.width * scaleFactor));
-          const newHeight = Math.max(200, Math.round(currentMeta.height * scaleFactor));
-          
-          pipeline = sharp(input).rotate().resize(newWidth, newHeight, { fit: 'inside' });
-          quality = Math.min(85, quality + 10);
-        }
-      }
-      
+
       return {
         success: true,
+        output_filename: name,
         processed_buffer: outputBuffer,
         original: {
-          file_size: input.length,
-          format: metadata.format,
-          size: [metadata.width, metadata.height]
+          file_size: originalSize,
+          format: metaUpload.format,
+          size: [metaUpload.width, metaUpload.height],
         },
         processed: {
           file_size: outputBuffer.length,
           format: 'webp',
-          size: await sharp(outputBuffer).metadata().then(m => [m.width, m.height])
+          size: [finalMeta.width, finalMeta.height],
         },
-        compression_ratio: Math.round((1 - outputBuffer.length / input.length) * 100),
-        settings_used: processedSettings
+        compression_ratio: Math.round((1 - outputBuffer.length / originalSize) * 100),
+        settings_used: processedSettings,
       };
-      
     } catch (error) {
       return {
         success: false,
-        error: error.message
+        error: error.message,
       };
     }
   }

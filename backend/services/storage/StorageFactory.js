@@ -1,5 +1,6 @@
 const GCPStorage = require('./GCPStorage');
 const AWSS3Storage = require('./AWSS3Storage');
+const SupabaseStorage = require('./SupabaseStorage');
 const LocalStorage = require('./LocalStorage');
 
 /**
@@ -13,6 +14,7 @@ class StorageFactory {
   static PROVIDERS = {
     GCP: 'gcp',
     AWS: 'aws',
+    SUPABASE: 'supabase',
     LOCAL: 'local'
   };
 
@@ -37,7 +39,10 @@ class StorageFactory {
       
       case this.PROVIDERS.AWS:
         return new AWSS3Storage(config);
-      
+
+      case this.PROVIDERS.SUPABASE:
+        return new SupabaseStorage(config);
+
       case this.PROVIDERS.LOCAL:
         return new LocalStorage(config);
       
@@ -59,6 +64,10 @@ class StorageFactory {
     // Check for AWS credentials
     if (process.env.AWS_S3_BUCKET || (process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY)) {
       return this.PROVIDERS.AWS;
+    }
+
+    if (process.env.SUPABASE_STORAGE_BUCKET) {
+      return this.PROVIDERS.SUPABASE;
     }
 
     // Default to local storage
@@ -88,6 +97,17 @@ class StorageFactory {
           accessKeyId: process.env.AWS_ACCESS_KEY_ID,
           secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
           folder: process.env.STORAGE_FOLDER || 'product-images'
+        };
+
+      case this.PROVIDERS.SUPABASE:
+        return {
+          supabaseUrl: process.env.SUPABASE_URL,
+          serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
+          anonKey: process.env.SUPABASE_ANON_KEY,
+          bucketName: process.env.SUPABASE_STORAGE_BUCKET,
+          folder: process.env.STORAGE_FOLDER || 'product-images',
+          publicBucket: process.env.SUPABASE_STORAGE_PUBLIC !== 'false',
+          signedUrlExpiresSeconds: process.env.SUPABASE_SIGNED_URL_EXPIRES_SECONDS
         };
 
       case this.PROVIDERS.LOCAL:
@@ -147,6 +167,27 @@ class StorageFactory {
           if (!process.env.AWS_ACCESS_KEY_ID || !process.env.AWS_SECRET_ACCESS_KEY) {
             warnings.push('AWS credentials not fully specified, using IAM role or default credentials');
           }
+        }
+        break;
+
+      case this.PROVIDERS.SUPABASE:
+        if (!config.bucketName) {
+          errors.push('SUPABASE_STORAGE_BUCKET is required');
+        }
+        if (!config.supabaseUrl && !process.env.SUPABASE_URL) {
+          errors.push('SUPABASE_URL is required');
+        }
+        if (
+          !config.serviceRoleKey &&
+          !config.anonKey &&
+          !process.env.SUPABASE_SERVICE_ROLE_KEY &&
+          !process.env.SUPABASE_ANON_KEY
+        ) {
+          errors.push('SUPABASE_SERVICE_ROLE_KEY or SUPABASE_ANON_KEY is required');
+        } else if (!config.serviceRoleKey && !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+          warnings.push(
+            'Using anon key for Storage: ensure RLS Storage policies allow uploads, or set SUPABASE_SERVICE_ROLE_KEY for the API server'
+          );
         }
         break;
 
@@ -212,6 +253,18 @@ class StorageFactory {
           metadata: true,
           versioning: true,
           lifecycle: true,
+          cors: true,
+          cdn: true,
+          globalDistribution: true
+        };
+
+      case this.PROVIDERS.SUPABASE:
+        return {
+          signedUrls: true,
+          publicUrls: true,
+          metadata: true,
+          versioning: false,
+          lifecycle: false,
           cors: true,
           cdn: true,
           globalDistribution: true

@@ -29,6 +29,11 @@ const deliveryService = require('./services/delivery/DeliveryService');
 const pickupScheduler = require('./services/delivery/pickupScheduler');
 const orderRecoveryService = require('./services/order/OrderRecoveryService');
 const { buildVariantMutationPlan } = require('./services/productVariantSync');
+const {
+    parseProcessingSettings,
+    fetchImageFromUrl,
+} = require('./utils/imageProcessingHttp');
+const ImageProcessingWrapper = require('./services/ImageProcessingWrapper');
 
 const app = express();
 const port = process.env.PORT || 3001;
@@ -1411,16 +1416,12 @@ app.post('/api/admin/products/:id/images/upload', authenticateAdmin, upload.sing
         let processedBuffer = req.file.buffer;
         let processedMimeType = req.file.mimetype;
         let processedFilename = req.file.originalname;
-        
-        // Check if processing settings are provided
-        const processingSettings = req.body.processing_settings ? 
-            JSON.parse(req.body.processing_settings) : 
-            { mode: 'auto', targetFileSize: 150 * 1024 }; // Default to auto mode with 150KB target
-        
+
+        const processingSettings = parseProcessingSettings(req.body.processing_settings);
+
         try {
-            const ImageProcessingWrapper = require('./services/ImageProcessingWrapper');
             const imageProcessor = new ImageProcessingWrapper();
-            
+
             // Process image using Sharp
             const processResult = await imageProcessor.processImage(
                 req.file.buffer,
@@ -1538,66 +1539,147 @@ app.post('/api/admin/products/:id/images/upload', authenticateAdmin, upload.sing
         res.status(201).json(data);
 }));
 
-// Add image by URL for a product
+// Add image by URL for a product (download, optional processing, host like file uploads)
 app.post('/api/admin/products/:id/images/url', authenticateAdmin, asyncHandler(async (req, res) => {
     const { id } = req.params;
-    const { image_url, alt_text, is_primary } = req.body;
-    
+    const { image_url, alt_text, is_primary, processing_settings } = req.body;
+
     if (!image_url) {
         return res.status(400).json({ error: 'Image URL is required' });
     }
-    
-    // Get the highest sort_order for this product
+
+    let fetchResult;
+    try {
+        fetchResult = await fetchImageFromUrl(image_url);
+    } catch (fetchErr) {
+        logger.warn('Product image URL fetch failed', {
+            userId: req.user?.id,
+            productId: id,
+            message: fetchErr.message,
+            code: fetchErr.code,
+        });
+        return res.status(400).json({ error: fetchErr.message || 'Could not download image from URL' });
+    }
+
+    const { buffer: remoteBuffer, contentType } = fetchResult;
+    const processingSettings = parseProcessingSettings(processing_settings);
+
+    let processedBuffer = remoteBuffer;
+    let processedMimeType = contentType;
+    const baseName = `url_${uuidv4()}`;
+    let processedFilename = `${baseName}.${(contentType.split('/')[1] || 'jpg').replace('jpeg', 'jpg')}`;
+
+    try {
+        const imageProcessor = new ImageProcessingWrapper();
+        const processResult = await imageProcessor.processImage(remoteBuffer, processingSettings);
+        if (processResult.success) {
+            processedBuffer = processResult.processed_buffer;
+            const processedFormat = processResult.processed.format.toLowerCase();
+            processedMimeType = `image/${processedFormat === 'jpeg' ? 'jpeg' : processedFormat}`;
+            const extension = processedFormat === 'jpeg' ? 'jpg' : processedFormat;
+            processedFilename = `${baseName}.${extension}`;
+        } else {
+            logger.warn('Product URL image processing failed, using downloaded bytes', {
+                userId: req.user?.id,
+                productId: id,
+                error: processResult.error,
+            });
+        }
+    } catch (processingError) {
+        logger.warn('Product URL image processing error, using downloaded bytes', {
+            userId: req.user?.id,
+            productId: id,
+            error: processingError.message,
+        });
+    }
+
+    const uploadResult = await storageService.uploadFile(
+        processedBuffer,
+        processedFilename,
+        processedMimeType,
+        {
+            prefix: 'products',
+            uploadedBy: req.user.id,
+            metadata: {
+                productId: id,
+                altText: alt_text || '',
+                sourceUrl: image_url,
+            },
+        }
+    );
+
+    if (!uploadResult.success) {
+        throw new Error('Failed to upload file to cloud storage');
+    }
+
     const { data: existingImages, error: sortError } = await supabase
         .from('product_images')
         .select('sort_order')
         .eq('product_id', id)
         .order('sort_order', { ascending: false })
         .limit(1);
-    
-    const nextSortOrder = existingImages && existingImages.length > 0 
-        ? existingImages[0].sort_order + 1 
-        : 0;
-    
-    // If this is set as primary, remove primary flag from other images
+
+    const nextSortOrder =
+        existingImages && existingImages.length > 0 ? existingImages[0].sort_order + 1 : 0;
+
     if (is_primary) {
-        await supabase
-            .from('product_images')
-            .update({ is_primary: false })
-            .eq('product_id', id);
+        await supabase.from('product_images').update({ is_primary: false }).eq('product_id', id);
     }
-    
+
     const { data, error } = await supabase
         .from('product_images')
-        .insert([{
-            product_id: id,
-            image_url,
-            image_type: 'url',
-            sort_order: nextSortOrder,
-            alt_text: alt_text || '',
-            is_primary: is_primary || false
-        }])
+        .insert([
+            {
+                product_id: id,
+                image_url: uploadResult.url,
+                image_type: 'file',
+                sort_order: nextSortOrder,
+                alt_text: alt_text || '',
+                is_primary: is_primary || false,
+            },
+        ])
         .select()
         .single();
-    
-    if (error) throw error;
-    
-    // Log admin action
-    await supabase.from('admin_logs').insert([{
-        admin_id: req.user.id,
-        action: 'ADD_PRODUCT_IMAGE_URL',
-        entity_type: 'product',
-        entity_id: id,
-        details: { image_id: data.id, image_url }
-    }]);
-    
+
+    if (error || !data) {
+        logger.error('Failed to insert URL-sourced product image', {
+            userId: req.user?.id,
+            productId: id,
+            error,
+        });
+        try {
+            await storageService.deleteFile(uploadResult.url);
+        } catch (deleteError) {
+            logger.error('Failed to cleanup uploaded file after DB error', {
+                userId: req.user?.id,
+                productId: id,
+                error: deleteError,
+            });
+        }
+        throw error || new Error('Failed to insert product image');
+    }
+
+    await supabase.from('admin_logs').insert([
+        {
+            admin_id: req.user.id,
+            action: 'ADD_PRODUCT_IMAGE_URL',
+            entity_type: 'product',
+            entity_id: id,
+            details: {
+                image_id: data.id,
+                image_url: uploadResult.url,
+                source_url: image_url,
+            },
+        },
+    ]);
+
     logger.info('Product image URL added successfully', {
         userId: req.user?.id,
         productId: id,
         imageId: data.id,
-        imageUrl: image_url
+        imageUrl: uploadResult.url,
     });
-    
+
     res.status(201).json(data);
 }));
 
@@ -2005,15 +2087,11 @@ app.post('/api/admin/categories/:id/images', authenticateAdmin, upload.single('i
         let processedMimeType = req.file.mimetype;
         let processedFilename = req.file.originalname;
         
-        // Check if processing settings are provided
-        const processingSettings = req.body.processing_settings ? 
-            JSON.parse(req.body.processing_settings) : 
-            { mode: 'auto', targetFileSize: 150 * 1024 }; // Default to auto mode with 150KB target
-        
+        const processingSettings = parseProcessingSettings(req.body.processing_settings);
+
         try {
-            const ImageProcessingWrapper = require('./services/ImageProcessingWrapper');
             const imageProcessor = new ImageProcessingWrapper();
-            
+
             // Process category image using Sharp
             const processResult = await imageProcessor.processImage(
                 req.file.buffer,
@@ -2095,72 +2173,128 @@ app.post('/api/admin/categories/:id/images', authenticateAdmin, upload.single('i
     }
 });
 
-// Add category image by URL
+// Add category image by URL (download, optional processing, host like file uploads)
 app.post('/api/admin/categories/:id/images/url', authenticateAdmin, async (req, res) => {
     const { id: category_id } = req.params;
     const { image_url, alt_text, is_primary, processing_settings } = req.body;
-    
+
     if (!image_url) {
         return res.status(400).json({ error: 'Image URL is required' });
     }
-    
+
     try {
-        // Verify category exists
         const { data: category, error: categoryError } = await supabase
             .from('categories')
             .select('id')
             .eq('id', category_id)
             .single();
-            
+
         if (categoryError || !category) {
             return res.status(404).json({ error: 'Category not found' });
         }
-        
-        // Get next sort order
-        const { data: existingImages, error: sortError } = await supabase
+
+        let fetchResult;
+        try {
+            fetchResult = await fetchImageFromUrl(image_url);
+        } catch (fetchErr) {
+            console.warn('Category image URL fetch failed:', fetchErr.message);
+            return res.status(400).json({ error: fetchErr.message || 'Could not download image from URL' });
+        }
+
+        const { buffer: remoteBuffer, contentType } = fetchResult;
+        const processingSettings = parseProcessingSettings(processing_settings);
+
+        let processedBuffer = remoteBuffer;
+        let processedMimeType = contentType;
+        const baseName = `url_${uuidv4()}`;
+        let processedFilename = `${baseName}.${(contentType.split('/')[1] || 'jpg').replace('jpeg', 'jpg')}`;
+
+        try {
+            const imageProcessor = new ImageProcessingWrapper();
+            const processResult = await imageProcessor.processImage(remoteBuffer, processingSettings);
+            if (processResult.success) {
+                processedBuffer = processResult.processed_buffer;
+                const processedFormat = processResult.processed.format.toLowerCase();
+                processedMimeType = `image/${processedFormat === 'jpeg' ? 'jpeg' : processedFormat}`;
+                const extension = processedFormat === 'jpeg' ? 'jpg' : processedFormat;
+                processedFilename = `${baseName}.${extension}`;
+            } else {
+                console.warn('Category URL image processing failed, using downloaded bytes:', processResult.error);
+            }
+        } catch (processingError) {
+            console.warn('Category URL image processing error, using downloaded bytes:', processingError.message);
+        }
+
+        const uploadResult = await storageService.uploadFile(
+            processedBuffer,
+            processedFilename,
+            processedMimeType,
+            {
+                prefix: 'category_images',
+                uploadedBy: req.user.id,
+                metadata: {
+                    categoryId: category_id,
+                    altText: alt_text || '',
+                    sourceUrl: image_url,
+                },
+            }
+        );
+
+        if (!uploadResult.success) {
+            return res.status(500).json({ error: 'Failed to upload file to cloud storage' });
+        }
+
+        const { data: existingImages } = await supabase
             .from('category_images')
             .select('sort_order')
             .eq('category_id', category_id)
             .order('sort_order', { ascending: false })
             .limit(1);
-            
-        const next_sort_order = (existingImages && existingImages.length > 0) 
-            ? existingImages[0].sort_order + 1 
-            : 0;
-        
-        // If this is primary, unset other primary images
+
+        const next_sort_order =
+            existingImages && existingImages.length > 0 ? existingImages[0].sort_order + 1 : 0;
+
         if (is_primary) {
             await supabase
                 .from('category_images')
                 .update({ is_primary: false })
                 .eq('category_id', category_id);
         }
-        
-        // For URL images, we'll store the original URL
-        // But we could also process it if needed in the future
-        
+
+        const image_url_stored = uploadResult.url;
+
         const { data, error } = await supabase
             .from('category_images')
-            .insert([{
-                category_id,
-                image_url,
-                sort_order: next_sort_order,
-                alt_text: alt_text || '',
-                is_primary: is_primary || false,
-                image_type: 'url'
-            }])
+            .insert([
+                {
+                    category_id,
+                    image_url: image_url_stored,
+                    sort_order: next_sort_order,
+                    alt_text: alt_text || '',
+                    is_primary: is_primary || false,
+                },
+            ])
             .select()
             .single();
 
-        if (error) return res.status(500).json({ error: error.message });
+        if (error || !data) {
+            try {
+                await storageService.deleteFile(uploadResult.url);
+            } catch (deleteError) {
+                console.warn('Could not cleanup uploaded category image:', deleteError.message);
+            }
+            return res.status(500).json({ error: error?.message || 'Failed to save image record' });
+        }
 
-        await supabase.from('admin_logs').insert([{
-            admin_id: req.user.id,
-            action: 'ADD_CATEGORY_IMAGE_URL',
-            entity_type: 'category_image',
-            entity_id: data.id,
-            details: { category_id, image_url, alt_text }
-        }]);
+        await supabase.from('admin_logs').insert([
+            {
+                admin_id: req.user.id,
+                action: 'ADD_CATEGORY_IMAGE_URL',
+                entity_type: 'category_image',
+                entity_id: data.id,
+                details: { category_id, image_url: image_url_stored, source_url: image_url, alt_text },
+            },
+        ]);
 
         res.status(201).json(data);
     } catch (error) {
@@ -3994,6 +4128,7 @@ app.get('/api/admin/storage/config', authenticateAdmin, async (req, res) => {
                 STORAGE_PROVIDER: process.env.STORAGE_PROVIDER || 'auto-detected',
                 GCP_STORAGE_BUCKET: process.env.GCP_STORAGE_BUCKET ? '***configured***' : 'not set',
                 AWS_S3_BUCKET: process.env.AWS_S3_BUCKET ? '***configured***' : 'not set',
+                SUPABASE_STORAGE_BUCKET: process.env.SUPABASE_STORAGE_BUCKET ? '***configured***' : 'not set',
                 STORAGE_FOLDER: process.env.STORAGE_FOLDER || 'product-images'
             }
         });

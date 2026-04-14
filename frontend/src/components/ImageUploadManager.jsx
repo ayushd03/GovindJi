@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect, useId } from 'react';
 import { PhotoIcon, CogIcon, XMarkIcon, CheckIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import './ImageUploadManager.css';
 
@@ -12,8 +12,9 @@ const ImageUploadManager = ({
   showAdvancedSettings = true,
   defaultSettings = {}
 }) => {
-  const [uploadMode, setUploadMode] = useState('file'); // 'file' or 'url'
-  const [showSettings, setShowSettings] = useState(false);
+  /** One visible panel at a time so settings does not push file/URL UI out of the scroll area. */
+  const [activeTab, setActiveTab] = useState('file'); // 'file' | 'url' | 'settings'
+  const processingModeRadioName = `${useId()}-processing-mode`;
   const [dragActive, setDragActive] = useState(false);
   const [errors, setErrors] = useState([]);
   const [selectedFiles, setSelectedFiles] = useState([]);
@@ -53,6 +54,14 @@ const ImageUploadManager = ({
     altText: '',
     isPrimary: false
   });
+
+  const onFilesSelectedRef = useRef(onFilesSelected);
+  onFilesSelectedRef.current = onFilesSelected;
+
+  useEffect(() => {
+    if (!onFilesSelectedRef.current) return;
+    onFilesSelectedRef.current(selectedFiles, settings);
+  }, [settings, selectedFiles]);
 
   const handleDrag = (e) => {
     e.preventDefault();
@@ -141,101 +150,117 @@ const ImageUploadManager = ({
   };
 
   const removeFile = (index) => {
-    const newFiles = selectedFiles.filter((_, i) => i !== index);
-    setSelectedFiles(newFiles);
+    setSelectedFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
   const updateSetting = (path, value) => {
-    setSettings(prev => {
-      const updated = { ...prev };
+    setSettings((prev) => {
       const keys = path.split('.');
-      let current = updated;
-      
+      const next = { ...prev };
+      let cur = next;
       for (let i = 0; i < keys.length - 1; i++) {
-        current = current[keys[i]];
+        const k = keys[i];
+        cur[k] = { ...cur[k] };
+        cur = cur[k];
       }
-      current[keys[keys.length - 1]] = value;
-      
-      return updated;
+      cur[keys[keys.length - 1]] = value;
+      return next;
     });
   };
 
+  const maxSizeLabel =
+    Number.isFinite(maxSize) && maxSize < Number.MAX_SAFE_INTEGER
+      ? `${(maxSize / (1024 * 1024)).toFixed(1)}MB each`
+      : 'no per-file limit';
+
   return (
     <div className="image-upload-manager">
-      {/* Upload Mode Toggle */}
-      <div className="upload-mode-toggle">
+      <div
+        className="upload-tabs"
+        role="tablist"
+        aria-label="Image upload and processing"
+      >
         <button
           type="button"
-          className={`mode-btn ${uploadMode === 'file' ? 'active' : ''}`}
-          onClick={() => setUploadMode('file')}
+          role="tab"
+          aria-selected={activeTab === 'file'}
+          id="upload-tab-file"
+          className={`tab-btn ${activeTab === 'file' ? 'active' : ''}`}
+          onClick={() => setActiveTab('file')}
         >
-          <PhotoIcon className="w-4 h-4 mr-2" />
-          Upload Files
+          <PhotoIcon className="w-4 h-4 shrink-0" aria-hidden />
+          <span>Upload Files</span>
         </button>
         <button
           type="button"
-          className={`mode-btn ${uploadMode === 'url' ? 'active' : ''}`}
-          onClick={() => setUploadMode('url')}
+          role="tab"
+          aria-selected={activeTab === 'url'}
+          id="upload-tab-url"
+          className={`tab-btn ${activeTab === 'url' ? 'active' : ''}`}
+          onClick={() => setActiveTab('url')}
         >
-          <PhotoIcon className="w-4 h-4 mr-2" />
-          From URL
+          <PhotoIcon className="w-4 h-4 shrink-0" aria-hidden />
+          <span>From URL</span>
         </button>
         {showAdvancedSettings && (
           <button
             type="button"
-            className={`settings-btn ${showSettings ? 'active' : ''}`}
-            onClick={() => setShowSettings(!showSettings)}
-            title="Advanced Settings"
+            role="tab"
+            aria-selected={activeTab === 'settings'}
+            id="upload-tab-settings"
+            className={`tab-btn tab-btn-settings ${activeTab === 'settings' ? 'active' : ''}`}
+            onClick={() => setActiveTab('settings')}
+            title="Image processing settings"
           >
-            <CogIcon className="w-4 h-4" />
+            <CogIcon className="w-4 h-4 shrink-0" aria-hidden />
+            <span className="tab-btn-settings-label">Settings</span>
           </button>
         )}
       </div>
 
-      {/* Advanced Settings Panel */}
-      {showSettings && showAdvancedSettings && (
-        <div className="settings-panel">
+      {/* Advanced Settings Panel (tab content) */}
+      {activeTab === 'settings' && showAdvancedSettings && (
+        <div
+          className="settings-panel"
+          role="tabpanel"
+          aria-labelledby="upload-tab-settings"
+          id="upload-panel-settings"
+        >
           <div className="settings-header">
-            <h4>Image Processing Settings</h4>
-            <button
-              type="button"
-              onClick={() => setShowSettings(false)}
-              className="close-settings"
-            >
-              <XMarkIcon className="w-4 h-4" />
-            </button>
+            <h4>Processing</h4>
+            <p className="settings-header-caption">Compression and output apply before upload.</p>
           </div>
 
           <div className="settings-content">
             {/* Mode Selection */}
             <div className="setting-group">
-              <h5>🎯 Processing Mode</h5>
+              <h5>Mode</h5>
               <div className="mode-selector">
                 <label className="mode-option">
                   <input
                     type="radio"
-                    name="processing-mode"
+                    name={processingModeRadioName}
                     value="auto"
                     checked={settings.mode === 'auto'}
                     onChange={(e) => updateSetting('mode', e.target.value)}
                   />
                   <div className="mode-info">
-                    <strong>🚀 Auto Mode</strong>
-                    <p>Automatically optimizes images to your target size using WebP format with smart quality adjustment</p>
+                    <strong>Auto</strong>
+                    <p>Targets a set file size with WebP and adaptive quality.</p>
                   </div>
                 </label>
                 
                 <label className="mode-option">
                   <input
                     type="radio"
-                    name="processing-mode"
+                    name={processingModeRadioName}
                     value="manual"
                     checked={settings.mode === 'manual'}
                     onChange={(e) => updateSetting('mode', e.target.value)}
                   />
                   <div className="mode-info">
-                    <strong>🛠️ Manual Mode</strong>
-                    <p>Full control over compression, format, dimensions, and optimization settings</p>
+                    <strong>Manual</strong>
+                    <p>Choose compression, format, and optimization yourself.</p>
                   </div>
                 </label>
               </div>
@@ -244,11 +269,11 @@ const ImageUploadManager = ({
             {/* Auto Mode Settings */}
             {settings.mode === 'auto' && (
               <div className="setting-group">
-                <h5>🎚️ Auto Mode Configuration</h5>
+                <h5>Target size</h5>
                 <div className="setting-item">
-                  <label className="flex items-center justify-between">
-                    <span>Target File Size</span>
-                    <span className="text-lg font-semibold text-blue-600">{Math.round(settings.targetFileSize / 1024)}KB</span>
+                  <label className="setting-value-row">
+                    <span className="setting-value-label">Output budget</span>
+                    <span className="setting-value-pill tabular-nums">{Math.round(settings.targetFileSize / 1024)} KB</span>
                   </label>
                   <input
                     type="range"
@@ -260,32 +285,20 @@ const ImageUploadManager = ({
                     className="quality-slider"
                   />
                   <div className="slider-labels">
-                    <span>📱 50KB<br/><small>Mobile-friendly</small></span>
-                    <span>💻 500KB<br/><small>High quality</small></span>
+                    <span>50 KB<span className="slider-label-hint">Smaller files</span></span>
+                    <span>500 KB<span className="slider-label-hint">Higher detail</span></span>
                   </div>
                 </div>
                 <div className="auto-mode-info">
-                  <h6 className="font-semibold text-gray-800 mb-2 flex items-center">
-                    ✨ Auto-Applied Optimizations
-                  </h6>
-                  <div className="grid grid-cols-2 gap-2 text-sm">
-                    <div className="flex items-center space-x-2">
-                      <span className="text-green-500">✓</span>
-                      <span>WebP format</span>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <span className="text-green-500">✓</span>
-                      <span>Smart quality</span>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <span className="text-green-500">✓</span>
-                      <span>Metadata removed</span>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <span className="text-green-500">✓</span>
-                      <span>Auto-orientation</span>
-                    </div>
-                  </div>
+                  <h6 className="auto-mode-info-title">Included in auto</h6>
+                  <ul className="auto-mode-info-list">
+                    {['WebP output', 'Adaptive quality', 'Metadata stripped', 'EXIF orientation'].map((label) => (
+                      <li key={label} className="auto-mode-info-item">
+                        <CheckIcon className="auto-mode-info-check" aria-hidden />
+                        <span>{label}</span>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
               </div>
             )}
@@ -295,7 +308,7 @@ const ImageUploadManager = ({
               <>
                 {/* Compression Settings */}
                 <div className="setting-group">
-                  <h5>🗜️ Compression & Quality</h5>
+                  <h5>Compression</h5>
                   <label className="setting-label">
                     <input
                       type="checkbox"
@@ -303,17 +316,17 @@ const ImageUploadManager = ({
                       onChange={(e) => updateSetting('compression.enabled', e.target.checked)}
                     />
                     <div>
-                      <strong>Enable Compression</strong>
-                      <p className="text-xs text-gray-500 mt-1">Reduce file size while maintaining quality</p>
+                      <strong>Enable compression</strong>
+                      <p className="setting-label-hint">Resize and re-encode to reduce file size.</p>
                     </div>
                   </label>
                   
                   {settings.compression.enabled && (
                     <div className="setting-subgroup">
                       <div className="setting-item">
-                        <label className="flex items-center justify-between">
-                          <span>Quality</span>
-                          <span className="text-lg font-semibold text-blue-600">{settings.compression.quality}%</span>
+                        <label className="setting-value-row">
+                          <span className="setting-value-label">Quality</span>
+                          <span className="setting-value-pill tabular-nums">{settings.compression.quality}%</span>
                         </label>
                         <input
                           type="range"
@@ -324,14 +337,14 @@ const ImageUploadManager = ({
                           className="quality-slider"
                         />
                         <div className="slider-labels">
-                          <span>🗜️ 10%<br/><small>Smallest</small></span>
-                          <span>🌟 100%<br/><small>Best quality</small></span>
+                          <span>10%<span className="slider-label-hint">Smaller</span></span>
+                          <span>100%<span className="slider-label-hint">Sharper</span></span>
                         </div>
                       </div>
                       
                       <div className="setting-row">
                         <div className="setting-item">
-                          <label>Max Width (px)</label>
+                          <label>Max width (px)</label>
                           <input
                             type="number"
                             value={settings.compression.maxWidth}
@@ -341,7 +354,7 @@ const ImageUploadManager = ({
                           />
                         </div>
                         <div className="setting-item">
-                          <label>Max Height (px)</label>
+                          <label>Max height (px)</label>
                           <input
                             type="number"
                             value={settings.compression.maxHeight}
@@ -357,25 +370,25 @@ const ImageUploadManager = ({
 
                 {/* Format Settings */}
                 <div className="setting-group">
-                  <h5>📄 Output Format</h5>
+                  <h5>Output format</h5>
                   <div className="setting-item">
-                    <label>Choose output format</label>
+                    <label>Format</label>
                     <select
                       value={settings.format.outputFormat}
                       onChange={(e) => updateSetting('format.outputFormat', e.target.value)}
                       className="format-select"
                     >
-                      <option value="original">📁 Keep Original Format</option>
-                      <option value="webp">🚀 WebP (Best compression)</option>
-                      <option value="jpeg">📷 JPEG (Universal)</option>
-                      <option value="png">🖼️ PNG (Transparency)</option>
+                      <option value="original">Original</option>
+                      <option value="webp">WebP</option>
+                      <option value="jpeg">JPEG</option>
+                      <option value="png">PNG</option>
                     </select>
                   </div>
                 </div>
 
                 {/* Optimization Settings */}
                 <div className="setting-group">
-                  <h5>⚡ Advanced Optimizations</h5>
+                  <h5>Optimization</h5>
                   <label className="setting-label">
                     <input
                       type="checkbox"
@@ -383,8 +396,8 @@ const ImageUploadManager = ({
                       onChange={(e) => updateSetting('optimization.removeMetadata', e.target.checked)}
                     />
                     <div>
-                      <strong>Remove Metadata</strong>
-                      <p className="text-xs text-gray-500 mt-1">Strip EXIF data for smaller files</p>
+                      <strong>Remove metadata</strong>
+                      <p className="setting-label-hint">Strip EXIF for smaller files and privacy.</p>
                     </div>
                   </label>
                   <label className="setting-label">
@@ -395,7 +408,7 @@ const ImageUploadManager = ({
                     />
                     <div>
                       <strong>Progressive JPEG</strong>
-                      <p className="text-xs text-gray-500 mt-1">Loads progressively for better UX</p>
+                      <p className="setting-label-hint">Decode in passes when output is JPEG.</p>
                     </div>
                   </label>
                   <label className="setting-label">
@@ -405,8 +418,8 @@ const ImageUploadManager = ({
                       onChange={(e) => updateSetting('optimization.autoOrient', e.target.checked)}
                     />
                     <div>
-                      <strong>Auto-Orient Images</strong>
-                      <p className="text-xs text-gray-500 mt-1">Fix rotation based on EXIF data</p>
+                      <strong>Auto-orient</strong>
+                      <p className="setting-label-hint">Correct rotation from camera EXIF.</p>
                     </div>
                   </label>
                 </div>
@@ -416,8 +429,8 @@ const ImageUploadManager = ({
         </div>
       )}
 
-      {/* Error Display */}
-      {errors.length > 0 && (
+      {/* Error Display (file validation) */}
+      {activeTab === 'file' && errors.length > 0 && (
         <div className="error-list">
           {errors.map((error, index) => (
             <div key={index} className="error-item">
@@ -429,8 +442,13 @@ const ImageUploadManager = ({
       )}
 
       {/* File Upload Mode */}
-      {uploadMode === 'file' && (
-        <div className="file-upload-section">
+      {activeTab === 'file' && (
+        <div
+          className="file-upload-section"
+          role="tabpanel"
+          aria-labelledby="upload-tab-file"
+          id="upload-panel-file"
+        >
           <div
             className={`upload-dropzone ${dragActive ? 'drag-active' : ''}`}
             onDragEnter={handleDrag}
@@ -455,8 +473,8 @@ const ImageUploadManager = ({
                   {dragActive ? 'Drop files here' : 'Choose files or drag here'}
                 </p>
                 <p className="secondary-text">
-                  Supports: {allowedTypes.map(type => type.split('/')[1].toUpperCase()).join(', ')} 
-                  {' '}(Max {(maxSize / (1024 * 1024)).toFixed(1)}MB each)
+                  Supports: {allowedTypes.map(type => type.split('/')[1].toUpperCase()).join(', ')}
+                  {' '}(Max {maxSizeLabel})
                   {multiple && ` • Up to ${maxFiles} files`}
                 </p>
               </div>
@@ -466,7 +484,7 @@ const ImageUploadManager = ({
           {/* Selected Files Preview */}
           {selectedFiles.length > 0 && (
             <div className="selected-files">
-              <h4>Selected Files ({selectedFiles.length})</h4>
+              <h4 className="selected-files-title">Selected ({selectedFiles.length})</h4>
               <div className="files-list">
                 {selectedFiles.map((file, index) => (
                   <div key={index} className="file-item">
@@ -493,11 +511,16 @@ const ImageUploadManager = ({
       )}
 
       {/* URL Upload Mode */}
-      {uploadMode === 'url' && (
-        <div className="url-upload-section">
+      {activeTab === 'url' && (
+        <div
+          className="url-upload-section"
+          role="tabpanel"
+          aria-labelledby="upload-tab-url"
+          id="upload-panel-url"
+        >
           <form onSubmit={handleUrlSubmit} className="url-form">
             <div className="form-group">
-              <label htmlFor="imageUrl">Image URL *</label>
+              <label htmlFor="imageUrl">Image URL</label>
               <input
                 id="imageUrl"
                 type="url"
@@ -533,22 +556,28 @@ const ImageUploadManager = ({
             </div>
             
             <button type="submit" className="add-url-btn">
-              <CheckIcon className="w-4 h-4 mr-2" />
-              Add Image from URL
+              <CheckIcon className="add-url-btn-icon" aria-hidden />
+              Add from URL
             </button>
           </form>
         </div>
       )}
 
       {/* Settings Summary */}
-      {!showSettings && showAdvancedSettings && (
+      {activeTab !== 'settings' && showAdvancedSettings && (
         <div className="settings-summary">
-          <small className="text-gray-600">
-            Current Mode: <strong className={settings.mode === 'auto' ? 'text-green-600' : 'text-blue-600'}>
-              {settings.mode === 'auto' ? `Auto (${Math.round(settings.targetFileSize / 1024)}KB target, WebP)` : 
-               `Manual (${settings.compression.enabled ? `${settings.compression.quality}% quality` : 'No compression'}, ${settings.format.outputFormat})`}
-            </strong>
-          </small>
+          <span className="settings-summary-label">Active pipeline</span>
+          <span
+            className={
+              settings.mode === 'auto'
+                ? 'settings-summary-value settings-summary-value--auto'
+                : 'settings-summary-value settings-summary-value--manual'
+            }
+          >
+            {settings.mode === 'auto'
+              ? `Auto · ${Math.round(settings.targetFileSize / 1024)} KB · WebP`
+              : `Manual · ${settings.compression.enabled ? `${settings.compression.quality}%` : 'Off'} · ${settings.format.outputFormat}`}
+          </span>
         </div>
       )}
     </div>

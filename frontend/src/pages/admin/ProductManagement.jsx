@@ -781,6 +781,7 @@ const ProductManagement = () => {
 
         <EnhancedImageGalleryManager
           productId={selectedProductForImages?.id}
+          productName={selectedProductForImages?.name}
           isOpen={showImageGallery}
           onClose={handleCloseImageGallery}
           onImagesUpdate={fetchProducts}

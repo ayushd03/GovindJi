@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { PermissionGuard } from '../../components/PermissionGuard';
 import { ADMIN_PERMISSIONS } from '../../enums/roles';
 import ImageUploadManager from '../../components/ImageUploadManager';
@@ -58,6 +58,11 @@ const CategoryManagement = () => {
 
   useEffect(() => {
     fetchCategories();
+  }, []);
+
+  const handleCategoryImageFiles = useCallback((files, settings) => {
+    setImageFiles(files);
+    setImageProcessingSettings(settings);
   }, []);
 
   const fetchCategories = async () => {
@@ -145,9 +150,7 @@ const CategoryManagement = () => {
           imageFormData.append('image', file);
           imageFormData.append('alt_text', `${savedCategory.name} category image`);
           imageFormData.append('is_primary', i === 0 ? 'true' : 'false');
-          if (Object.keys(imageProcessingSettings).length > 0) {
-            imageFormData.append('processing_settings', JSON.stringify(imageProcessingSettings));
-          }
+          imageFormData.append('processing_settings', JSON.stringify(imageProcessingSettings));
           await fetch(`${API_BASE_URL}/api/admin/categories/${savedCategory.id}/images`, {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${token}` },
@@ -355,7 +358,7 @@ const CategoryManagement = () => {
                   <div>
                     <label className="admin-dialog-label">Category Images</label>
                     <ImageUploadManager
-                      onFilesSelected={(files, settings) => { setImageFiles(files); setImageProcessingSettings(settings); }}
+                      onFilesSelected={handleCategoryImageFiles}
                       onUrlSubmit={(urlData) => { setUrlImages(prev => [...prev, urlData]); }}
                       multiple={true}
                       maxFiles={5}
