@@ -143,9 +143,6 @@ const ProductImageGallery = ({ productId, fallbackImageUrl = null }) => {
                     alt={image.alt_text || `Product image ${index + 1}`}
                     onError={(e) => handleImageError(e, 'product')}
                   />
-                  {image.is_primary && (
-                    <span className="product-gallery__thumb-badge">Primary</span>
-                  )}
                 </button>
               ))}
             </div>
@@ -188,10 +185,6 @@ const ProductImageGallery = ({ productId, fallbackImageUrl = null }) => {
           </div>
         </div>
       </div>
-
-      {currentImage.alt_text && (
-        <p className="product-gallery__caption">{currentImage.alt_text}</p>
-      )}
     </div>
   );
 };
