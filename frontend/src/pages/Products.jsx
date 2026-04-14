@@ -26,53 +26,6 @@ const Products = () => {
   const location = useLocation();
   const latestProductsRequestIdRef = useRef(0);
 
-  // Fuzzy search function
-  const fuzzySearch = (searchTerm, text) => {
-    if (!searchTerm || !text) return false;
-    
-    const search = searchTerm.toLowerCase().trim();
-    const target = text.toLowerCase();
-    
-    // Exact match (highest priority)
-    if (target.includes(search)) return true;
-    
-    // Split search term into words for multi-word matching
-    const searchWords = search.split(/\s+/).filter(word => word.length > 0);
-    
-    // Check if all search words are present (word order independent)
-    const allWordsMatch = searchWords.every(word => target.includes(word));
-    if (allWordsMatch) return true;
-    
-    // Fuzzy character matching (allows for typos)
-    // Remove spaces and check if most characters match in order
-    const searchChars = search.replace(/\s/g, '');
-    const targetChars = target.replace(/\s/g, '');
-    
-    if (searchChars.length <= 2) {
-      // For short searches, require exact substring match
-      return targetChars.includes(searchChars);
-    }
-    
-    // For longer searches, allow some character mismatches
-    let matchCount = 0;
-    let targetIndex = 0;
-    
-    for (let i = 0; i < searchChars.length && targetIndex < targetChars.length; i++) {
-      const char = searchChars[i];
-      while (targetIndex < targetChars.length && targetChars[targetIndex] !== char) {
-        targetIndex++;
-      }
-      if (targetIndex < targetChars.length) {
-        matchCount++;
-        targetIndex++;
-      }
-    }
-    
-    // Require at least 80% character match for fuzzy matching
-    const matchRatio = matchCount / searchChars.length;
-    return matchRatio >= 0.8;
-  };
-  
   const [filters, setFilters] = useState({
     search: searchParams.get('search') || '',
     categories: [],
@@ -332,22 +285,6 @@ const Products = () => {
                   <div className="products-display-section">
                     <div>
                       <label className="mb-1.5 block text-sm font-semibold tracking-tight text-slate-900">
-                        Search
-                      </label>
-                      <div className="relative">
-                        <MagnifyingGlassIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                        <input
-                          type="text"
-                          value={filters.search}
-                          onChange={(e) => handleFilterChange('search', e.target.value)}
-                          placeholder="Search products"
-                          className="h-10 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-sm text-slate-700 shadow-sm transition-all duration-200 focus:border-[#23442a]/35 focus:outline-none focus:ring-2 focus:ring-[#23442a]/15"
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="mb-1.5 block text-sm font-semibold tracking-tight text-slate-900">
                         Layout
                       </label>
                       <div className="grid grid-cols-2 gap-1 rounded-2xl bg-white p-1 shadow-[inset_0_0_0_1px_rgba(226,232,240,1)]">
@@ -526,7 +463,48 @@ const Products = () => {
           </motion.div>
 
           <div className="products-results-scroll min-h-0 lg:h-full lg:overflow-y-auto lg:pr-2">
-            {error ? (
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.25 }}
+              className="mb-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm"
+            >
+              <label className="mb-1.5 block text-sm font-semibold tracking-tight text-slate-900">
+                Search
+              </label>
+              <div className="relative">
+                <MagnifyingGlassIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  value={filters.search}
+                  onChange={(e) => handleFilterChange('search', e.target.value)}
+                  placeholder="Search products"
+                  className="h-10 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-sm text-slate-700 shadow-sm transition-all duration-200 focus:border-[#23442a]/35 focus:outline-none focus:ring-2 focus:ring-[#23442a]/15"
+                />
+              </div>
+            </motion.div>
+
+            {isProductsLoading && !isInitialLoading && (
+              <div className="mb-3 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-600 shadow-sm">
+                Updating results...
+              </div>
+            )}
+
+            {isInitialLoading && !error ? (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="rounded-[1.6rem] border border-slate-200 bg-white p-10 text-center shadow-[0_14px_34px_rgba(15,23,42,0.05)]"
+              >
+                <div className="page-container flex items-center justify-center py-10">
+                  <motion.div
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+                    className="h-10 w-10 rounded-full border-[3px] border-[#23442a]/20 border-t-[#23442a]"
+                  />
+                </div>
+              </motion.div>
+            ) : error ? (
               <motion.div 
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
