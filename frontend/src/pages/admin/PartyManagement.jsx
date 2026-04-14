@@ -104,6 +104,57 @@ const PartyManagement = () => {
     });
   }, [toast]);
 
+  const fetchAllPaginatedData = useCallback(async ({
+    endpoint,
+    dataKey,
+    token,
+    query = {}
+  }) => {
+    const pageSize = 200;
+    const aggregated = [];
+    let page = 1;
+
+    while (page <= 1000) {
+      const queryParams = new URLSearchParams({
+        ...query,
+        page: page.toString(),
+        limit: pageSize.toString(),
+      });
+
+      const response = await fetch(`${API_BASE_URL}${endpoint}?${queryParams}`, {
+        cache: 'no-store',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch paginated data for ${dataKey}`);
+      }
+
+      const payload = await response.json();
+      const records = payload[dataKey];
+      const pagination = payload.pagination;
+
+      if (!Array.isArray(records) || !pagination || typeof pagination !== 'object') {
+        throw new Error(`Invalid paginated response for ${dataKey}`);
+      }
+
+      aggregated.push(...records);
+
+      if (!pagination.hasNextPage) {
+        return aggregated;
+      }
+
+      page += 1;
+    }
+
+    throw new Error(`Exceeded pagination safety limit for ${dataKey}`);
+  }, []);
+
   const fetchParties = useCallback(async (page = 1, limit = itemsPerPage) => {
     if (page === 1) setLoading(true);
     try {
@@ -128,8 +179,16 @@ const PartyManagement = () => {
       if (!response.ok) throw new Error('Failed to fetch parties');
 
       const data = await response.json();
-      setParties(data.parties || data);
-      setTotalParties(data.total || data.length || 0);
+      const nextParties = Array.isArray(data.parties) ? data.parties : [];
+      const pagination = data.pagination;
+
+      if (!pagination || typeof pagination !== 'object') {
+        throw new Error('Invalid parties response format');
+      }
+
+      setParties(nextParties);
+      setTotalParties(Number(pagination.total) || 0);
+      setError(null);
     } catch (err) {
       setError(err.message);
       showError('Failed to load parties');
@@ -162,8 +221,16 @@ const PartyManagement = () => {
       if (!response.ok) throw new Error('Failed to fetch archived parties');
 
       const data = await response.json();
-      setArchivedParties(data.parties || data);
-      setTotalArchivedParties(data.total || data.length || 0);
+      const nextParties = Array.isArray(data.parties) ? data.parties : [];
+      const pagination = data.pagination;
+
+      if (!pagination || typeof pagination !== 'object') {
+        throw new Error('Invalid archived parties response format');
+      }
+
+      setArchivedParties(nextParties);
+      setTotalArchivedParties(Number(pagination.total) || 0);
+      setError(null);
     } catch (err) {
       setError(err.message);
       showError('Failed to load archived parties');
@@ -178,19 +245,20 @@ const PartyManagement = () => {
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (currentPage === 1) {
-        if (viewMode === 'active') {
-          fetchParties(1);
-        } else if (viewMode === 'archived') {
-          fetchArchivedParties(1);
-        }
-      } else {
+      if (currentPage !== 1) {
         setCurrentPage(1);
+        return;
+      }
+
+      if (viewMode === 'active') {
+        fetchParties(1);
+      } else if (viewMode === 'archived') {
+        fetchArchivedParties(1);
       }
     }, 500);
 
     return () => clearTimeout(timer);
-  }, [currentPage, fetchArchivedParties, fetchParties, searchTerm, selectedCategory, selectedGstType, selectedState, viewMode]);
+  }, [fetchArchivedParties, fetchParties, searchTerm, selectedCategory, selectedGstType, selectedState, viewMode]);
 
   const currentTotal = viewMode === 'active' ? totalParties : totalArchivedParties;
   const currentPartiesList = viewMode === 'active' ? parties : archivedParties;
@@ -339,35 +407,22 @@ const PartyManagement = () => {
     setVendorDetailsLoading(true);
     try {
       const token = localStorage.getItem('authToken');
-      const ts = Date.now();
-      const ordersUrl = `${API_BASE_URL}/api/admin/purchase-orders?party_id=${partyId}&limit=1000&__ts=${ts}`;
-      const paymentsUrl = `${API_BASE_URL}/api/admin/party-payments?party_id=${partyId}&limit=1000&__ts=${ts}`;
-
-      const commonOpts = {
-        cache: 'no-store',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-          'Cache-Control': 'no-cache',
-          'Pragma': 'no-cache'
-        }
-      };
-
-      const [ordersResponse, paymentsResponse] = await Promise.all([
-        fetch(ordersUrl, commonOpts),
-        fetch(paymentsUrl, commonOpts)
+      const [orders, payments] = await Promise.all([
+        fetchAllPaginatedData({
+          endpoint: '/api/admin/purchase-orders',
+          dataKey: 'purchase_orders',
+          token,
+          query: { party_id: partyId }
+        }),
+        fetchAllPaginatedData({
+          endpoint: '/api/admin/party-payments',
+          dataKey: 'payments',
+          token,
+          query: { party_id: partyId }
+        })
       ]);
-
-      if (!ordersResponse.ok || !paymentsResponse.ok) {
-        throw new Error('Failed to fetch vendor details');
-      }
-
-      const ordersData = await ordersResponse.json();
-      const paymentsData = await paymentsResponse.json();
-
-      const orders = ordersData.purchase_orders || [];
       setVendorOrders(orders);
-      setVendorPayments(paymentsData.payments || []);
+      setVendorPayments(payments);
 
       // Extract all items from all purchase orders
       const allItems = [];

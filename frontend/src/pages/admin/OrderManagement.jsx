@@ -13,6 +13,8 @@ import {
   EyeIcon,
   FunnelIcon,
   TruckIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
   XCircleIcon,
   XMarkIcon
 } from '@heroicons/react/24/outline';
@@ -52,6 +54,10 @@ const OrderManagement = () => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedStatus, setSelectedStatus] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(20);
+  const [totalOrders, setTotalOrders] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [deliveryDetailsLoading, setDeliveryDetailsLoading] = useState(false);
   const [deliveryDetailsError, setDeliveryDetailsError] = useState('');
@@ -66,16 +72,30 @@ const OrderManagement = () => {
     window.scrollTo(0, 0);
   }, []);
 
-  const fetchOrders = useCallback(async () => {
+  const fetchOrders = useCallback(async (page = currentPage) => {
     try {
       setLoading(true);
-      const params = selectedStatus ? { status: selectedStatus } : undefined;
+      const params = {
+        page,
+        limit: itemsPerPage,
+        ...(selectedStatus ? { status: selectedStatus } : {})
+      };
       const response = await adminOrdersAPI.getAll(params);
-      const nextOrders = response.data || [];
+      const payload = response.data;
+      const nextOrders = Array.isArray(payload?.orders) ? payload.orders : [];
+      const pagination = payload?.pagination;
+
+      if (!pagination || typeof pagination !== 'object') {
+        throw new Error('Invalid orders response format');
+      }
+
       setOrders(nextOrders);
+      setTotalOrders(Number(pagination.total) || 0);
+      setTotalPages(Math.max(1, Number(pagination.totalPages) || 1));
+      setCurrentPage(Number(pagination.page) || page);
       setSelectedOrder((prev) => {
         if (!prev) return prev;
-        return nextOrders.find((order) => order.id === prev.id) || prev;
+        return nextOrders.find((order) => order.id === prev.id) || null;
       });
     } catch (error) {
       console.error('Error fetching orders:', error);
@@ -87,11 +107,11 @@ const OrderManagement = () => {
     } finally {
       setLoading(false);
     }
-  }, [selectedStatus, toast]);
+  }, [currentPage, itemsPerPage, selectedStatus, toast]);
 
   useEffect(() => {
-    fetchOrders();
-  }, [fetchOrders]);
+    fetchOrders(currentPage);
+  }, [currentPage, fetchOrders]);
 
   const fetchDeliveryDetails = useCallback(async (orderId) => {
     if (!orderId) return;
@@ -340,6 +360,12 @@ const OrderManagement = () => {
     setCancelDialogOrder(null);
   };
 
+  const handlePageChange = (page) => {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page);
+    }
+  };
+
   const closeCancelDialog = () => {
     if (!cancellingOrder) {
       setCancelDialogOrder(null);
@@ -393,7 +419,10 @@ const OrderManagement = () => {
                 <FunnelIcon className="input-icon-left" />
                 <select
                   value={selectedStatus}
-                  onChange={(event) => setSelectedStatus(event.target.value)}
+                  onChange={(event) => {
+                    setSelectedStatus(event.target.value);
+                    setCurrentPage(1);
+                  }}
                   className="input-field input-with-left-icon w-full min-w-[170px] pr-8 text-[13px]"
                 >
                   {statusOptions.map((option) => (
@@ -554,6 +583,31 @@ const OrderManagement = () => {
                   </div>
                 ))}
               </div>
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between border-t px-4 py-3 sm:px-6">
+                  <div className="text-xs sm:text-sm text-muted-foreground">
+                    Page <span className="font-medium text-foreground">{currentPage}</span> of <span className="font-medium text-foreground">{totalPages}</span> • <span className="font-medium text-foreground">{totalOrders}</span> total
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handlePageChange(currentPage - 1)}
+                      disabled={currentPage === 1}
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-md border text-muted-foreground hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <ChevronLeftIcon className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handlePageChange(currentPage + 1)}
+                      disabled={currentPage === totalPages}
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-md border text-muted-foreground hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <ChevronRightIcon className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              )}
             </>
           )}
         </div>

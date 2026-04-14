@@ -14,6 +14,13 @@ const buildCacheKey = ({ endpoint, term = '', filters = {}, limit = 10, offset =
   return JSON.stringify({ endpoint, term, filters, limit, offset });
 };
 
+const parseSearchResponse = (responseBody) => {
+  if (!responseBody || typeof responseBody !== 'object' || typeof responseBody.data !== 'object' || responseBody.data === null) {
+    throw new Error('Invalid search response format');
+  }
+  return responseBody.data;
+};
+
 const apiCall = async (endpoint, queryParams = {}) => {
   const token = localStorage.getItem('authToken');
 
@@ -32,8 +39,8 @@ const apiCall = async (endpoint, queryParams = {}) => {
     throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
   }
 
-  const data = await response.json();
-  return data.data || data; // Handle wrapped responses
+  const responseBody = await response.json();
+  return parseSearchResponse(responseBody);
 };
 
 export const prefetchApiSearch = async (endpoint, { limit = 20, filters = {} } = {}) => {

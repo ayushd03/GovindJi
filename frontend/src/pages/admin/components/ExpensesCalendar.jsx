@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin from '@fullcalendar/interaction';
@@ -34,6 +34,7 @@ const ExpensesCalendar = ({ scope, dateRange, onRangeChange, filters, onSelectEx
   const [events, setEvents] = useState([]);
   const [dayItems, setDayItems] = useState(new Map()); // date -> { products: [...], pos: [...], otherExpenses: [...], payments: [...] }
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState('');
   const [detailDay, setDetailDay] = useState(null); // iso date string for modal
   const [detailPO, setDetailPO] = useState(null); // purchase order for modal
   const calendarRef = useRef(null);
@@ -120,6 +121,87 @@ const ExpensesCalendar = ({ scope, dateRange, onRangeChange, filters, onSelectEx
     }
   }, [dateRange, scope]);
 
+  const fetchAllExpenseHistory = useCallback(async ({ authToken, range, activeFilters }) => {
+    const collected = [];
+    let page = 1;
+
+    while (page <= 1000) {
+      const txnParams = new URLSearchParams({
+        page: page.toString(),
+        limit: '200',
+        ...(activeFilters.searchTerm && { search: activeFilters.searchTerm }),
+        ...(activeFilters.selectedCategory && { category: activeFilters.selectedCategory }),
+        ...(activeFilters.selectedPaymentMethod && { payment_method: activeFilters.selectedPaymentMethod }),
+        ...(range.start_date && { start_date: range.start_date }),
+        ...(range.end_date && { end_date: range.end_date })
+      });
+
+      const txnRes = await fetch(`${API_BASE_URL}/api/admin/expenses/history?${txnParams.toString()}`, {
+        headers: { 'Authorization': `Bearer ${authToken}` }
+      });
+
+      if (!txnRes.ok) {
+        throw new Error('Failed to fetch expense history');
+      }
+
+      const txnPayload = await txnRes.json();
+      if (!txnPayload?.success || !txnPayload.data || typeof txnPayload.data !== 'object') {
+        throw new Error('Invalid expense history response format');
+      }
+
+      const rows = Array.isArray(txnPayload.data.expenses) ? txnPayload.data.expenses : [];
+      const pagination = txnPayload.data.pagination;
+      if (!pagination || typeof pagination !== 'object') {
+        throw new Error('Invalid expense history pagination');
+      }
+
+      collected.push(...rows);
+      if (!pagination.hasNextPage) {
+        return collected;
+      }
+      page += 1;
+    }
+
+    throw new Error('Expense history pagination exceeded safety limit');
+  }, []);
+
+  const fetchAllPurchaseOrders = useCallback(async ({ authToken, range }) => {
+    const collected = [];
+    let page = 1;
+
+    while (page <= 1000) {
+      const poParams = new URLSearchParams({
+        page: page.toString(),
+        limit: '200',
+        ...(range.start_date && { start_date: range.start_date }),
+        ...(range.end_date && { end_date: range.end_date })
+      });
+
+      const poRes = await fetch(`${API_BASE_URL}/api/admin/purchase-orders?${poParams.toString()}`, {
+        headers: { 'Authorization': `Bearer ${authToken}` }
+      });
+
+      if (!poRes.ok) {
+        throw new Error('Failed to fetch purchase orders for calendar');
+      }
+
+      const poPayload = await poRes.json();
+      const rows = Array.isArray(poPayload.purchase_orders) ? poPayload.purchase_orders : [];
+      const pagination = poPayload.pagination;
+      if (!pagination || typeof pagination !== 'object') {
+        throw new Error('Invalid purchase order pagination format');
+      }
+
+      collected.push(...rows);
+      if (!pagination.hasNextPage) {
+        return collected;
+      }
+      page += 1;
+    }
+
+    throw new Error('Purchase order pagination exceeded safety limit');
+  }, []);
+
   useEffect(() => {
     const fetchForRange = async () => {
       // Check if we've already fetched this exact range to prevent duplicate calls
@@ -133,44 +215,21 @@ const ExpensesCalendar = ({ scope, dateRange, onRangeChange, filters, onSelectEx
       lastFetchedRange.current = rangeKey;
       
       setLoading(true);
+      setLoadError('');
       try {
         const authToken = localStorage.getItem('authToken');
 
-        // 1) Fetch unified transactions for the range (to keep non-PO expenses/payments)
-        const txnParams = new URLSearchParams({
-          page: '1',
-          limit: '500',
-          ...(filters.searchTerm && { search: filters.searchTerm }),
-          ...(filters.selectedCategory && { category: filters.selectedCategory }),
-          ...(filters.selectedPaymentMethod && { payment_method: filters.selectedPaymentMethod }),
-          ...(effectiveRange.start_date && { start_date: effectiveRange.start_date }),
-          ...(effectiveRange.end_date && { end_date: effectiveRange.end_date })
-        });
-        const txnRes = await fetch(`${API_BASE_URL}/api/admin/expenses/history?${txnParams.toString()}`, {
-          headers: { 'Authorization': `Bearer ${authToken}` }
-        });
-        const txnPayload = await txnRes.json();
-        const txnItems = (txnPayload.data || txnPayload).expenses || [];
-
-        // 2) Fetch purchase orders for the same range (to show products)
-        const poParams = new URLSearchParams({
-          page: '1',
-          limit: '500',
-          ...(effectiveRange.start_date && { start_date: effectiveRange.start_date }),
-          ...(effectiveRange.end_date && { end_date: effectiveRange.end_date })
-        });
-        let poItems = [];
-        try {
-          const poRes = await fetch(`${API_BASE_URL}/api/admin/purchase-orders?${poParams.toString()}`, {
-            headers: { 'Authorization': `Bearer ${authToken}` }
-          });
-          if (poRes.ok) {
-            const poPayload = await poRes.json();
-            // server returns either {data, total,...} or array
-            const list = Array.isArray(poPayload) ? poPayload : (poPayload.data || poPayload.purchase_orders || []);
-            poItems = list || [];
-          }
-        } catch {}
+        const [txnItems, poItems] = await Promise.all([
+          fetchAllExpenseHistory({
+            authToken,
+            range: effectiveRange,
+            activeFilters: filters || {}
+          }),
+          fetchAllPurchaseOrders({
+            authToken,
+            range: effectiveRange
+          })
+        ]);
 
         // Group items by date and create product-focused events
         const eventsByDate = new Map();
@@ -318,8 +377,7 @@ const ExpensesCalendar = ({ scope, dateRange, onRangeChange, filters, onSelectEx
         setDayItems(map);
       } catch (err) {
         console.error('Error fetching calendar data:', err);
-        // Show error to user but don't silently fail
-        alert(`Failed to load calendar data: ${err.message || 'Unknown error'}`);
+        setLoadError('Failed to load calendar data for the selected range.');
         setEvents([]);
         setDayItems(new Map());
       } finally {
@@ -327,7 +385,7 @@ const ExpensesCalendar = ({ scope, dateRange, onRangeChange, filters, onSelectEx
       }
     };
     fetchForRange();
-  }, [effectiveRange.start_date, effectiveRange.end_date, filters?.searchTerm, filters?.selectedCategory, filters?.selectedPaymentMethod]);
+  }, [effectiveRange.start_date, effectiveRange.end_date, fetchAllExpenseHistory, fetchAllPurchaseOrders, filters?.searchTerm, filters?.selectedCategory, filters?.selectedPaymentMethod]);
 
   // Build simple day grid
   const days = useMemo(() => {
@@ -429,6 +487,11 @@ const ExpensesCalendar = ({ scope, dateRange, onRangeChange, filters, onSelectEx
 
   return (
     <div className="h-full flex flex-col relative">
+      {loadError && (
+        <div className="mx-4 mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          {loadError}
+        </div>
+      )}
       {loading && (
         <div className="calendar-loading-overlay">
           <div className="calendar-spinner">
@@ -1052,5 +1115,3 @@ const ExpensesCalendar = ({ scope, dateRange, onRangeChange, filters, onSelectEx
 };
 
 export default ExpensesCalendar;
-
-

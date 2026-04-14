@@ -53,6 +53,7 @@ const EmployeeManagement = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(ITEMS_PER_PAGE);
   const [totalEmployees, setTotalEmployees] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
   
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRole, setSelectedRole] = useState('');
@@ -104,8 +105,18 @@ const EmployeeManagement = () => {
       if (!response.ok) throw new Error('Failed to fetch employees');
 
       const data = await response.json();
-      setEmployees(data.employees || data);
-      setTotalEmployees(data.total || data.length || 0);
+      const nextEmployees = Array.isArray(data.employees) ? data.employees : [];
+      const pagination = data.pagination;
+
+      if (!pagination || typeof pagination !== 'object') {
+        throw new Error('Invalid employees response format');
+      }
+
+      setEmployees(nextEmployees);
+      setTotalEmployees(Number(pagination.total) || 0);
+      setTotalPages(Math.max(1, Number(pagination.totalPages) || 1));
+      setCurrentPage(Number(pagination.page) || page);
+      setError(null);
     } catch (err) {
       setError(err.message);
       showError('Failed to load employees');
@@ -120,13 +131,15 @@ const EmployeeManagement = () => {
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (currentPage === 1) fetchEmployees(1);
-      else setCurrentPage(1);
+      if (currentPage !== 1) {
+        setCurrentPage(1);
+        return;
+      }
+      fetchEmployees(1);
     }, 500);
     return () => clearTimeout(timer);
-  }, [currentPage, fetchEmployees, searchTerm, selectedRole]);
+  }, [fetchEmployees, searchTerm, selectedRole]);
 
-  const totalPages = Math.ceil(totalEmployees / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = Math.min(startIndex + itemsPerPage, totalEmployees);
 
@@ -330,7 +343,9 @@ const EmployeeManagement = () => {
           <CardHeader className="pb-4">
             <div className="flex items-center justify-between">
               <CardTitle>Employees ({totalEmployees})</CardTitle>
-              <div className="text-sm text-muted-foreground">Showing {startIndex + 1}-{endIndex} of {totalEmployees}</div>
+              <div className="text-sm text-muted-foreground">
+                {totalEmployees > 0 ? `Showing ${startIndex + 1}-${endIndex} of ${totalEmployees}` : 'No records'}
+              </div>
             </div>
           </CardHeader>
           <CardContent className="p-0">

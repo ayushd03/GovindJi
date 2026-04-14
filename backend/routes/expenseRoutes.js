@@ -2,6 +2,12 @@ const express = require('express');
 const { createClient } = require('@supabase/supabase-js');
 const roleMiddleware = require('../middleware/roleMiddleware');
 const { asyncHandler, logger, sendSuccess, sendError } = require('../middleware/errorHandler');
+const {
+  parsePageLimit,
+  parseOffsetLimit,
+  buildPagePagination,
+  buildOffsetPagination
+} = require('../utils/pagination');
 
 const router = express.Router();
 
@@ -17,6 +23,81 @@ const { validateTransactionFields: validateTxnFields, getTransactionTypeById } =
  * Expense Management API
  * Handles all expense-related transactions
  */
+
+const normalizeString = (value) => (typeof value === 'string' ? value.trim() : '');
+
+const applyExpenseFilters = (query, filters = {}) => {
+  const {
+    search = '',
+    category = '',
+    start_date,
+    end_date,
+    min_amount,
+    max_amount
+  } = filters;
+
+  const normalizedSearch = normalizeString(search);
+  const normalizedCategory = normalizeString(category);
+
+  if (normalizedSearch) {
+    query = query.or(`description.ilike.%${normalizedSearch}%,reference_number.ilike.%${normalizedSearch}%,notes.ilike.%${normalizedSearch}%`);
+  }
+
+  if (normalizedCategory) {
+    query = query.eq('expense_category', normalizedCategory);
+  }
+
+  if (start_date) {
+    query = query.gte('transaction_date', start_date);
+  }
+
+  if (end_date) {
+    query = query.lte('transaction_date', end_date);
+  }
+
+  if (min_amount !== undefined && min_amount !== null && min_amount !== '') {
+    const parsedMin = Number.parseFloat(min_amount);
+    if (Number.isFinite(parsedMin)) {
+      query = query.gte('total_amount', parsedMin);
+    }
+  }
+
+  if (max_amount !== undefined && max_amount !== null && max_amount !== '') {
+    const parsedMax = Number.parseFloat(max_amount);
+    if (Number.isFinite(parsedMax)) {
+      query = query.lte('total_amount', parsedMax);
+    }
+  }
+
+  return query;
+};
+
+const applyPaymentMethodFilter = async (query, paymentMethod) => {
+  const normalizedPaymentMethod = normalizeString(paymentMethod);
+  if (!normalizedPaymentMethod) {
+    return { query, noResults: false, paymentMethod: '' };
+  }
+
+  const { data: matchingPayments, error } = await supabase
+    .from('party_payments')
+    .select('id')
+    .eq('payment_method', normalizedPaymentMethod);
+
+  if (error) {
+    throw error;
+  }
+
+  const paymentIds = (matchingPayments || []).map((payment) => payment.id);
+  if (paymentIds.length === 0) {
+    return { query, noResults: true, paymentMethod: normalizedPaymentMethod };
+  }
+
+  return {
+    query: query.in('party_payment_id', paymentIds),
+    noResults: false,
+    paymentMethod: normalizedPaymentMethod
+  };
+};
 
 // Main expense transaction endpoint
 router.post('/', 
@@ -277,14 +358,15 @@ router.get('/search/parties',
     const { 
       q = '', 
       party_type = '', 
-      limit = 10, 
-      offset = 0 
     } = req.query;
 
-    // Validate limit to prevent abuse
-    const maxLimit = 50;
-    const parsedLimit = Math.min(parseInt(limit) || 10, maxLimit);
-    const parsedOffset = parseInt(offset) || 0;
+    const { limit, offset } = parseOffsetLimit(req.query, {
+      defaultLimit: 10,
+      minLimit: 1,
+      maxLimit: 50
+    });
+    const normalizedQuery = normalizeString(q);
+    const normalizedPartyType = normalizeString(party_type);
 
     // Build the query
     let query = supabase
@@ -293,19 +375,19 @@ router.get('/search/parties',
       .eq('is_active', true);
 
     // Add search filter if provided
-    if (q.trim()) {
-      query = query.or(`name.ilike.%${q}%,contact_person.ilike.%${q}%,phone_number.ilike.%${q}%,email.ilike.%${q}%`);
+    if (normalizedQuery) {
+      query = query.or(`name.ilike.%${normalizedQuery}%,contact_person.ilike.%${normalizedQuery}%,phone_number.ilike.%${normalizedQuery}%,email.ilike.%${normalizedQuery}%`);
     }
 
     // Add party type filter if provided
-    if (party_type) {
-      query = query.eq('party_type', party_type);
+    if (normalizedPartyType) {
+      query = query.eq('party_type', normalizedPartyType);
     }
 
     // Add pagination and ordering
     query = query
       .order('name')
-      .range(parsedOffset, parsedOffset + parsedLimit - 1);
+      .range(offset, offset + limit - 1);
 
     const { data: parties, error, count } = await query;
 
@@ -317,24 +399,24 @@ router.get('/search/parties',
       .select('id', { count: 'exact', head: true })
       .eq('is_active', true);
 
-    if (q.trim()) {
-      countQuery = countQuery.or(`name.ilike.%${q}%,contact_person.ilike.%${q}%,phone_number.ilike.%${q}%,email.ilike.%${q}%`);
+    if (normalizedQuery) {
+      countQuery = countQuery.or(`name.ilike.%${normalizedQuery}%,contact_person.ilike.%${normalizedQuery}%,phone_number.ilike.%${normalizedQuery}%,email.ilike.%${normalizedQuery}%`);
     }
 
-    if (party_type) {
-      countQuery = countQuery.eq('party_type', party_type);
+    if (normalizedPartyType) {
+      countQuery = countQuery.eq('party_type', normalizedPartyType);
     }
 
     const { count: totalCount } = await countQuery;
+    const pagination = buildOffsetPagination({
+      total: totalCount || 0,
+      offset,
+      limit
+    });
 
     const result = {
       parties: parties || [],
-      pagination: {
-        limit: parsedLimit,
-        offset: parsedOffset,
-        total: totalCount || 0,
-        hasMore: (parsedOffset + parsedLimit) < (totalCount || 0)
-      }
+      pagination
     };
 
     sendSuccess(res, result, 'Parties retrieved successfully');
@@ -347,14 +429,15 @@ router.get('/search/products',
     const { 
       q = '', 
       category_id = '', 
-      limit = 10, 
-      offset = 0 
     } = req.query;
 
-    // Validate limit to prevent abuse
-    const maxLimit = 50;
-    const parsedLimit = Math.min(parseInt(limit) || 10, maxLimit);
-    const parsedOffset = parseInt(offset) || 0;
+    const { limit, offset } = parseOffsetLimit(req.query, {
+      defaultLimit: 10,
+      minLimit: 1,
+      maxLimit: 50
+    });
+    const normalizedQuery = normalizeString(q);
+    const normalizedCategoryId = normalizeString(category_id);
 
     // Build the query
     let query = supabase
@@ -363,19 +446,19 @@ router.get('/search/products',
       .eq('is_active', true);
 
     // Add search filter if provided
-    if (q.trim()) {
-      query = query.or(`name.ilike.%${q}%,sku.ilike.%${q}%,description.ilike.%${q}%`);
+    if (normalizedQuery) {
+      query = query.or(`name.ilike.%${normalizedQuery}%,sku.ilike.%${normalizedQuery}%,description.ilike.%${normalizedQuery}%`);
     }
 
     // Add category filter if provided
-    if (category_id) {
-      query = query.eq('category_id', category_id);
+    if (normalizedCategoryId) {
+      query = query.eq('category_id', normalizedCategoryId);
     }
 
     // Add pagination and ordering
     query = query
       .order('name')
-      .range(parsedOffset, parsedOffset + parsedLimit - 1);
+      .range(offset, offset + limit - 1);
 
     const { data: products, error } = await query;
 
@@ -387,24 +470,24 @@ router.get('/search/products',
       .select('id', { count: 'exact', head: true })
       .eq('is_active', true);
 
-    if (q.trim()) {
-      countQuery = countQuery.or(`name.ilike.%${q}%,sku.ilike.%${q}%,description.ilike.%${q}%`);
+    if (normalizedQuery) {
+      countQuery = countQuery.or(`name.ilike.%${normalizedQuery}%,sku.ilike.%${normalizedQuery}%,description.ilike.%${normalizedQuery}%`);
     }
 
-    if (category_id) {
-      countQuery = countQuery.eq('category_id', category_id);
+    if (normalizedCategoryId) {
+      countQuery = countQuery.eq('category_id', normalizedCategoryId);
     }
 
     const { count: totalCount } = await countQuery;
+    const pagination = buildOffsetPagination({
+      total: totalCount || 0,
+      offset,
+      limit
+    });
 
     const result = {
       products: products || [],
-      pagination: {
-        limit: parsedLimit,
-        offset: parsedOffset,
-        total: totalCount || 0,
-        hasMore: (parsedOffset + parsedLimit) < (totalCount || 0)
-      }
+      pagination
     };
 
     sendSuccess(res, result, 'Products retrieved successfully');
@@ -432,8 +515,6 @@ router.get('/history',
   roleMiddleware.requirePermission(roleMiddleware.ADMIN_PERMISSIONS.VIEW_EXPENSES),
   asyncHandler(async (req, res) => {
     const {
-      page = 1,
-      limit = 20,
       search = '',
       category = '',
       payment_method = '',
@@ -442,8 +523,12 @@ router.get('/history',
       min_amount,
       max_amount
     } = req.query;
-
-    const offset = (parseInt(page) - 1) * parseInt(limit);
+    const { page, limit, offset } = parsePageLimit(req.query, {
+      defaultLimit: 20,
+      minLimit: 1,
+      maxLimit: 100
+    });
+    const normalizedPaymentMethod = normalizeString(payment_method);
 
     // Build query with payment details from party_payments
     let query = supabase
@@ -456,62 +541,69 @@ router.get('/history',
       .order('transaction_date', { ascending: false })
       .order('created_at', { ascending: false });
 
-    // Apply filters
-    if (search) {
-      query = query.or(`description.ilike.%${search}%,reference_number.ilike.%${search}%,notes.ilike.%${search}%`);
-    }
+    query = applyExpenseFilters(query, {
+      search,
+      category,
+      start_date,
+      end_date,
+      min_amount,
+      max_amount
+    });
 
-    if (category) {
-      query = query.eq('expense_category', category);
-    }
+    const paymentFilterResult = await applyPaymentMethodFilter(query, normalizedPaymentMethod);
+    if (paymentFilterResult.noResults) {
+      const pagination = buildPagePagination({
+        total: 0,
+        page,
+        limit
+      });
 
-    // Note: payment_method filtering done client-side after fetch (see below)
+      logger.info('Expense history retrieved', {
+        user_id: req.user?.id,
+        page,
+        total_count: 0,
+        returned_count: 0,
+        filters: { search: normalizeString(search), category: normalizeString(category), payment_method: normalizedPaymentMethod, start_date, end_date, min_amount, max_amount }
+      });
 
-    if (start_date) {
-      query = query.gte('transaction_date', start_date);
+      return sendSuccess(res, {
+        expenses: [],
+        pagination,
+        total: pagination.total,
+        page: pagination.page,
+        limit: pagination.limit,
+        totalPages: pagination.totalPages
+      }, 'Expense history retrieved successfully');
     }
-
-    if (end_date) {
-      query = query.lte('transaction_date', end_date);
-    }
-
-    if (min_amount) {
-      query = query.gte('total_amount', parseFloat(min_amount));
-    }
-
-    if (max_amount) {
-      query = query.lte('total_amount', parseFloat(max_amount));
-    }
+    query = paymentFilterResult.query;
 
     // Apply pagination
-    query = query.range(offset, offset + parseInt(limit) - 1);
+    query = query.range(offset, offset + limit - 1);
 
     const { data: expenses, error, count } = await query;
 
     if (error) throw error;
-
-    // Filter by payment method client-side if specified
-    let filteredExpenses = expenses || [];
-    if (payment_method && filteredExpenses.length > 0) {
-      filteredExpenses = filteredExpenses.filter(expense =>
-        expense.payment?.payment_method === payment_method
-      );
-    }
+    const pagination = buildPagePagination({
+      total: count || 0,
+      page,
+      limit
+    });
 
     logger.info('Expense history retrieved', {
       user_id: req.user?.id,
-      page: parseInt(page),
-      total_count: count,
-      filtered_count: filteredExpenses.length,
-      filters: { search, category, payment_method, start_date, end_date, min_amount, max_amount }
+      page: pagination.page,
+      total_count: pagination.total,
+      returned_count: (expenses || []).length,
+      filters: { search: normalizeString(search), category: normalizeString(category), payment_method: normalizedPaymentMethod, start_date, end_date, min_amount, max_amount }
     });
 
     sendSuccess(res, {
-      expenses: filteredExpenses,
-      total: filteredExpenses.length,
-      page: parseInt(page),
-      limit: parseInt(limit),
-      totalPages: Math.ceil(filteredExpenses.length / parseInt(limit))
+      expenses: expenses || [],
+      pagination,
+      total: pagination.total,
+      page: pagination.page,
+      limit: pagination.limit,
+      totalPages: pagination.totalPages
     }, 'Expense history retrieved successfully');
   }));
 
@@ -529,6 +621,8 @@ router.get('/export',
       max_amount
     } = req.query;
 
+    const normalizedPaymentMethod = normalizeString(payment_method);
+
     // Build query (without pagination for export)
     let query = supabase
       .from('unified_transactions')
@@ -540,44 +634,30 @@ router.get('/export',
       .order('transaction_date', { ascending: false })
       .order('created_at', { ascending: false });
 
-    // Apply same filters as history endpoint
-    if (search) {
-      query = query.or(`description.ilike.%${search}%,reference_number.ilike.%${search}%,notes.ilike.%${search}%`);
+    query = applyExpenseFilters(query, {
+      search,
+      category,
+      start_date,
+      end_date,
+      min_amount,
+      max_amount
+    });
+
+    const paymentFilterResult = await applyPaymentMethodFilter(query, normalizedPaymentMethod);
+    if (paymentFilterResult.noResults) {
+      query = null;
+    } else {
+      query = paymentFilterResult.query;
     }
 
-    if (category) {
-      query = query.eq('expense_category', category);
+    let expenses = [];
+    if (query) {
+      const { data, error } = await query;
+      if (error) throw error;
+      expenses = data || [];
     }
 
-    // Note: payment_method filtering done client-side after fetch (see below)
-
-    if (start_date) {
-      query = query.gte('transaction_date', start_date);
-    }
-
-    if (end_date) {
-      query = query.lte('transaction_date', end_date);
-    }
-
-    if (min_amount) {
-      query = query.gte('total_amount', parseFloat(min_amount));
-    }
-
-    if (max_amount) {
-      query = query.lte('total_amount', parseFloat(max_amount));
-    }
-
-    const { data: expenses, error } = await query;
-
-    if (error) throw error;
-
-    // Filter by payment method client-side if specified
-    let filteredExpenses = expenses || [];
-    if (payment_method && filteredExpenses.length > 0) {
-      filteredExpenses = filteredExpenses.filter(expense =>
-        expense.payment?.payment_method === payment_method
-      );
-    }
+    const filteredExpenses = expenses;
 
     // Create Excel workbook
     const ExcelJS = require('exceljs');
@@ -630,7 +710,7 @@ router.get('/export',
     logger.info('Expenses exported', {
       user_id: req.user?.id,
       record_count: filteredExpenses.length,
-      filters: { search, category, payment_method, start_date, end_date }
+      filters: { search: normalizeString(search), category: normalizeString(category), payment_method: normalizedPaymentMethod, start_date, end_date }
     });
 
     res.end();

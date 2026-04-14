@@ -34,6 +34,12 @@ const {
     fetchImageFromUrl,
 } = require('./utils/imageProcessingHttp');
 const ImageProcessingWrapper = require('./services/ImageProcessingWrapper');
+const {
+    parsePageLimit,
+    parseOffsetLimit,
+    buildPagePagination,
+    buildOffsetPagination
+} = require('./utils/pagination');
 
 const app = express();
 const port = process.env.PORT || 3001;
@@ -885,8 +891,12 @@ app.delete('/api/admin/products/:id', authenticateAdmin, asyncHandler(async (req
 
 // Admin Order Management
 app.get('/api/admin/orders', authenticateAdmin, asyncHandler(async (req, res) => {
-    const { status, page = 1, limit = 20 } = req.query;
-    const offset = (page - 1) * limit;
+    const { status } = req.query;
+    const { page, limit, offset } = parsePageLimit(req.query, {
+        defaultLimit: 20,
+        minLimit: 1,
+        maxLimit: 100
+    });
 
     let query = supabase
         .from('orders')
@@ -898,7 +908,7 @@ app.get('/api/admin/orders', authenticateAdmin, asyncHandler(async (req, res) =>
                 products (name, price),
                 product_variants (variant_name, size_value, size_unit)
             )
-        `)
+        `, { count: 'exact' })
         .order('created_at', { ascending: false })
         .range(offset, offset + limit - 1);
 
@@ -910,19 +920,33 @@ app.get('/api/admin/orders', authenticateAdmin, asyncHandler(async (req, res) =>
         }
     }
 
-    const { data, error } = await query;
+    const { data, error, count } = await query;
 
     if (error) throw error;
+
+    const pagination = buildPagePagination({
+        total: count || 0,
+        page,
+        limit
+    });
 
     logger.info('Orders retrieved successfully', {
         userId: req.user?.id,
         status,
-        page,
-        limit,
-        resultCount: data?.length
+        page: pagination.page,
+        limit: pagination.limit,
+        resultCount: data?.length,
+        totalCount: pagination.total
     });
 
-    res.json(data);
+    res.json({
+        orders: data || [],
+        pagination,
+        total: pagination.total,
+        page: pagination.page,
+        limit: pagination.limit,
+        totalPages: pagination.totalPages
+    });
 }));
 
 // Check shipment readiness before creating shipment
@@ -3121,24 +3145,33 @@ app.post('/api/admin/products/:id/wholesale-prices', authenticateAdmin, async (r
 });
 
 app.get('/api/admin/logs', roleMiddleware.requireAdminRole, asyncHandler(async (req, res) => {
-    const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
-    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 25, 1), 100);
-    const start = (page - 1) * limit;
-    const end = start + limit - 1;
+    const { page, limit, offset } = parsePageLimit(req.query, {
+        defaultLimit: 25,
+        minLimit: 1,
+        maxLimit: 100
+    });
 
     const { data, error, count } = await supabase
         .from('admin_logs')
         .select('*, admin:admin_id(id, email, name)', { count: 'exact' })
         .order('created_at', { ascending: false })
-        .range(start, end);
+        .range(offset, offset + limit - 1);
 
     if (error) throw error;
 
-    res.json({
-        logs: data || [],
+    const pagination = buildPagePagination({
         total: count || 0,
         page,
         limit
+    });
+
+    res.json({
+        logs: data || [],
+        pagination,
+        total: pagination.total,
+        page: pagination.page,
+        limit: pagination.limit,
+        totalPages: pagination.totalPages
     });
 }));
 
@@ -4147,25 +4180,70 @@ app.get('/api/admin/storage/config', authenticateAdmin, async (req, res) => {
 
 // Get all employees
 app.get('/api/admin/employees', roleMiddleware.requirePermission(roleMiddleware.ADMIN_PERMISSIONS.VIEW_EMPLOYEES), asyncHandler(async (req, res) => {
-    const { data, error } = await supabase
+    const { search = '', role = '' } = req.query;
+    const { page, limit, offset } = parsePageLimit(req.query, {
+        defaultLimit: 25,
+        minLimit: 1,
+        maxLimit: 100
+    });
+
+    let query = supabase
         .from('employees')
-        .select('*')
-        .eq('is_active', true)
-        .order('name');
+        .select('*', { count: 'exact' })
+        .eq('is_active', true);
+
+    const normalizedSearch = typeof search === 'string' ? search.trim() : '';
+    const normalizedRole = typeof role === 'string' ? role.trim() : '';
+
+    if (normalizedSearch) {
+        query = query.or(`name.ilike.%${normalizedSearch}%,email.ilike.%${normalizedSearch}%,contact_number.ilike.%${normalizedSearch}%`);
+    }
+
+    if (normalizedRole) {
+        query = query.eq('role', normalizedRole);
+    }
+
+    query = query
+        .order('name')
+        .range(offset, offset + limit - 1);
+
+    const { data, error, count } = await query;
 
     if (error) {
         logger.error('Failed to fetch employees', error, {
-            adminId: req.user?.id
+            adminId: req.user?.id,
+            filters: {
+                search: normalizedSearch,
+                role: normalizedRole
+            },
+            page,
+            limit
         });
         throw error;
     }
+
+    const pagination = buildPagePagination({
+        total: count || 0,
+        page,
+        limit
+    });
     
     logger.info('Employees retrieved successfully', {
         adminId: req.user?.id,
-        employeeCount: data?.length || 0
+        employeeCount: data?.length || 0,
+        totalEmployees: pagination.total,
+        page: pagination.page,
+        limit: pagination.limit
     });
     
-    res.json(data);
+    res.json({
+        employees: data || [],
+        pagination,
+        total: pagination.total,
+        page: pagination.page,
+        limit: pagination.limit,
+        totalPages: pagination.totalPages
+    });
 }));
 
 // Create new employee
@@ -4290,14 +4368,18 @@ app.delete('/api/admin/employees/:id', roleMiddleware.requirePermission(roleMidd
 // Get all parties with advanced filtering
 app.get('/api/admin/parties', roleMiddleware.requirePermission(roleMiddleware.ADMIN_PERMISSIONS.VIEW_VENDORS), asyncHandler(async (req, res) => {
     const { 
-        page = 1, 
-        limit = 10, 
         search = '', 
         category = '', 
         party_type = 'vendor',
         gst_type = '',
         state = ''
     } = req.query;
+    const { page, limit, offset } = parsePageLimit(req.query, {
+        defaultLimit: 10,
+        minLimit: 1,
+        maxLimit: 200
+    });
+    const normalizedSearch = typeof search === 'string' ? search.trim() : '';
 
     // Build query for filtering
     let query = supabase
@@ -4305,8 +4387,8 @@ app.get('/api/admin/parties', roleMiddleware.requirePermission(roleMiddleware.AD
         .select('*', { count: 'exact' });
 
     // Apply filters
-    if (search) {
-        query = query.or(`name.ilike.%${search}%,contact_person.ilike.%${search}%,email.ilike.%${search}%,phone_number.ilike.%${search}%`);
+    if (normalizedSearch) {
+        query = query.or(`name.ilike.%${normalizedSearch}%,contact_person.ilike.%${normalizedSearch}%,email.ilike.%${normalizedSearch}%,phone_number.ilike.%${normalizedSearch}%`);
     }
     
     if (category) {
@@ -4328,49 +4410,59 @@ app.get('/api/admin/parties', roleMiddleware.requirePermission(roleMiddleware.AD
     query = query.eq('is_active', true);
 
     // Apply pagination and ordering
-    const offset = (parseInt(page) - 1) * parseInt(limit);
     query = query
         .order('name')
-        .range(offset, offset + parseInt(limit) - 1);
+        .range(offset, offset + limit - 1);
 
     const { data, error, count } = await query;
 
     if (error) {
         logger.error('Failed to fetch parties', error, {
             adminId: req.user?.id,
-            filters: { search, category, party_type, gst_type, state }
+            filters: { search: normalizedSearch, category, party_type, gst_type, state }
         });
         throw error;
     }
 
+    const pagination = buildPagePagination({
+        total: count || 0,
+        page,
+        limit
+    });
+
     logger.info('Parties retrieved successfully', {
         adminId: req.user?.id,
         partyCount: data?.length || 0,
-        totalCount: count,
-        page: parseInt(page),
-        filters: { search, category, party_type, gst_type, state }
+        totalCount: pagination.total,
+        page: pagination.page,
+        filters: { search: normalizedSearch, category, party_type, gst_type, state }
     });
 
     res.json({
-        parties: data,
-        total: count || 0,
-        page: parseInt(page),
-        limit: parseInt(limit),
-        totalPages: Math.ceil((count || 0) / parseInt(limit))
+        parties: data || [],
+        pagination,
+        total: pagination.total,
+        page: pagination.page,
+        limit: pagination.limit,
+        totalPages: pagination.totalPages
     });
 }));
 
 // Get archived parties with filtering (MUST be before /:id route)
 app.get('/api/admin/parties/archived', roleMiddleware.requirePermission(roleMiddleware.ADMIN_PERMISSIONS.VIEW_VENDORS), asyncHandler(async (req, res) => {
     const {
-        page = 1,
-        limit = 10,
         search = '',
         category = '',
         party_type = 'vendor',
         gst_type = '',
         state = ''
     } = req.query;
+    const { page, limit, offset } = parsePageLimit(req.query, {
+        defaultLimit: 10,
+        minLimit: 1,
+        maxLimit: 200
+    });
+    const normalizedSearch = typeof search === 'string' ? search.trim() : '';
 
     // Build query for filtering archived parties
     let query = supabase
@@ -4378,8 +4470,8 @@ app.get('/api/admin/parties/archived', roleMiddleware.requirePermission(roleMidd
         .select('*', { count: 'exact' });
 
     // Apply filters
-    if (search) {
-        query = query.or(`name.ilike.%${search}%,contact_person.ilike.%${search}%,email.ilike.%${search}%,phone_number.ilike.%${search}%`);
+    if (normalizedSearch) {
+        query = query.or(`name.ilike.%${normalizedSearch}%,contact_person.ilike.%${normalizedSearch}%,email.ilike.%${normalizedSearch}%,phone_number.ilike.%${normalizedSearch}%`);
     }
 
     if (category) {
@@ -4402,35 +4494,41 @@ app.get('/api/admin/parties/archived', roleMiddleware.requirePermission(roleMidd
     query = query.eq('is_active', false);
 
     // Apply pagination and ordering
-    const offset = (parseInt(page) - 1) * parseInt(limit);
     query = query
         .order('name')
-        .range(offset, offset + parseInt(limit) - 1);
+        .range(offset, offset + limit - 1);
 
     const { data, error, count } = await query;
 
     if (error) {
         logger.error('Failed to fetch archived parties', error, {
             adminId: req.user?.id,
-            filters: { search, category, party_type, gst_type, state }
+            filters: { search: normalizedSearch, category, party_type, gst_type, state }
         });
         throw error;
     }
 
+    const pagination = buildPagePagination({
+        total: count || 0,
+        page,
+        limit
+    });
+
     logger.info('Archived parties retrieved successfully', {
         adminId: req.user?.id,
         archivedPartyCount: data?.length || 0,
-        totalArchivedCount: count,
-        page: parseInt(page),
-        limit: parseInt(limit)
+        totalArchivedCount: pagination.total,
+        page: pagination.page,
+        limit: pagination.limit
     });
 
     res.json({
-        parties: data,
-        total: count || 0,
-        page: parseInt(page),
-        limit: parseInt(limit),
-        totalPages: Math.ceil((count || 0) / parseInt(limit))
+        parties: data || [],
+        pagination,
+        total: pagination.total,
+        page: pagination.page,
+        limit: pagination.limit,
+        totalPages: pagination.totalPages
     });
 }));
 
@@ -4742,14 +4840,18 @@ app.patch('/api/admin/parties/:id/archive', roleMiddleware.requirePermission(rol
 app.get('/api/admin/purchase-orders', roleMiddleware.requirePermission(roleMiddleware.ADMIN_PERMISSIONS.VIEW_VENDORS), async (req, res) => {
     try {
         const { 
-            page = 1, 
-            limit = 10, 
             search = '', 
             status = '', 
             party_id = '',
             start_date = '',
             end_date = ''
         } = req.query;
+        const { page, limit, offset } = parsePageLimit(req.query, {
+            defaultLimit: 10,
+            minLimit: 1,
+            maxLimit: 200
+        });
+        const normalizedSearch = typeof search === 'string' ? search.trim() : '';
 
         // Build query for filtering
         let query = supabase
@@ -4763,8 +4865,8 @@ app.get('/api/admin/purchase-orders', roleMiddleware.requirePermission(roleMiddl
             `, { count: 'exact' });
 
         // Apply filters
-        if (search) {
-            query = query.or(`po_number.ilike.%${search}%,notes.ilike.%${search}%`);
+        if (normalizedSearch) {
+            query = query.or(`po_number.ilike.%${normalizedSearch}%,notes.ilike.%${normalizedSearch}%`);
         }
         
         if (status) {
@@ -4784,22 +4886,28 @@ app.get('/api/admin/purchase-orders', roleMiddleware.requirePermission(roleMiddl
         }
 
         // Apply pagination and ordering
-        const offset = (parseInt(page) - 1) * parseInt(limit);
         query = query
             .order('order_date', { ascending: false })
             .order('created_at', { ascending: false })
-            .range(offset, offset + parseInt(limit) - 1);
+            .range(offset, offset + limit - 1);
 
         const { data, error, count } = await query;
 
         if (error) throw error;
 
-        res.json({
-            purchase_orders: data,
+        const pagination = buildPagePagination({
             total: count || 0,
-            page: parseInt(page),
-            limit: parseInt(limit),
-            totalPages: Math.ceil((count || 0) / parseInt(limit))
+            page,
+            limit
+        });
+
+        res.json({
+            purchase_orders: data || [],
+            pagination,
+            total: pagination.total,
+            page: pagination.page,
+            limit: pagination.limit,
+            totalPages: pagination.totalPages
         });
     } catch (error) {
         console.error('Error fetching purchase orders:', error);
@@ -5267,13 +5375,16 @@ app.get('/api/admin/purchase-orders/summary', roleMiddleware.requirePermission(r
 app.get('/api/admin/party-payments', roleMiddleware.requirePermission(roleMiddleware.ADMIN_PERMISSIONS.VIEW_VENDORS), async (req, res) => {
     try {
         const { 
-            page = 1, 
-            limit = 10, 
             party_id = '',
             payment_type = '',
             start_date = '',
             end_date = ''
         } = req.query;
+        const { page, limit, offset } = parsePageLimit(req.query, {
+            defaultLimit: 10,
+            minLimit: 1,
+            maxLimit: 200
+        });
 
         let query = supabase
             .from('party_payments')
@@ -5298,22 +5409,28 @@ app.get('/api/admin/party-payments', roleMiddleware.requirePermission(roleMiddle
             query = query.lte('payment_date', end_date);
         }
 
-        const offset = (parseInt(page) - 1) * parseInt(limit);
         query = query
             .order('payment_date', { ascending: false })
             .order('created_at', { ascending: false })
-            .range(offset, offset + parseInt(limit) - 1);
+            .range(offset, offset + limit - 1);
 
         const { data, error, count } = await query;
 
         if (error) throw error;
 
-        res.json({
-            payments: data,
+        const pagination = buildPagePagination({
             total: count || 0,
-            page: parseInt(page),
-            limit: parseInt(limit),
-            totalPages: Math.ceil((count || 0) / parseInt(limit))
+            page,
+            limit
+        });
+
+        res.json({
+            payments: data || [],
+            pagination,
+            total: pagination.total,
+            page: pagination.page,
+            limit: pagination.limit,
+            totalPages: pagination.totalPages
         });
     } catch (error) {
         console.error('Error fetching party payments:', error);
@@ -5584,13 +5701,18 @@ app.get('/api/admin/transaction-types/:id/form-schema', authenticateAdmin, async
 // Get inventory movements/history for a product
 app.get('/api/admin/inventory/movements', roleMiddleware.requirePermission(roleMiddleware.ADMIN_PERMISSIONS.VIEW_INVENTORY), async (req, res) => {
     try {
-        const { product_id, limit = 50, offset = 0 } = req.query;
+        const { product_id } = req.query;
+        const { offset, limit } = parseOffsetLimit(req.query, {
+            defaultLimit: 50,
+            minLimit: 1,
+            maxLimit: 200
+        });
 
         if (!product_id) {
             return res.status(400).json({ error: 'product_id is required' });
         }
 
-        const { data, error } = await supabase
+        const { data, error, count } = await supabase
             .from('stock_movements')
             .select(`
                 *,
@@ -5599,14 +5721,23 @@ app.get('/api/admin/inventory/movements', roleMiddleware.requirePermission(roleM
                 party:parties!fk_stock_movements_party_id(name),
                 purchase_order:purchase_orders!fk_stock_movements_purchase_order(po_number),
                 purchase_order_items!fk_stock_movements_purchase_order_item_id(item_name, quantity as po_quantity)
-            `)
+            `, { count: 'exact' })
             .eq('product_id', product_id)
             .order('created_at', { ascending: false })
-            .range(parseInt(offset), parseInt(offset) + parseInt(limit) - 1);
+            .range(offset, offset + limit - 1);
 
         if (error) throw error;
 
-        res.json({ movements: data || [] });
+        const pagination = buildOffsetPagination({
+            total: count || 0,
+            offset,
+            limit
+        });
+
+        res.json({
+            movements: data || [],
+            pagination
+        });
     } catch (error) {
         console.error('Error fetching inventory movements:', error);
         res.status(500).json({ error: error.message });
@@ -5617,55 +5748,98 @@ app.get('/api/admin/inventory/movements', roleMiddleware.requirePermission(roleM
 app.get('/api/admin/products/:productId/purchase-orders', roleMiddleware.requirePermission(roleMiddleware.ADMIN_PERMISSIONS.VIEW_INVENTORY), async (req, res) => {
     try {
         const { productId } = req.params;
-        const { status = '', limit = 50 } = req.query;
+        const { status = '' } = req.query;
+        const { page, limit, offset } = parsePageLimit(req.query, {
+            defaultLimit: 50,
+            minLimit: 1,
+            maxLimit: 200
+        });
 
-        let query = supabase
+        const normalizedStatus = typeof status === 'string' ? status.trim() : '';
+
+        const { data: references, error: referenceError } = await supabase
             .from('purchase_order_items')
-            .select(`
-                *,
-                purchase_order:purchase_order_id(
-                    id, po_number, order_date, status, final_amount,
-                    party:party_id(name, contact_person)
-                )
-            `)
+            .select('purchase_order_id, created_at')
             .eq('product_id', productId)
-            .order('created_at', { ascending: false })
-            .limit(parseInt(limit));
+            .order('created_at', { ascending: false });
 
-        if (status) {
-            query = query.eq('purchase_order.status', status);
+        if (referenceError) throw referenceError;
+
+        const orderedUniqueIds = [];
+        const seenIds = new Set();
+        for (const row of references || []) {
+            const purchaseOrderId = row.purchase_order_id;
+            if (!purchaseOrderId || seenIds.has(purchaseOrderId)) {
+                continue;
+            }
+            seenIds.add(purchaseOrderId);
+            orderedUniqueIds.push(purchaseOrderId);
         }
 
-        const { data, error } = await query;
+        let filteredIds = orderedUniqueIds;
+        if (normalizedStatus && orderedUniqueIds.length > 0) {
+            const { data: statusRows, error: statusError } = await supabase
+                .from('purchase_orders')
+                .select('id')
+                .in('id', orderedUniqueIds)
+                .eq('status', normalizedStatus);
+
+            if (statusError) throw statusError;
+
+            const allowedIds = new Set((statusRows || []).map((row) => row.id));
+            filteredIds = orderedUniqueIds.filter((id) => allowedIds.has(id));
+        }
+
+        const totalCount = filteredIds.length;
+        const pageIds = filteredIds.slice(offset, offset + limit);
+        const pagination = buildPagePagination({
+            total: totalCount,
+            page,
+            limit
+        });
+
+        if (pageIds.length === 0) {
+            return res.json({
+                purchase_orders: [],
+                total_pos: totalCount,
+                pagination,
+                total: pagination.total,
+                page: pagination.page,
+                limit: pagination.limit,
+                totalPages: pagination.totalPages
+            });
+        }
+
+        const { data: purchaseOrders, error } = await supabase
+            .from('purchase_orders')
+            .select(`
+                id, po_number, order_date, status, final_amount,
+                party:party_id(name, contact_person),
+                items:purchase_order_items(
+                    id, product_id, item_name, quantity, received_quantity, pending_quantity,
+                    is_fully_received, price_per_unit, total_amount, unit
+                )
+            `)
+            .in('id', pageIds);
 
         if (error) throw error;
 
-        // Format the response to group by purchase order
-        const purchaseOrders = {};
-        data?.forEach(item => {
-            const poId = item.purchase_order.id;
-            if (!purchaseOrders[poId]) {
-                purchaseOrders[poId] = {
-                    ...item.purchase_order,
-                    items: []
-                };
-            }
-            purchaseOrders[poId].items.push({
-                id: item.id,
-                item_name: item.item_name,
-                quantity: item.quantity,
-                received_quantity: item.received_quantity,
-                pending_quantity: item.pending_quantity,
-                is_fully_received: item.is_fully_received,
-                price_per_unit: item.price_per_unit,
-                total_amount: item.total_amount,
-                unit: item.unit
-            });
-        });
+        const orderIndex = new Map(pageIds.map((id, index) => [id, index]));
+        const sortedOrders = (purchaseOrders || [])
+            .map((purchaseOrder) => ({
+                ...purchaseOrder,
+                items: (purchaseOrder.items || []).filter((item) => item.product_id === productId)
+            }))
+            .sort((left, right) => (orderIndex.get(left.id) || 0) - (orderIndex.get(right.id) || 0));
 
         res.json({ 
-            purchase_orders: Object.values(purchaseOrders),
-            total_pos: Object.keys(purchaseOrders).length
+            purchase_orders: sortedOrders,
+            total_pos: pagination.total,
+            pagination,
+            total: pagination.total,
+            page: pagination.page,
+            limit: pagination.limit,
+            totalPages: pagination.totalPages
         });
     } catch (error) {
         console.error('Error fetching product purchase orders:', error);

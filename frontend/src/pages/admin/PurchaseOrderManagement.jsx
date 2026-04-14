@@ -14,6 +14,8 @@ import {
   XMarkIcon,
   AdjustmentsHorizontalIcon,
   CurrencyRupeeIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
 } from '@heroicons/react/24/outline';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
@@ -41,6 +43,7 @@ const PurchaseOrderManagement = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(ITEMS_PER_PAGE);
   const [totalPOs, setTotalPOs] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
   
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('');
@@ -99,8 +102,18 @@ const PurchaseOrderManagement = () => {
       if (!response.ok) throw new Error('Failed to fetch purchase orders');
 
       const data = await response.json();
-      setPurchaseOrders(data.purchase_orders || []);
-      setTotalPOs(data.total || 0);
+      const nextPurchaseOrders = Array.isArray(data.purchase_orders) ? data.purchase_orders : [];
+      const pagination = data.pagination;
+
+      if (!pagination || typeof pagination !== 'object') {
+        throw new Error('Invalid purchase orders response format');
+      }
+
+      setPurchaseOrders(nextPurchaseOrders);
+      setTotalPOs(Number(pagination.total) || 0);
+      setTotalPages(Math.max(1, Number(pagination.totalPages) || 1));
+      setCurrentPage(Number(pagination.page) || page);
+      setError(null);
     } catch (err) {
       setError(err.message);
       showError('Failed to load purchase orders');
@@ -112,17 +125,37 @@ const PurchaseOrderManagement = () => {
   const fetchParties = useCallback(async () => {
     try {
       const token = localStorage.getItem('authToken');
-      const response = await fetch(`${API_BASE_URL}/api/admin/parties?party_type=vendor&limit=1000`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
+      const nextParties = [];
+      let page = 1;
+
+      while (page <= 1000) {
+        const queryParams = new URLSearchParams({
+          party_type: 'vendor',
+          page: page.toString(),
+          limit: '200'
+        });
+        const response = await fetch(`${API_BASE_URL}/api/admin/parties?${queryParams}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (!response.ok) throw new Error('Failed to fetch parties');
+
+        const data = await response.json();
+        const pagedParties = Array.isArray(data.parties) ? data.parties : [];
+        const pagination = data.pagination;
+        if (!pagination || typeof pagination !== 'object') {
+          throw new Error('Invalid parties response format');
         }
-      });
 
-      if (!response.ok) throw new Error('Failed to fetch parties');
+        nextParties.push(...pagedParties);
+        if (!pagination.hasNextPage) break;
+        page += 1;
+      }
 
-      const data = await response.json();
-      setParties(data.parties || []);
+      setParties(nextParties);
     } catch (err) {
       console.error('Error fetching parties:', err);
     }
@@ -135,15 +168,31 @@ const PurchaseOrderManagement = () => {
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (currentPage === 1) {
-        fetchPurchaseOrders(1);
-      } else {
+      if (currentPage !== 1) {
         setCurrentPage(1);
+        return;
       }
+      fetchPurchaseOrders(1);
     }, 500);
 
     return () => clearTimeout(timer);
-  }, [currentPage, endDate, fetchPurchaseOrders, searchTerm, selectedParty, selectedStatus, startDate]);
+  }, [endDate, fetchPurchaseOrders, searchTerm, selectedParty, selectedStatus, startDate]);
+
+  const handlePageChange = (page) => {
+    if (page >= 1 && page <= totalPages) {
+      fetchPurchaseOrders(page);
+    }
+  };
+
+  const getPaginationPages = () => {
+    const pages = [];
+    const maxVisible = 5;
+    let start = Math.max(1, currentPage - Math.floor(maxVisible / 2));
+    let end = Math.min(totalPages, start + maxVisible - 1);
+    if (end - start + 1 < maxVisible) start = Math.max(1, end - maxVisible + 1);
+    for (let page = start; page <= end; page += 1) pages.push(page);
+    return pages;
+  };
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('en-IN', {
@@ -535,6 +584,31 @@ const PurchaseOrderManagement = () => {
               </div>
             )}
           </CardContent>
+          {purchaseOrders.length > 0 && totalPages > 1 && (
+            <div className="p-4 sm:p-6 border-t">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="text-sm text-muted-foreground">
+                  Page <span className="font-medium">{currentPage}</span> of <span className="font-medium">{totalPages}</span> • <span className="font-medium">{totalPOs}</span> total
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Button variant="outline" size="sm" onClick={() => handlePageChange(currentPage - 1)} disabled={currentPage === 1} className="h-8 w-8 p-0">
+                    <ChevronLeftIcon className="w-4 h-4" />
+                  </Button>
+                  <div className="hidden sm:flex items-center space-x-1">
+                    {getPaginationPages().map((page) => (
+                      <Button key={page} variant={currentPage === page ? 'default' : 'outline'} size="sm" onClick={() => handlePageChange(page)} className="h-8 w-8 p-0">
+                        {page}
+                      </Button>
+                    ))}
+                  </div>
+                  <div className="sm:hidden text-sm text-muted-foreground">Page {currentPage}</div>
+                  <Button variant="outline" size="sm" onClick={() => handlePageChange(currentPage + 1)} disabled={currentPage === totalPages} className="h-8 w-8 p-0">
+                    <ChevronRightIcon className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
         </Card>
 
         {/* Purchase Order Form Modal - Using Unified Component */}

@@ -84,7 +84,9 @@ const InventoryManagement = () => {
       if (!response.ok) throw new Error('Failed to fetch products');
 
       const data = await response.json();
-      setProducts(data.products || data || []);
+      const nextProducts = Array.isArray(data.products) ? data.products : [];
+      setProducts(nextProducts);
+      setError(null);
     } catch (err) {
       setError(err.message);
       showError('Failed to load products');
@@ -110,7 +112,8 @@ const InventoryManagement = () => {
       if (!response.ok) throw new Error('Failed to fetch stock movements');
 
       const data = await response.json();
-      setStockMovements(data.movements || data || []);
+      const nextMovements = Array.isArray(data.movements) ? data.movements : [];
+      setStockMovements(nextMovements);
     } catch (err) {
       showError('Failed to load stock movements');
     }
@@ -119,17 +122,36 @@ const InventoryManagement = () => {
   const fetchPurchaseOrders = async (productId) => {
     try {
       const token = localStorage.getItem('authToken');
-      const response = await fetch(`${API_BASE_URL}/api/admin/products/${productId}/purchase-orders`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
+      const aggregated = [];
+      let page = 1;
+
+      while (page <= 1000) {
+        const queryParams = new URLSearchParams({
+          page: page.toString(),
+          limit: '200'
+        });
+        const response = await fetch(`${API_BASE_URL}/api/admin/products/${productId}/purchase-orders?${queryParams}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (!response.ok) throw new Error('Failed to fetch purchase orders');
+
+        const data = await response.json();
+        const pageOrders = Array.isArray(data.purchase_orders) ? data.purchase_orders : [];
+        const pagination = data.pagination;
+        if (!pagination || typeof pagination !== 'object') {
+          throw new Error('Invalid purchase order response format');
         }
-      });
 
-      if (!response.ok) throw new Error('Failed to fetch purchase orders');
+        aggregated.push(...pageOrders);
+        if (!pagination.hasNextPage) break;
+        page += 1;
+      }
 
-      const data = await response.json();
-      setPurchaseOrders(data.purchase_orders || []);
+      setPurchaseOrders(aggregated);
     } catch (err) {
       showError('Failed to load purchase orders');
     }

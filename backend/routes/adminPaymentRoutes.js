@@ -3,6 +3,7 @@ const router = express.Router();
 const roleMiddleware = require('../middleware/roleMiddleware');
 const { extractAuthToken } = require('../middleware/authMiddleware');
 const { createBackendSupabaseClient } = require('../config/supabaseClient');
+const { parsePageLimit, buildPagePagination } = require('../utils/pagination');
 
 const attachScopedSupabase = (req, res, next) => {
   try {
@@ -41,8 +42,12 @@ router.use(roleMiddleware.authenticateAdmin, attachScopedSupabase);
  */
 router.get('/payments', async (req, res) => {
   try {
-    const { status, payment_method, page = 1, limit = 50 } = req.query;
-    const offset = (page - 1) * limit;
+    const { status, payment_method } = req.query;
+    const { page, limit, offset } = parsePageLimit(req.query, {
+      defaultLimit: 50,
+      minLimit: 1,
+      maxLimit: 200
+    });
 
     let query = req.supabase
       .from('payment_transactions')
@@ -62,7 +67,7 @@ router.get('/payments', async (req, res) => {
         )
       `, { count: 'exact' })
       .order('initiated_at', { ascending: false })
-      .range(offset, offset + parseInt(limit) - 1);
+      .range(offset, offset + limit - 1);
 
     // Apply filters
     if (status) {
@@ -79,15 +84,16 @@ router.get('/payments', async (req, res) => {
       return res.status(500).json({ success: false, error: 'Failed to fetch payments' });
     }
 
+    const pagination = buildPagePagination({
+      total: count || 0,
+      page,
+      limit
+    });
+
     res.json({
       success: true,
-      payments: data,
-      pagination: {
-        total: count,
-        page: parseInt(page),
-        limit: parseInt(limit),
-        totalPages: Math.ceil(count / limit)
-      }
+      payments: data || [],
+      pagination
     });
   } catch (error) {
     console.error('Admin payments error:', error);

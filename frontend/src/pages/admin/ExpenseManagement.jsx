@@ -32,6 +32,13 @@ import {
 // Import sub-components
 import ExpenseForm from './components/UnifiedExpenseForm';
 
+const unwrapSuccessData = (responsePayload, contextLabel) => {
+  if (!responsePayload || typeof responsePayload !== 'object' || responsePayload.success !== true || typeof responsePayload.data !== 'object' || responsePayload.data === null) {
+    throw new Error(`Invalid ${contextLabel} response format`);
+  }
+  return responsePayload.data;
+};
+
 const ExpenseManagement = () => {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
@@ -184,7 +191,7 @@ const ExpenseManagement = () => {
   const loadDependencies = useCallback(async () => {
     try {
       const response = await makeApiCall('/api/admin/expenses/dependencies');
-      const dependencyData = response.data || response;
+      const dependencyData = unwrapSuccessData(response, 'expense dependencies');
       setDependencies(dependencyData);
     } catch (error) {
       console.error('Failed to load dependencies:', error);
@@ -216,12 +223,16 @@ const ExpenseManagement = () => {
       console.log('Fetching expenses with params:', paramsString);
 
       const response = await makeApiCall(`/api/admin/expenses/history?${searchParams}`);
-      const expenseData = response.data || response;
-      
-      setExpenses(expenseData.expenses || []);
-      setTotalExpenses(expenseData.total || 0);
-      setTotalPages(Math.ceil((expenseData.total || 0) / ITEMS_PER_PAGE));
-      setCurrentPage(page);
+      const expenseData = unwrapSuccessData(response, 'expense history');
+      const pagination = expenseData.pagination;
+      if (!pagination || typeof pagination !== 'object') {
+        throw new Error('Invalid expense history pagination');
+      }
+
+      setExpenses(Array.isArray(expenseData.expenses) ? expenseData.expenses : []);
+      setTotalExpenses(Number(pagination.total) || 0);
+      setTotalPages(Math.max(1, Number(pagination.totalPages) || 1));
+      setCurrentPage(Number(pagination.page) || page);
     } catch (error) {
       showErrorToast('Failed to load expenses');
       console.error('Failed to fetch expenses:', error);
@@ -285,7 +296,7 @@ const ExpenseManagement = () => {
         body: JSON.stringify(formData)
       });
       
-      const validationResult = response.data || response;
+      const validationResult = unwrapSuccessData(response, 'expense validation');
       setValidationErrors(validationResult.errors || {});
       return validationResult.isValid;
     } catch (error) {
@@ -350,6 +361,7 @@ const ExpenseManagement = () => {
         method: 'POST',
         body: JSON.stringify(expenseForm)
       });
+      const submissionData = unwrapSuccessData(submissionResult, 'expense submission');
 
       // Reset form
       resetExpenseForm();
@@ -360,7 +372,7 @@ const ExpenseManagement = () => {
       // Switch to view
       setActiveTab('view');
 
-      showSuccessToast(`Expense created successfully! Reference: ${submissionResult.reference_number}`);
+      showSuccessToast(`Expense created successfully! Reference: ${submissionData.reference_number}`);
 
     } catch (error) {
       showErrorToast(error.message || 'Failed to create expense. Please try again.');
@@ -744,7 +756,7 @@ const ExpenseManagement = () => {
                     <div className="flex flex-wrap items-center gap-4">
                       <div className="flex items-center space-x-2">
                         <DocumentTextIcon className="w-4 h-4 text-blue-600" />
-                        <span className="text-muted-foreground">Total: <span className="font-semibold text-foreground">{formatMobileDayCurrency(totalExpenses)}</span></span>
+                        <span className="text-muted-foreground">Total records: <span className="font-semibold text-foreground">{totalExpenses}</span></span>
                       </div>
                       <div className="flex items-center space-x-2">
                         <ListBulletIcon className="w-4 h-4 text-green-600" />

@@ -10,6 +10,7 @@ const deliveryService = require('../services/delivery/DeliveryService');
 const deliverySettingsService = require('../services/delivery/DeliverySettingsService');
 const roleMiddleware = require('../middleware/roleMiddleware');
 const { createBackendSupabaseClient } = require('../config/supabaseClient');
+const { parsePageLimit, buildPagePagination } = require('../utils/pagination');
 
 // Initialize Supabase client
 const supabase = createBackendSupabaseClient({ preferServiceRole: true });
@@ -143,9 +144,12 @@ router.post('/schedule-pickup', async (req, res) => {
  */
 router.get('/shipments', async (req, res) => {
   try {
-    const { status, order_id, page = 1, limit = 50 } = req.query;
-    const parsedPage = Number.parseInt(page, 10) || 1;
-    const parsedLimit = Number.parseInt(limit, 10) || 50;
+    const { status, order_id } = req.query;
+    const { page, limit, offset } = parsePageLimit(req.query, {
+      defaultLimit: 50,
+      minLimit: 1,
+      maxLimit: 200
+    });
 
     let query = supabase
       .from('shipments')
@@ -158,9 +162,9 @@ router.get('/shipments', async (req, res) => {
           customer_email,
           shipping_address
         )
-      `)
+      `, { count: 'exact' })
       .order('created_at', { ascending: false })
-      .range((parsedPage - 1) * parsedLimit, parsedPage * parsedLimit - 1);
+      .range(offset, offset + limit - 1);
 
     if (status) {
       query = query.eq('status', status);
@@ -170,15 +174,24 @@ router.get('/shipments', async (req, res) => {
       query = query.eq('order_id', order_id);
     }
 
-    const { data: shipments, error } = await query;
+    const { data: shipments, error, count } = await query;
 
     if (error) throw error;
 
+    const pagination = buildPagePagination({
+      total: count || 0,
+      page,
+      limit
+    });
+
     res.json({
       success: true,
-      shipments,
-      page: parsedPage,
-      limit: parsedLimit
+      shipments: shipments || [],
+      pagination,
+      page: pagination.page,
+      limit: pagination.limit,
+      total: pagination.total,
+      totalPages: pagination.totalPages
     });
 
   } catch (error) {
