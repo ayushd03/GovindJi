@@ -298,8 +298,23 @@ const AddProductModal = ({
   const handleClose = () => { resetState(); onClose(); };
 
   const handleInputChange = (field, value) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
-    setFormErrors((prev) => ({ ...prev, [field]: undefined }));
+    setFormData((prev) => {
+      if (field === 'mrp') {
+        const sellingPriceIsEmpty = prev.price === '' || prev.price === null || prev.price === undefined;
+        return {
+          ...prev,
+          mrp: value,
+          price: sellingPriceIsEmpty ? value : prev.price,
+        };
+      }
+
+      return { ...prev, [field]: value };
+    });
+    setFormErrors((prev) => ({
+      ...prev,
+      [field]: undefined,
+      ...(field === 'mrp' || field === 'price' ? { mrp: undefined, price: undefined } : {}),
+    }));
   };
 
   const handleUnitSave = (unitData) => {
@@ -455,8 +470,11 @@ const AddProductModal = ({
     }
 
     if (!hasVariants && !formData.is_service) {
+      if (!Number.isFinite(mrp) || mrp <= 0) errors.mrp = 'Original MRP is required and must be > 0.';
       if (!Number.isFinite(price) || price <= 0) errors.price = 'Selling price must be > 0.';
-      if (Number.isFinite(mrp) && mrp > 0 && mrp < price) errors.mrp = 'MRP must be ≥ selling price.';
+      if (Number.isFinite(mrp) && mrp > 0 && Number.isFinite(price) && price > mrp) {
+        errors.price = 'Selling price cannot be greater than MRP.';
+      }
       if (!Number.isFinite(weight) || weight <= 0) errors.weight = 'Pack size must be > 0.';
       if (singleOptionNeedsManualWeight && (!Number.isFinite(manualWg) || manualWg <= 0))
         errors.weight_grams = 'Shipping weight required for this unit.';
@@ -754,16 +772,16 @@ const AddProductModal = ({
                   ) : (
                     <div>
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
+                        <FieldBlock label="Original MRP" required={!formData.is_service} error={formErrors.mrp}>
+                          <div className="relative">
+                            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">₹</span>
+                            <input type="number" step="0.01" min="0" value={formData.mrp} onChange={(e) => handleInputChange('mrp', e.target.value)} placeholder="0.00" className={`${fieldClass('mrp')} pl-6 text-[13px]`} />
+                          </div>
+                        </FieldBlock>
                         <FieldBlock label="Selling Price" required={!formData.is_service} error={formErrors.price}>
                           <div className="relative">
                             <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-medium">₹</span>
                             <input type="number" step="0.01" min="0" value={formData.price} onChange={(e) => handleInputChange('price', e.target.value)} placeholder="0.00" className={`${fieldClass('price')} pl-6 font-medium text-[13px]`} />
-                          </div>
-                        </FieldBlock>
-                        <FieldBlock label="Original MRP" error={formErrors.mrp}>
-                          <div className="relative">
-                            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">₹</span>
-                            <input type="number" step="0.01" min="0" value={formData.mrp} onChange={(e) => handleInputChange('mrp', e.target.value)} placeholder="0.00" className={`${fieldClass('mrp')} pl-6 text-[13px]`} />
                           </div>
                         </FieldBlock>
                         <FieldBlock label="Stock Qty" error={formErrors.stock_quantity}>

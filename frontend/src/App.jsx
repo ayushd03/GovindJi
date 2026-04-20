@@ -135,6 +135,27 @@ const AppContent = () => {
     };
   }, [isCartPopupOpen, closeCartPopup]);
 
+  // Improve number input editing: replace default 0 on first focus/type.
+  useEffect(() => {
+    const handleNumberInputFocus = (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLInputElement)) return;
+      if (target.type !== 'number') return;
+      if (target.disabled || target.readOnly) return;
+
+      const normalizedValue = target.value.trim();
+      const isZeroLike = normalizedValue !== '' && Number(normalizedValue) === 0;
+      if (!isZeroLike) return;
+
+      requestAnimationFrame(() => target.select());
+    };
+
+    document.addEventListener('focusin', handleNumberInputFocus);
+    return () => {
+      document.removeEventListener('focusin', handleNumberInputFocus);
+    };
+  }, []);
+
   return (
     <div className="App">
       <CartNotification />
