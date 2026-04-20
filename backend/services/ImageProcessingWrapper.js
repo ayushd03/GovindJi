@@ -1,6 +1,9 @@
 const sharp = require('sharp');
 const fs = require('fs').promises;
 
+const MAX_INPUT_PIXELS = Number.parseInt(process.env.MAX_IMAGE_INPUT_PIXELS || '60000000', 10);
+sharp.cache(false);
+
 class ImageProcessingWrapper {
   /**
    * Process an image using Sharp
@@ -15,22 +18,21 @@ class ImageProcessingWrapper {
     try {
       const processedSettings = this.validateSettings(settings);
 
-      let inputBuffer;
       let originalSize;
+      let originalMeta;
 
       if (Buffer.isBuffer(input)) {
-        inputBuffer = input;
         originalSize = input.length;
       } else {
-        inputBuffer = await fs.readFile(input);
-        originalSize = inputBuffer.length;
+        const stat = await fs.stat(input);
+        originalSize = stat.size;
         if (typeof input === 'string' && input.includes('temp_')) {
           tempFilePath = input;
         }
       }
 
       if (processedSettings.mode === 'auto') {
-        const autoResult = await this.processToTargetSize(inputBuffer, processedSettings);
+        const autoResult = await this.processToTargetSize(input, processedSettings);
         if (tempFilePath) {
           try {
             await fs.unlink(tempFilePath);
@@ -56,15 +58,15 @@ class ImageProcessingWrapper {
         };
       }
 
-      const originalMeta = await sharp(inputBuffer).metadata();
+      const originalSharp = this._createSharp(input);
+      originalMeta = await originalSharp.metadata();
 
-      let workBuffer = Buffer.from(inputBuffer);
+      let orientedMeta = originalMeta;
+      let pipeline = this._createSharp(input);
       if (processedSettings.optimization.autoOrient) {
-        workBuffer = await sharp(workBuffer).rotate().toBuffer();
+        pipeline = pipeline.rotate();
+        orientedMeta = await pipeline.clone().metadata();
       }
-
-      const orientedMeta = await sharp(workBuffer).metadata();
-      let pipeline = sharp(workBuffer);
 
       const resizeOnce = this._computeManualResize(processedSettings, orientedMeta);
       if (resizeOnce) {
@@ -93,7 +95,7 @@ class ImageProcessingWrapper {
       );
 
       const processedBuffer = await pipeline.toBuffer();
-      const finalMeta = await sharp(processedBuffer).metadata();
+      const finalMeta = await this._createSharp(processedBuffer).metadata();
 
       if (!outputFilename) {
         const extension = outputFormat === 'jpeg' || outputFormat === 'jpg' ? 'jpg' : outputFormat;
@@ -378,15 +380,27 @@ class ImageProcessingWrapper {
       const targetSize = processedSettings.targetFileSize || 150 * 1024;
       const overshoot = 1.03;
 
-      let buffer = Buffer.isBuffer(input) ? Buffer.from(input) : await fs.readFile(input);
-      const originalSize = buffer.length;
-      const metaUpload = await sharp(buffer).metadata();
+      let buffer;
+      let originalSize;
+      let metaUpload;
 
-      if (processedSettings.optimization.autoOrient) {
-        buffer = await sharp(buffer).rotate().toBuffer();
+      if (Buffer.isBuffer(input)) {
+        buffer = input;
+        originalSize = input.length;
+        metaUpload = await this._createSharp(input).metadata();
+      } else {
+        const stat = await fs.stat(input);
+        originalSize = stat.size;
+        metaUpload = await this._createSharp(input).metadata();
       }
 
-      let meta = await sharp(buffer).metadata();
+      if (processedSettings.optimization.autoOrient) {
+        buffer = await this._createSharp(input).rotate().toBuffer();
+      } else if (!Buffer.isBuffer(input)) {
+        buffer = await fs.readFile(input);
+      }
+
+      let meta = await this._createSharp(buffer).metadata();
 
       const maxInitialEdge = 3200;
       if (
@@ -394,14 +408,14 @@ class ImageProcessingWrapper {
         meta.height &&
         (meta.width > maxInitialEdge || meta.height > maxInitialEdge)
       ) {
-        buffer = await sharp(buffer)
+        buffer = await this._createSharp(buffer)
           .resize(maxInitialEdge, maxInitialEdge, { fit: 'inside', withoutEnlargement: true })
           .toBuffer();
-        meta = await sharp(buffer).metadata();
+        meta = await this._createSharp(buffer).metadata();
       }
 
       const encodeWebp = (buf, quality) => {
-        let p = sharp(buf).webp({ quality, effort: 6, smartSubsample: true });
+        let p = this._createSharp(buf).webp({ quality, effort: 6, smartSubsample: true });
         if (processedSettings.optimization.removeMetadata === false) {
           p = p.withMetadata();
         }
@@ -437,19 +451,19 @@ class ImageProcessingWrapper {
 
       while (outputBuffer.length > targetSize * overshoot && guard < 14) {
         guard += 1;
-        const m = await sharp(buffer).metadata();
+        const m = await this._createSharp(buffer).metadata();
         const w = m.width || 800;
         const h = m.height || 800;
         const scale = Math.sqrt((targetSize * 0.92) / outputBuffer.length);
         const newW = Math.max(minEdge, Math.floor(w * scale));
         const newH = Math.max(minEdge, Math.floor(h * scale));
-        buffer = await sharp(buffer)
+        buffer = await this._createSharp(buffer)
           .resize(newW, newH, { fit: 'inside', withoutEnlargement: true })
           .toBuffer();
         ({ buf: outputBuffer } = await bestQualityUnderTarget(buffer));
       }
 
-      const finalMeta = await sharp(outputBuffer).metadata();
+      const finalMeta = await this._createSharp(outputBuffer).metadata();
       const name = `processed_${Date.now()}.webp`;
 
       processedSettings.format.outputFormat = 'webp';
@@ -477,6 +491,13 @@ class ImageProcessingWrapper {
         error: error.message,
       };
     }
+  }
+
+  _createSharp(input) {
+    return sharp(input, {
+      sequentialRead: true,
+      limitInputPixels: Number.isFinite(MAX_INPUT_PIXELS) ? MAX_INPUT_PIXELS : undefined,
+    });
   }
 }
 

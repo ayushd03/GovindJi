@@ -129,6 +129,13 @@ const errorHandler = (error, req, res, next) => {
     } else if (error.name === 'TokenExpiredError') {
         statusCode = 401;
         error.message = 'Token expired';
+    } else if (error.name === 'MulterError') {
+        if (error.code === 'LIMIT_FILE_SIZE') {
+            statusCode = 413;
+            error.message = 'Uploaded image is too large';
+        } else {
+            statusCode = 400;
+        }
     } else if (error.code === 11000) {
         statusCode = 400;
         error.message = 'Duplicate field value';

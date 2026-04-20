@@ -43,6 +43,18 @@ const {
 
 const app = express();
 const port = process.env.PORT || 3001;
+const parsedMaxImageUploadBytes = Number.parseInt(
+    process.env.MAX_IMAGE_UPLOAD_BYTES || `${30 * 1024 * 1024}`,
+    10
+);
+const MAX_IMAGE_UPLOAD_BYTES = Number.isFinite(parsedMaxImageUploadBytes) && parsedMaxImageUploadBytes > 0
+    ? parsedMaxImageUploadBytes
+    : 30 * 1024 * 1024;
+const uploadTempDir = path.join(__dirname, 'uploads', 'tmp');
+
+if (!fs.existsSync(uploadTempDir)) {
+    fs.mkdirSync(uploadTempDir, { recursive: true });
+}
 
 // Initialize Supabase client
 const supabase = createBackendSupabaseClient();
@@ -313,11 +325,47 @@ try {
     logger.warn('⚠️  Delivery service initialization failed - delivery features will be disabled', error.message);
 }
 
-// Configure multer for memory storage (for cloud upload)
+const cleanupUploadedTempFile = async (file) => {
+    if (!file?.path) {
+        return;
+    }
+
+    try {
+        await fs.promises.unlink(file.path);
+    } catch (error) {
+        if (error?.code !== 'ENOENT') {
+            logger.warn('Failed to clean up temporary upload file', {
+                path: file.path,
+                error: error.message
+            });
+        }
+    }
+};
+
+const readUploadedFile = async (file) => {
+    if (!file?.path) {
+        throw new Error('Uploaded file path is missing');
+    }
+
+    return fs.promises.readFile(file.path);
+};
+
+const isFatalImageProcessingError = (message = '') => {
+    const normalized = String(message).toLowerCase();
+    return normalized.includes('pixel limit');
+};
+
+// Configure multer for disk storage to avoid keeping large uploads in RAM
 const upload = multer({
-    storage: multer.memoryStorage(),
+    storage: multer.diskStorage({
+        destination: (req, file, cb) => cb(null, uploadTempDir),
+        filename: (req, file, cb) => {
+            const ext = path.extname(file.originalname || '');
+            cb(null, `upload_${Date.now()}_${uuidv4()}${ext}`);
+        }
+    }),
     limits: {
-        fileSize: Infinity // No file size limit
+        fileSize: MAX_IMAGE_UPLOAD_BYTES
     },
     fileFilter: function (req, file, cb) {
         // Check file type
@@ -1416,6 +1464,7 @@ app.post('/api/admin/products/:id/images/upload', authenticateAdmin, upload.sing
     if (!req.file) {
         return res.status(400).json({ error: 'No image file provided' });
     }
+    try {
         // Get the highest sort_order for this product
         const { data: existingImages, error: sortError } = await supabase
             .from('product_images')
@@ -1437,7 +1486,7 @@ app.post('/api/admin/products/:id/images/upload', authenticateAdmin, upload.sing
         }
         
         // Process image before upload
-        let processedBuffer = req.file.buffer;
+        let processedBuffer;
         let processedMimeType = req.file.mimetype;
         let processedFilename = req.file.originalname;
 
@@ -1448,7 +1497,7 @@ app.post('/api/admin/products/:id/images/upload', authenticateAdmin, upload.sing
 
             // Process image using Sharp
             const processResult = await imageProcessor.processImage(
-                req.file.buffer,
+                req.file.path,
                 processingSettings
             );
             
@@ -1473,20 +1522,26 @@ app.post('/api/admin/products/:id/images/upload', authenticateAdmin, upload.sing
                     compressionRatio: processResult.compression_ratio
                 });
             } else {
+                if (isFatalImageProcessingError(processResult.error)) {
+                    return res.status(413).json({ error: processResult.error });
+                }
                 logger.warn('Image processing failed, using original', {
                     userId: req.user?.id,
                     productId: id,
                     error: processResult.error
                 });
-                // Continue with original file if processing fails
+                processedBuffer = await readUploadedFile(req.file);
             }
         } catch (processingError) {
+            if (isFatalImageProcessingError(processingError.message)) {
+                return res.status(413).json({ error: processingError.message });
+            }
             logger.warn('Image processing error, using original', {
                 userId: req.user?.id,
                 productId: id,
                 error: processingError.message
             });
-            // Continue with original file if processing fails
+            processedBuffer = await readUploadedFile(req.file);
         }
 
         // Upload to cloud storage (now with processed image)
@@ -1561,6 +1616,9 @@ app.post('/api/admin/products/:id/images/upload', authenticateAdmin, upload.sing
         });
         
         res.status(201).json(data);
+    } finally {
+        await cleanupUploadedTempFile(req.file);
+    }
 }));
 
 // Add image by URL for a product (download, optional processing, host like file uploads)
@@ -2107,7 +2165,7 @@ app.post('/api/admin/categories/:id/images', authenticateAdmin, upload.single('i
         }
         
         // Process image before upload
-        let processedBuffer = req.file.buffer;
+        let processedBuffer;
         let processedMimeType = req.file.mimetype;
         let processedFilename = req.file.originalname;
         
@@ -2118,7 +2176,7 @@ app.post('/api/admin/categories/:id/images', authenticateAdmin, upload.single('i
 
             // Process category image using Sharp
             const processResult = await imageProcessor.processImage(
-                req.file.buffer,
+                req.file.path,
                 processingSettings
             );
             
@@ -2137,12 +2195,18 @@ app.post('/api/admin/categories/:id/images', authenticateAdmin, upload.single('i
                 
                 console.log(`Category image processed: ${processResult.original.file_size} -> ${processResult.processed.file_size} bytes (${processResult.compression_ratio}% reduction)`)
             } else {
+                if (isFatalImageProcessingError(processResult.error)) {
+                    return res.status(413).json({ error: processResult.error });
+                }
                 console.warn('Category image processing failed, using original:', processResult.error);
-                // Continue with original file if processing fails
+                processedBuffer = await readUploadedFile(req.file);
             }
         } catch (processingError) {
+            if (isFatalImageProcessingError(processingError.message)) {
+                return res.status(413).json({ error: processingError.message });
+            }
             console.warn('Category image processing error, using original:', processingError.message);
-            // Continue with original file if processing fails
+            processedBuffer = await readUploadedFile(req.file);
         }
         
         // Upload to cloud storage (now with processed image)
@@ -2194,6 +2258,8 @@ app.post('/api/admin/categories/:id/images', authenticateAdmin, upload.single('i
     } catch (error) {
         console.error('Category image upload error:', error);
         res.status(500).json({ error: error.message });
+    } finally {
+        await cleanupUploadedTempFile(req.file);
     }
 });
 
