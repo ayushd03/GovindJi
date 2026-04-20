@@ -60,9 +60,8 @@ const CategoryManagement = () => {
     fetchCategories();
   }, []);
 
-  const handleCategoryImageFiles = useCallback((files, settings) => {
+  const handleCategoryImageFiles = useCallback((files) => {
     setImageFiles(files);
-    setImageProcessingSettings(settings);
   }, []);
 
   const fetchCategories = async () => {
@@ -358,7 +357,8 @@ const CategoryManagement = () => {
                   <div>
                     <label className="admin-dialog-label">Category Images</label>
                     <ImageUploadManager
-                      onFilesSelected={handleCategoryImageFiles}
+                      onSelectionChange={handleCategoryImageFiles}
+                      onSettingsChange={setImageProcessingSettings}
                       onUrlSubmit={(urlData) => { setUrlImages(prev => [...prev, urlData]); }}
                       multiple={true}
                       maxFiles={5}

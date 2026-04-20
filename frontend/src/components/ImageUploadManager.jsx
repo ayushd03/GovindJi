@@ -4,6 +4,8 @@ import './ImageUploadManager.css';
 
 const ImageUploadManager = ({
   onFilesSelected,
+  onSelectionChange,
+  onSettingsChange,
   onUrlSubmit,
   multiple = true,
   maxFiles = 10,
@@ -57,11 +59,15 @@ const ImageUploadManager = ({
 
   const onFilesSelectedRef = useRef(onFilesSelected);
   onFilesSelectedRef.current = onFilesSelected;
+  const onSelectionChangeRef = useRef(onSelectionChange);
+  onSelectionChangeRef.current = onSelectionChange;
+  const onSettingsChangeRef = useRef(onSettingsChange);
+  onSettingsChangeRef.current = onSettingsChange;
 
   useEffect(() => {
-    if (!onFilesSelectedRef.current) return;
-    onFilesSelectedRef.current(selectedFiles, settings);
-  }, [settings, selectedFiles]);
+    if (!onSettingsChangeRef.current) return;
+    onSettingsChangeRef.current(settings);
+  }, [settings]);
 
   const handleDrag = (e) => {
     e.preventDefault();
@@ -127,8 +133,12 @@ const ImageUploadManager = ({
 
     if (validFiles.length > 0) {
       setSelectedFiles(validFiles);
-      // Pass files and settings to parent
-      onFilesSelected && onFilesSelected(validFiles, settings);
+      if (onFilesSelectedRef.current) {
+        onFilesSelectedRef.current(validFiles, settings);
+      }
+      if (onSelectionChangeRef.current) {
+        onSelectionChangeRef.current(validFiles, settings);
+      }
     }
   };
 
@@ -150,7 +160,13 @@ const ImageUploadManager = ({
   };
 
   const removeFile = (index) => {
-    setSelectedFiles((prev) => prev.filter((_, i) => i !== index));
+    setSelectedFiles((prev) => {
+      const nextFiles = prev.filter((_, i) => i !== index);
+      if (onSelectionChangeRef.current) {
+        onSelectionChangeRef.current(nextFiles, settings);
+      }
+      return nextFiles;
+    });
   };
 
   const updateSetting = (path, value) => {
