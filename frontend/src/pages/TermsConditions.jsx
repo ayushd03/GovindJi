@@ -23,7 +23,7 @@ const TermsConditions = () => {
               This document is published in accordance with the provisions of Rule 3 (1) of the Information Technology (Intermediaries guidelines) Rules, 2011 that require publishing the rules and regulations, privacy policy and Terms of Use for access or usage of domain name ('Website'), including the related mobile site and mobile application http://govindjidryfruits.com/ (hereinafter referred to as 'Platform').
             </p>
             <p>
-              The Platform is owned by <strong>Rameshchand Govinddas</strong>, a company incorporated under the Companies Act, 1956 with its registered office at 3, Marothia Bazar, Indore, Madhya Pradesh, India (hereinafter referred to as 'Platform Owner', 'we', 'us', 'our').
+              The Platform is owned by <strong>AARYASH AND COMPANY</strong>, a company incorporated under the Companies Act, 1956 with its registered office at 3, Marothia Bazar, Indore, Madhya Pradesh, India (hereinafter referred to as 'Platform Owner', 'we', 'us', 'our').
             </p>
           </section>
 

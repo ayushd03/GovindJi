@@ -33,7 +33,7 @@ const ShippingReturns = () => {
               Cancellations will only be considered if the request is made within <strong>2 days</strong> of placing the order. However, cancellation requests may not be entertained if the orders have been communicated to such sellers/merchant(s) listed on the Platform and they have initiated the process of shipping them, or the product is out for delivery. In such an event, you may choose to reject the product at the doorstep.
             </p>
             <p>
-              Rameshchand Govinddas does not accept cancellation requests for perishable items like eatables, etc. However, a replacement can be made if the user establishes that the quality of the product delivered is not good.
+              AARYASH AND COMPANY does not accept cancellation requests for perishable items like eatables, etc. However, a replacement can be made if the user establishes that the quality of the product delivered is not good.
             </p>
           </section>
 

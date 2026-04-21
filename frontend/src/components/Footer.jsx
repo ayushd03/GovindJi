@@ -189,7 +189,7 @@ const Footer = () => {
         <div className="page-container flex flex-col gap-6 py-6 sm:flex-row sm:items-center sm:justify-between">
           <div className="space-y-1 text-sm text-white/50">
             <p>&copy; {new Date().getFullYear()} GovindJi Dry Fruits. All rights reserved.</p>
-            <p className="text-xs">Owned & Operated by Rameshchand Govinddas</p>
+            <p className="text-xs">Owned & Operated by AARYASH AND COMPANY</p>
           </div>
           
           {/* Mock Payment Icons */}

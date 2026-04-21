@@ -17,7 +17,7 @@ const PrivacyPolicy = () => {
           <section className="space-y-4">
             <h2 className="text-2xl font-semibold">1. Introduction</h2>
             <p>
-              This Privacy Policy describes how <strong>Rameshchand Govinddas</strong> and its affiliates (collectively "Rameshchand Govinddas, we, our, us") collect, use, share, protect or otherwise process your information/personal data through our website <a href="http://govindjidryfruits.com/" className="text-primary hover:underline">http://govindjidryfruits.com/</a> (hereinafter referred to as Platform).
+              This Privacy Policy describes how <strong>AARYASH AND COMPANY</strong> and its affiliates (collectively "AARYASH AND COMPANY, we, our, us") collect, use, share, protect or otherwise process your information/personal data through our website <a href="http://govindjidryfruits.com/" className="text-primary hover:underline">http://govindjidryfruits.com/</a> (hereinafter referred to as Platform).
             </p>
             <p>
               Please note that you may be able to browse certain sections of the Platform without registering with us. We do not offer any product/service under this Platform outside India and your personal data will primarily be stored and processed in India. By visiting this Platform, providing your information or availing any product/service offered on the Platform, you expressly agree to be bound by the terms and conditions of this Privacy Policy, the Terms of Use and the applicable service/product terms and conditions, and agree to be governed by the laws of India including but not limited to the laws applicable to data protection and privacy. If you do not agree please do not use or access our Platform.
@@ -33,7 +33,7 @@ const PrivacyPolicy = () => {
               Some of the sensitive personal data may be collected with your consent, such as your bank account or credit or debit card or other payment instrument information or biometric information such as your facial features or physiological information (in order to enable use of certain features when opted for, available on the Platform) etc. all of the above being in accordance with applicable law(s). You always have the option to not provide information, by choosing not to use a particular service or feature on the Platform.
             </p>
             <p>
-              We may track your behaviour, preferences, and other information that you choose to provide on our Platform. This information is compiled and analysed on an aggregated basis. If you receive an email, a call from a person/association claiming to be Rameshchand Govinddas seeking any personal data like debit/credit card PIN, net-banking or mobile banking password, we request you to never provide such information. If you have already revealed such information, report it immediately to an appropriate law enforcement agency.
+              We may track your behaviour, preferences, and other information that you choose to provide on our Platform. This information is compiled and analysed on an aggregated basis. If you receive an email, a call from a person/association claiming to be AARYASH AND COMPANY seeking any personal data like debit/credit card PIN, net-banking or mobile banking password, we request you to never provide such information. If you have already revealed such information, report it immediately to an appropriate law enforcement agency.
             </p>
           </section>
 
@@ -99,7 +99,7 @@ const PrivacyPolicy = () => {
             <p>If you have any questions or grievances regarding this privacy policy or your personal data, please contact our Grievance Officer:</p>
             <div className="space-y-2 ml-4">
               <p>Name of the Office: Grievance Officer</p>
-              <p>Company: Rameshchand Govinddas</p>
+              <p>Company: AARYASH AND COMPANY</p>
               <p>Email: <a href="mailto:info@govindji.com" className="text-primary hover:underline">info@govindji.com</a></p>
               <p>Phone: <a href="tel:+919340637575" className="text-primary hover:underline">+91 93406 37575</a> (Monday - Friday, 9:00 - 18:00)</p>
               <p>Address: 3, Marothia Bazar, Indore, Madhya Pradesh, India</p>
