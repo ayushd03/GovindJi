@@ -4,6 +4,8 @@ import {
   ArrowLeftIcon,
   ClockIcon,
   MapPinIcon,
+  MinusIcon,
+  PlusIcon,
   TruckIcon,
 } from '@heroicons/react/24/outline';
 import { useCart } from '../context/CartContext';
@@ -359,7 +361,6 @@ const ProductDetail = () => {
                       const optionClassName = [
                         'product-detail-variant-card',
                         isSelected ? 'product-detail-variant-card--selected' : '',
-                        variant.is_default ? 'product-detail-variant-card--default' : '',
                         isDisabled ? 'product-detail-variant-card--disabled' : '',
                       ].filter(Boolean).join(' ');
 
@@ -372,7 +373,12 @@ const ProductDetail = () => {
                           className={optionClassName}
                         >
                           <div className="product-detail-variant-top">
-                            <span className="product-detail-variant-name">{variant.variant_name}</span>
+                            <div className="product-detail-variant-heading">
+                              <span className="product-detail-variant-name">{variant.variant_name}</span>
+                              {variant.is_default && (
+                                <span className="product-detail-variant-default-badge">Default</span>
+                              )}
+                            </div>
                             <span className="product-detail-variant-price">₹{parseFloat(variant.price).toFixed(0)}</span>
                           </div>
                           <div className="product-detail-variant-meta">
@@ -399,40 +405,38 @@ const ProductDetail = () => {
 
               {!isOutOfStock && (
                 <section className="product-detail-block product-detail-block--purchase">
+                  <label htmlFor="quantity" className="product-detail-field-label">
+                    Quantity
+                  </label>
                   <div className="product-detail-purchase-row">
-                    <div className="product-detail-quantity-block">
-                      <label htmlFor="quantity" className="product-detail-field-label">
-                        Quantity
-                      </label>
-                      <div className="product-detail-quantity-controls">
-                        <button
-                          type="button"
-                          className="product-detail-quantity-button"
-                          onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                          disabled={quantity <= 1}
-                          aria-label="Decrease quantity"
-                        >
-                          -
-                        </button>
-                        <input
-                          id="quantity"
-                          type="number"
-                          min="1"
-                          max={Math.max(availableStock, 1)}
-                          value={quantity}
-                          onChange={(e) => setQuantity(clampQuantityToStock(e.target.value, availableStock))}
-                          className="product-detail-quantity-input"
-                        />
-                        <button
-                          type="button"
-                          className="product-detail-quantity-button"
-                          onClick={() => setQuantity(clampQuantityToStock(quantity + 1, availableStock))}
-                          disabled={!canPurchase || quantity >= availableStock}
-                          aria-label="Increase quantity"
-                        >
-                          +
-                        </button>
-                      </div>
+                    <div className="product-detail-quantity-controls">
+                      <button
+                        type="button"
+                        className="product-detail-quantity-button"
+                        onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                        disabled={quantity <= 1}
+                        aria-label="Decrease quantity"
+                      >
+                        <MinusIcon className="h-4 w-4 shrink-0" aria-hidden />
+                      </button>
+                      <input
+                        id="quantity"
+                        type="number"
+                        min="1"
+                        max={Math.max(availableStock, 1)}
+                        value={quantity}
+                        onChange={(e) => setQuantity(clampQuantityToStock(e.target.value, availableStock))}
+                        className="product-detail-quantity-input"
+                      />
+                      <button
+                        type="button"
+                        className="product-detail-quantity-button"
+                        onClick={() => setQuantity(clampQuantityToStock(quantity + 1, availableStock))}
+                        disabled={!canPurchase || quantity >= availableStock}
+                        aria-label="Increase quantity"
+                      >
+                        <PlusIcon className="h-4 w-4 shrink-0" aria-hidden />
+                      </button>
                     </div>
 
                     <div className="product-detail-action-row">

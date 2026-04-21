@@ -126,7 +126,7 @@ const ProductImageGallery = ({ productId, fallbackImageUrl = null }) => {
   const hasMultipleImages = images.length > 1;
 
   return (
-    <div className="product-gallery">
+    <div className={`product-gallery ${hasMultipleImages ? 'product-gallery--multi' : 'product-gallery--single'}`}>
       <div className="product-gallery__frame">
         <div className="product-gallery__body">
           {hasMultipleImages && (

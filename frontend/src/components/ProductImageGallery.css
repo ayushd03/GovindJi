@@ -161,12 +161,17 @@
 }
 
 @media (min-width: 1024px) {
-  .product-gallery__body {
+  /* Two columns only when thumbnails exist; a lone child would otherwise sit in the 90px track. */
+  .product-gallery--multi .product-gallery__body {
     grid-template-columns: 90px minmax(0, 1fr);
     align-items: start;
   }
 
-  .product-gallery__thumbs {
+  .product-gallery--single .product-gallery__body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .product-gallery--multi .product-gallery__thumbs {
     flex-direction: column;
     overflow-x: visible;
     overflow-y: auto;
@@ -174,7 +179,7 @@
     padding-bottom: 0;
   }
 
-  .product-gallery__thumb {
+  .product-gallery--multi .product-gallery__thumb {
     flex-basis: auto;
   }
 }
